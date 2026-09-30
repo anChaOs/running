@@ -1,5 +1,5 @@
 <layout>
-    <!-- 暖墨沙面板。各块相对原布局整体 1.2x，块内字仍按原相对位置排。字体由 gopro_dashboard_wrap 统一偏粗：Mac=Hiragino Sans GB W6（备选 PingFang SC Semibold），Linux 预览=Source Han Sans SC Heavy（CJK+Latin 同一面）。字色纯白，无描边。 -->
+    <!-- 暖墨沙面板。各块相对原布局整体 1.2x，块内字仍按原相对位置排。字体由 gopro_dashboard_wrap 统一偏粗：默认捆绑 Source Han Sans SC Heavy（Mac+Linux）；可用 HUD_FONT_PATH / --font 覆盖。字色纯白，无描边。 -->
 
     <!-- 左上路线，无底框。360px，线宽 10，3 倍超采样。loc-size 是当前位置圆半径（像素），画在缩小后的最终图上。 -->
     <translate x="40" y="40">

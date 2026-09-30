@@ -3,36 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HUD 设计稿</title>
+  <title>HUD 设计稿 · v15a</title>
   <style>
     @font-face {
-      font-family: "HUD Compact Rounded";
-      src: local(".SF Compact Rounded"), local("SF Compact Rounded");
-      font-weight: 1 1000;
+      font-family: "HUD Source Han Heavy";
+      src: url("fonts/SourceHanSansSC-Heavy.otf") format("opentype");
+      font-weight: 900;
       font-style: normal;
+      font-display: swap;
     }
     @font-face {
-      font-family: "HUD NS Rounded";
-      src: local(".SF NS Rounded"), local("SF NS Rounded");
-      font-weight: 1 1000;
-      font-style: normal;
-    }
-    @font-face {
-      font-family: "HUD Arial Rounded";
-      src: local("Arial Rounded MT Bold"), local("ArialRoundedMTBold");
-      font-weight: 400 700;
-      font-style: normal;
-    }
-    @font-face {
-      font-family: "HUD PingFang";
-      src: local("PingFang SC"), local("PingFangSC-Regular"), local("苹方-简");
-      font-weight: 400;
-      font-style: normal;
-    }
-    @font-face {
-      font-family: "HUD PingFang";
-      src: local("PingFang SC Medium"), local("PingFangSC-Medium"), local("苹方-简 Medium");
-      font-weight: 500;
+      font-family: "HUD Hiragino";
+      src: local("Hiragino Sans GB W6"), local("HiraginoSansGB-W6"), local("冬青黑体简体 W6");
+      font-weight: 600;
       font-style: normal;
     }
     @font-face {
@@ -50,7 +33,8 @@
       --map-line: #e8c9a4;
       --hairline: rgba(226, 196, 154, .32);
       --radius: 18px;
-      --hud-font: "HUD Compact Rounded", ui-rounded, system-ui, sans-serif;
+      --pill: #704e34;
+      --hud-font: "HUD Source Han Heavy", "Source Han Sans SC", "Noto Sans SC", sans-serif;
       --hud-weight: 900;
       --hud-mark-font: var(--hud-font);
     }
@@ -82,7 +66,7 @@
     }
     h1 { margin: 0 0 8px; font-size: 28px; font-weight: 600; }
     .lead {
-      max-width: 920px;
+      max-width: 960px;
       line-height: 1.65;
       color: #b9b9b9;
       margin-bottom: 20px;
@@ -168,15 +152,15 @@
       position: absolute;
       left: 40px;
       top: 40px;
-      width: 300px;
-      height: 300px;
+      width: 360px;
+      height: 360px;
       overflow: visible;
       filter: drop-shadow(0 1px 2px rgba(42, 26, 16, .45));
     }
     .route .path {
       fill: none;
       stroke: var(--map-line);
-      stroke-width: 8;
+      stroke-width: 10;
       stroke-linecap: round;
       stroke-linejoin: round;
     }
@@ -186,17 +170,18 @@
       stroke: #2a1a10;
       stroke-width: 3;
     }
+    /* XML: top rail x=444 y=40 w=1032 h=77 */
     .topbar {
-      left: 530px;
+      left: 444px;
       top: 40px;
-      width: 860px;
-      height: 64px;
-      border-radius: 32px;
+      width: 1032px;
+      height: 77px;
+      border-radius: 38px;
       display: grid;
-      grid-template-columns: 108px 1fr 108px;
+      grid-template-columns: 150px 1fr 150px;
       align-items: center;
       column-gap: 14px;
-      padding: 0 22px;
+      padding: 0 26px;
     }
     .km {
       display: flex;
@@ -205,26 +190,26 @@
     }
     .km.left { justify-self: start; }
     .km.right { justify-self: end; }
-    .km .num { font-size: 22px; font-weight: inherit; }
-    .km .unit { font-size: 13px; color: var(--muted); }
+    .km .num { font-size: 26px; font-weight: inherit; }
+    .km .unit { font-size: 16px; color: var(--muted); }
     .progress {
       position: relative;
-      height: 8px;
+      height: 10px;
       border-radius: 999px;
       background: var(--track);
     }
     .progress .fill {
-      width: 22%;
+      width: 48%;
       height: 100%;
       border-radius: inherit;
       background: var(--accent);
     }
     .progress .knob {
       position: absolute;
-      left: 22%;
+      left: 48%;
       top: 50%;
-      width: 18px;
-      height: 18px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
       background: #fff;
       transform: translate(-50%, -50%);
@@ -236,35 +221,42 @@
       flex-direction: column;
       gap: 8px;
     }
+    /* XML: primary x=40 y=809 w=235 h=154 */
     .primary {
       left: 40px;
-      top: 848px;
-      width: 196px;
-      height: 128px;
-      justify-content: center;
+      top: 809px;
+      width: 235px;
+      height: 154px;
+      justify-content: flex-start;
       gap: 4px;
+      padding: 8px 19px 12px;
     }
+    /* XML: shoe x=40 y=982 w=235 h=58 */
     .shoe {
       left: 40px;
-      top: 992px;
-      width: 196px;
-      height: 48px;
-      padding: 0 16px;
+      top: 982px;
+      width: 235px;
+      height: 58px;
+      padding: 0 19px;
       display: flex;
       flex-direction: row;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      opacity: .88;
+      border-radius: 22px;
     }
+    /* XML: secondary x=1578 y=838 w=302 h=202 */
     .secondary {
-      left: 1504px;
-      top: 840px;
-      width: 376px;
-      height: 200px;
+      left: 1578px;
+      top: 838px;
+      width: 302px;
+      height: 202px;
       justify-content: flex-start;
-      gap: 4px;
-      padding: 20px 24px 20px;
+      gap: 0;
+      padding: 8px 20px 20px;
       align-items: flex-end;
+      border-radius: 22px;
     }
     .row {
       display: flex;
@@ -278,104 +270,94 @@
     .primary .row.pace {
       gap: 1px;
       align-items: flex-start;
-      margin-bottom: 10px;
+      margin-bottom: 18px;
+      width: 100%;
+      justify-content: flex-end;
     }
-    .primary .row.pace .num { font-size: 44px; line-height: 1; }
+    .primary .row.pace .num { font-size: 53px; line-height: 1; }
     .primary .row.pace .mark {
       font-family: var(--hud-mark-font);
-      font-size: 20px;
+      font-size: 22px;
       font-weight: inherit;
       line-height: 1;
       transform: translateY(2px);
     }
-    .primary .row.sub .num { font-size: 24px; }
-    .primary .row.sub .unit { font-size: 14px; }
-    .pair {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 8px;
-      line-height: 1;
+    .primary .row.sub {
+      width: 100%;
+      justify-content: flex-end;
+      margin-top: 4px;
     }
-    .pair .name, .shoe .name { font-size: 15px; color: var(--muted); }
-    .pair .val, .shoe .val { display: flex; align-items: baseline; gap: 6px; }
-    .pair .val .num, .shoe .val .num { font-size: 22px; font-weight: inherit; }
-    .pair .val .unit, .shoe .val .unit { font-size: 14px; color: var(--muted); }
-    .shoe { opacity: .88; }
-    .shoe .name { font-size: 13px; opacity: .85; }
-    .shoe .val .num { font-size: 18px; opacity: .9; }
-    .shoe .val .unit { font-size: 12px; opacity: .75; }
+    .primary .row.sub .num { font-size: 29px; }
+    .primary .row.sub .unit { font-size: 17px; }
+    .shoe .name { font-size: 15px; color: rgba(255,255,255,.78); }
+    .shoe .val { display: flex; align-items: baseline; gap: 6px; }
+    .shoe .val .num { font-size: 22px; font-weight: inherit; opacity: .9; }
+    .shoe .val .unit { font-size: 14px; color: rgba(255,255,255,.7); }
     .secondary .row.clock {
-      margin-bottom: 14px;
+      width: 100%;
+      margin-bottom: 20px;
     }
     .secondary .row.clock .num {
-      font-size: 54px;
+      font-size: 46px;
       font-weight: inherit;
       color: var(--text);
       white-space: nowrap;
       letter-spacing: -0.02em;
     }
+    .secondary .row.when {
+      width: 100%;
+      margin-bottom: 18px;
+    }
     .secondary .row.when .num {
-      font-size: 18px;
+      font-size: 16px;
       font-weight: inherit;
       color: rgba(255, 255, 255, .67);
       white-space: nowrap;
     }
+    /* v15a: two stacked pills, right-aligned stack, label L / values R */
     .secondary .pills {
       display: flex;
+      flex-direction: column;
+      align-items: flex-end;
       gap: 8px;
       width: 100%;
-      margin-top: 18px;
     }
     .secondary .pill {
-      flex: 1;
-      height: 48px;
-      border-radius: 999px;
-      background: #704e34;
-      display: grid;
-      grid-template-columns: 34px 28px 16px;
+      width: 156px;
+      height: 32px;
+      border-radius: 16px;
+      background: var(--pill);
+      display: flex;
       align-items: center;
-      justify-content: center;
-      column-gap: 2px;
-      font-size: 17px;
+      justify-content: space-between;
+      padding: 0 14px;
+      font-size: 14px;
       color: #fff;
       white-space: nowrap;
     }
-    .secondary .pill .k { text-align: left; }
-    .secondary .pill .n { text-align: right; font-variant-numeric: tabular-nums; }
-    .secondary .pill .u { text-align: left; }
-    .secondary .row.sub .num {
-      font-size: 18px;
-      font-weight: inherit;
-      color: rgba(255, 255, 255, .72);
+    .secondary .pill .k {
+      text-align: left;
+      letter-spacing: 0.04em;
     }
-    .secondary .row.wx {
-      justify-content: flex-end;
-      gap: 6px;
-      width: 100%;
-      align-items: baseline;
-    }
-    .secondary .row.wx .num {
-      font-size: 18px;
-      font-weight: inherit;
-      color: rgba(255, 255, 255, .90);
-    }
-    .secondary .row.wx .sep {
-      font-size: 16px;
-      color: rgba(255, 255, 255, .47);
-      padding: 0 6px;
+    .secondary .pill .v {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
     .note2 {
       margin-top: 18px;
       color: #9a9a9a;
       font-size: 14px;
       line-height: 1.6;
+      max-width: 960px;
     }
   </style>
 </head>
 <body>
-  <h1>HUD 设计稿</h1>
-  <p class="lead">字色纯白、无描边。下面切字体看粗细和圆角，定了再改渲染。</p>
+  <h1>HUD 设计稿 · v15a</h1>
+  <p class="lead">
+    与生产 XML 对齐：右下 <strong>AIR / FEEL</strong> 两枚纵向胶囊（湿度优先 <code>88% · 23°</code> / <code>27°</code>，标签左、数值右）；
+    进度圆钮 26px；默认字体捆绑 <strong>Source Han Sans SC Heavy</strong>（全平台一致）。字色纯白、无描边。
+  </p>
 
   <div class="bar">
     <span class="label">配色</span>
@@ -385,14 +367,10 @@
   </div>
   <div class="bar" id="font-bar">
     <span class="label">字体</span>
-    <button type="button" data-font="compact-reg" aria-pressed="false">Compact 中</button>
-    <button type="button" data-font="compact-bold" aria-pressed="false">Compact 粗</button>
-    <button type="button" data-font="compact-black" aria-pressed="true">Compact 特粗</button>
-    <button type="button" data-font="ns-bold" aria-pressed="false">NS 粗</button>
-    <button type="button" data-font="ns-black" aria-pressed="false">NS 特粗</button>
-    <button type="button" data-font="arial-rounded" aria-pressed="false">Arial Rounded</button>
-    <button type="button" data-font="pingfang" aria-pressed="false">苹方 粗</button>
-    <span class="hint">这台没有微软雅黑；苹方是 mac 上最接近的中文黑体。</span>
+    <button type="button" data-font="source-han-heavy" aria-pressed="true">Source Han Heavy（默认）</button>
+    <button type="button" data-font="hiragino" aria-pressed="false">Hiragino W6</button>
+    <button type="button" data-font="pingfang" aria-pressed="false">苹方 Semibold</button>
+    <span class="hint">预览优先加载 <code>fonts/SourceHanSansSC-Heavy.otf</code>；系统面仅作对照。</span>
   </div>
 
   <div class="shell">
@@ -403,16 +381,16 @@
       <svg class="route" viewBox="40 10 180 220" aria-label="route">
         <path class="path" d="M86 205 C72 165, 98 140, 130 145 C151 149, 165 124, 180 108 C192 95, 189 68, 164 55 C150 48, 143 33, 153 20" />
         <circle class="start" cx="86" cy="205" r="4" />
-        <circle class="current" cx="165" cy="145" r="11" />
+        <circle class="current" cx="165" cy="145" r="12" />
       </svg>
 
       <div class="panel topbar">
-        <div class="km left"><span class="num">2.48</span><span class="unit">km</span></div>
+        <div class="km left"><span class="num">7.32</span><span class="unit">km</span></div>
         <div class="progress">
           <div class="fill"></div>
           <div class="knob"></div>
         </div>
-        <div class="km right"><span class="num">12.05</span><span class="unit">km</span></div>
+        <div class="km right"><span class="num">15.23</span><span class="unit">km</span></div>
       </div>
 
       <div class="panel corner primary">
@@ -422,56 +400,39 @@
       </div>
 
       <div class="panel shoe">
-        <span class="name">Cumulus</span>
-        <span class="val"><span class="num">642</span><span class="unit">km</span></span>
+        <span class="name">Plaid 1.5</span>
+        <span class="val"><span class="num">469</span><span class="unit">km</span></span>
       </div>
 
       <div class="panel corner secondary">
-        <div class="row clock"><span class="num">0:36:19</span></div>
-        <div class="row when"><span class="num">2026/09/30 · 06:32:08</span></div>
+        <div class="row clock"><span class="num">0:36:15</span></div>
+        <div class="row when"><span class="num">2026/09/30 · 06:32:04</span></div>
         <div class="pills">
-          <span class="pill"><span class="k">环境</span><span class="n">23</span><span class="u">°</span></span>
-          <span class="pill"><span class="k">体感</span><span class="n">27</span><span class="u">°</span></span>
-          <span class="pill"><span class="k">湿度</span><span class="n">88</span><span class="u">%</span></span>
+          <span class="pill"><span class="k">AIR</span><span class="v">88% · 23°</span></span>
+          <span class="pill"><span class="k">FEEL</span><span class="v">27°</span></span>
         </div>
       </div>
     </div>
   </div>
 
-  <p class="note2">只改预览。Compact / NS 是系统圆角可变字体，能出粗和特粗；Arial Rounded 只有粗，′″ 会回落到 Compact。</p>
+  <p class="note2">
+    几何对齐 <code>gopro-dashboard-overlay-running-hud-landscape-narrow-shrink.xml</code>（≡ map-safe）：
+    顶栏 444×40 / 1032×77，右下 1578×838 / 302×202，胶囊 156×32。
+    改预览后再改 XML。天气坐标生产用 <code>--weather-city</code>，不是三枚中文胶囊。
+  </p>
 
   <script>
     const root = document.documentElement;
     const FONTS = {
-      "compact-reg": {
-        font: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
-        weight: "400",
-        mark: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
-      },
-      "compact-bold": {
-        font: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
-        weight: "700",
-        mark: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
-      },
-      "compact-black": {
-        font: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+      "source-han-heavy": {
+        font: '"HUD Source Han Heavy", "Source Han Sans SC", "Noto Sans SC", sans-serif',
         weight: "900",
-        mark: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+        mark: '"HUD Source Han Heavy", "Source Han Sans SC", sans-serif',
       },
-      "ns-bold": {
-        font: '"HUD NS Rounded", ui-rounded, system-ui, sans-serif',
-        weight: "700",
-        mark: '"HUD NS Rounded", ui-rounded, system-ui, sans-serif',
-      },
-      "ns-black": {
-        font: '"HUD NS Rounded", ui-rounded, system-ui, sans-serif',
-        weight: "900",
-        mark: '"HUD NS Rounded", ui-rounded, system-ui, sans-serif',
-      },
-      "arial-rounded": {
-        font: '"HUD Arial Rounded", "Arial Rounded MT Bold", sans-serif',
-        weight: "400",
-        mark: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+      hiragino: {
+        font: '"HUD Hiragino", "Hiragino Sans GB", "冬青黑体简体", sans-serif',
+        weight: "600",
+        mark: '"HUD Hiragino", "Hiragino Sans GB", sans-serif',
       },
       pingfang: {
         font: '"HUD PingFang", "PingFang SC", "苹方-简", sans-serif',

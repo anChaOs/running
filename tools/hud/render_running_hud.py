@@ -263,7 +263,12 @@ def main() -> int:
         action="store_true",
         help="Use the platform-safe full-route map HUD template (same as default unless --template overrides it)",
     )
-    parser.add_argument("--font", default=str(DEFAULT_FONT), help="Font path passed to gopro-overlay; wrap overrides to unified PingFang SC / Noto Sans CJK SC (CJK+Latin one face)")
+    parser.add_argument(
+        "--font",
+        default=str(DEFAULT_FONT),
+        help="Font file for the HUD (CJK+Latin). Default: bundled Source Han Sans SC Heavy. "
+        "Honored by wrap unless HUD_FONT_PATH is set (env wins). Optional HUD_FONT_INDEX / HUD_FONT_WGHT for TTC/VF.",
+    )
     parser.add_argument(
         "--video-end-time-mode",
         "--video-time-mode",

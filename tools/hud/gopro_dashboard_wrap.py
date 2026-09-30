@@ -46,9 +46,10 @@ _orig_create_text = lx.Widgets.create_text
 #   Heavy ≈ athletic Black). Same face on Mac and Linux for consistent renders.
 # Fallbacks (if bundle missing): Noto Sans SC VF wght=900 → Hiragino Sans GB W6
 #   → PingFang SC Semibold → system Noto Sans CJK SC Bold.
-# Override anytime with HUD_FONT_PATH / HUD_FONT_INDEX / HUD_FONT_WGHT.
-#
-# gopro-overlay --font path is overridden so every metric/text shares this face.
+# Resolve order for the unified face:
+#   1) HUD_FONT_PATH (+ optional HUD_FONT_INDEX / HUD_FONT_WGHT)
+#   2) CLI --font (gopro-overlay / render_running_hud.py)
+#   3) bundled SourceHanSansSC-Heavy.otf, then other fallbacks
 # ---------------------------------------------------------------------------
 
 _HUD_DIR = Path(__file__).resolve().parent
@@ -223,21 +224,51 @@ def resolve_hud_font() -> tuple[str, int, str, list[float] | None]:
 
 HUD_FONT_PATH, HUD_FONT_INDEX, HUD_FONT_LABEL, HUD_FONT_AXES = resolve_hud_font()
 _hud_font_logged = False
+_cli_font_applied = False
 
 
-def _load_hud_face(size: int):
-    loaded = ImageFont.truetype(font=HUD_FONT_PATH, size=size, index=HUD_FONT_INDEX)
-    if HUD_FONT_AXES and hasattr(loaded, "set_variation_by_axes"):
+def _load_hud_face(size: int, path: str | None = None, index: int | None = None, axes=None):
+    path = path if path is not None else HUD_FONT_PATH
+    index = HUD_FONT_INDEX if index is None else index
+    axes = HUD_FONT_AXES if axes is None else axes
+    loaded = ImageFont.truetype(font=path, size=size, index=index)
+    if axes and hasattr(loaded, "set_variation_by_axes"):
         try:
-            loaded.set_variation_by_axes(list(HUD_FONT_AXES))
+            loaded.set_variation_by_axes(list(axes))
         except OSError:
             pass
     return loaded
 
 
+def _apply_cli_font_if_needed(font: str) -> None:
+    """HUD_FONT_PATH > CLI --font > bundled/default from resolve_hud_font()."""
+    global HUD_FONT_PATH, HUD_FONT_INDEX, HUD_FONT_LABEL, HUD_FONT_AXES, _cli_font_applied
+    if _cli_font_applied:
+        return
+    _cli_font_applied = True
+    if os.environ.get("HUD_FONT_PATH"):
+        # Already resolved from env in resolve_hud_font(); CLI --font must not win.
+        return
+    if not font:
+        return
+    cli = Path(font).expanduser()
+    if not cli.exists():
+        return
+    # Same path as already resolved default → keep label/index/axes.
+    if cli.resolve() == Path(HUD_FONT_PATH).resolve():
+        return
+    idx = int(os.environ["HUD_FONT_INDEX"]) if os.environ.get("HUD_FONT_INDEX") else 0
+    axes = [float(os.environ["HUD_FONT_WGHT"])] if os.environ.get("HUD_FONT_WGHT") else None
+    HUD_FONT_PATH = str(cli.resolve())
+    HUD_FONT_INDEX = idx
+    HUD_FONT_AXES = axes
+    HUD_FONT_LABEL = f"CLI --font ({cli.name}#{idx})"
+
+
 def load_font(font: str, size: int = 32):
-    """Always load the unified HUD face (path + TTC index + optional wght axis)."""
+    """Load unified HUD face. Order: HUD_FONT_PATH > --font > bundled Heavy."""
     global _hud_font_logged
+    _apply_cli_font_if_needed(font)
     if not _hud_font_logged:
         print(f"HUD font (unified CJK+Latin, heavier): {HUD_FONT_LABEL}")
         print(f"  file: {HUD_FONT_PATH}  index={HUD_FONT_INDEX}  axes={HUD_FONT_AXES}")
