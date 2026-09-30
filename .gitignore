@@ -1,0 +1,11 @@
+# 本地 Python 环境，可重建
+.venv/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store
+
+# 旧工具工作记忆，不是内容源
+.omx/

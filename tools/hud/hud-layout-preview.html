@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="warm">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HUD 设计稿</title>
+  <style>
+    @font-face {
+      font-family: "HUD Compact Rounded";
+      src: local(".SF Compact Rounded"), local("SF Compact Rounded");
+      font-weight: 1 1000;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "HUD NS Rounded";
+      src: local(".SF NS Rounded"), local("SF NS Rounded");
+      font-weight: 1 1000;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "HUD Arial Rounded";
+      src: local("Arial Rounded MT Bold"), local("ArialRoundedMTBold");
+      font-weight: 400 700;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "HUD PingFang";
+      src: local("PingFang SC"), local("PingFangSC-Regular"), local("苹方-简");
+      font-weight: 400;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "HUD PingFang";
+      src: local("PingFang SC Medium"), local("PingFangSC-Medium"), local("苹方-简 Medium");
+      font-weight: 500;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: "HUD PingFang";
+      src: local("PingFang SC Semibold"), local("PingFangSC-Semibold"), local("苹方-简 Semibold");
+      font-weight: 600;
+      font-style: normal;
+    }
+    :root {
+      --text: #ffffff;
+      --muted: #ffffff;
+      --panel: linear-gradient(165deg, rgba(96, 62, 38, .88), rgba(58, 36, 22, .86));
+      --accent: #f6efe4;
+      --track: rgba(28, 16, 10, .55);
+      --map-line: #e8c9a4;
+      --hairline: rgba(226, 196, 154, .32);
+      --radius: 18px;
+      --hud-font: "HUD Compact Rounded", ui-rounded, system-ui, sans-serif;
+      --hud-weight: 900;
+      --hud-mark-font: var(--hud-font);
+    }
+    html[data-theme="warm"] {
+      --panel: linear-gradient(165deg, rgba(96, 62, 38, .88), rgba(58, 36, 22, .86));
+      --text: #ffffff;
+      --muted: #ffffff;
+      --accent: #f6efe4;
+      --track: rgba(28, 16, 10, .55);
+      --map-line: #e8c9a4;
+      --hairline: rgba(226, 196, 154, .32);
+    }
+    html[data-theme="warm-deep"] {
+      --panel: linear-gradient(165deg, rgba(72, 46, 28, .90), rgba(42, 26, 16, .88));
+      --text: #ffffff;
+      --muted: #ffffff;
+      --accent: #f6efe4;
+      --track: rgba(20, 12, 8, .62);
+      --map-line: #e2c49a;
+      --hairline: rgba(226, 196, 154, .22);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #111;
+      color: #ececec;
+      font-family: ui-sans-serif, system-ui, sans-serif;
+      padding: 28px;
+    }
+    h1 { margin: 0 0 8px; font-size: 28px; font-weight: 600; }
+    .lead {
+      max-width: 920px;
+      line-height: 1.65;
+      color: #b9b9b9;
+      margin-bottom: 20px;
+    }
+    .bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .bar .label {
+      color: #8d8d8d;
+      font-size: 13px;
+      min-width: 36px;
+    }
+    button {
+      border: 1px solid rgba(255,255,255,.16);
+      background: rgba(255,255,255,.05);
+      color: #eee;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font: 14px/1.2 ui-sans-serif, system-ui, sans-serif;
+      cursor: pointer;
+    }
+    button[aria-pressed="true"] {
+      background: #fff;
+      color: #111;
+      border-color: #fff;
+    }
+    .hint { color: #8d8d8d; font-size: 13px; align-self: center; }
+    .shell {
+      overflow: auto;
+      width: min-content;
+      border-radius: 16px;
+      box-shadow: 0 12px 40px rgba(0,0,0,.4);
+    }
+    .canvas {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      background: #000 url("preview-bg.jpg") center / cover no-repeat;
+    }
+    .guide { display: none; pointer-events: none; }
+    html[data-guides="on"] .guide { display: grid; }
+    .watermark {
+      position: absolute;
+      right: 40px;
+      top: 40px;
+      width: 240px;
+      height: 88px;
+      place-items: center;
+      border: 1px dashed rgba(255,120,120,.7);
+      background: rgba(255,80,80,.14);
+      color: #ffd0d0;
+      font-size: 15px;
+      text-align: center;
+    }
+    .subtitle {
+      position: absolute;
+      left: 0;
+      top: 920px;
+      width: 1920px;
+      height: 160px;
+      place-items: center;
+      background: rgba(255,80,80,.1);
+      border-top: 1px dashed rgba(255,140,140,.5);
+      color: #ffd0d0;
+      font-size: 16px;
+    }
+    .panel {
+      position: absolute;
+      background: var(--panel);
+      color: var(--text);
+      border-radius: var(--radius);
+      box-shadow: none;
+      font-family: var(--hud-font);
+      font-variant-numeric: tabular-nums;
+      font-weight: var(--hud-weight);
+      -webkit-font-smoothing: antialiased;
+    }
+    svg.route {
+      position: absolute;
+      left: 40px;
+      top: 40px;
+      width: 300px;
+      height: 300px;
+      overflow: visible;
+      filter: drop-shadow(0 1px 2px rgba(42, 26, 16, .45));
+    }
+    .route .path {
+      fill: none;
+      stroke: var(--map-line);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .route .start { fill: var(--text); }
+    .route .current {
+      fill: #fff;
+      stroke: #2a1a10;
+      stroke-width: 2;
+    }
+    .topbar {
+      left: 530px;
+      top: 40px;
+      width: 860px;
+      height: 64px;
+      border-radius: 32px;
+      display: grid;
+      grid-template-columns: 108px 1fr 108px;
+      align-items: center;
+      column-gap: 14px;
+      padding: 0 22px;
+    }
+    .km {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .km.left { justify-self: start; }
+    .km.right { justify-self: end; }
+    .km .num { font-size: 22px; font-weight: inherit; }
+    .km .unit { font-size: 13px; color: var(--muted); }
+    .progress {
+      position: relative;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--track);
+    }
+    .progress .fill {
+      width: 22%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--accent);
+    }
+    .progress .knob {
+      position: absolute;
+      left: 22%;
+      top: 50%;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 0 2px rgba(42, 26, 16, .35);
+    }
+    .corner {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .primary {
+      left: 40px;
+      top: 848px;
+      width: 196px;
+      height: 128px;
+      justify-content: center;
+      gap: 4px;
+    }
+    .shoe {
+      left: 40px;
+      top: 992px;
+      width: 196px;
+      height: 48px;
+      padding: 0 16px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .secondary {
+      left: 1644px;
+      top: 892px;
+      width: 236px;
+      height: 148px;
+      justify-content: center;
+      gap: 8px;
+    }
+    .row {
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 6px;
+      line-height: 1;
+    }
+    .row .num { font-weight: inherit; }
+    .row .unit, .row .mark { color: var(--muted); }
+    .primary .row.pace {
+      gap: 1px;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+    .primary .row.pace .num { font-size: 44px; line-height: 1; }
+    .primary .row.pace .mark {
+      font-family: var(--hud-mark-font);
+      font-size: 20px;
+      font-weight: inherit;
+      line-height: 1;
+      transform: translateY(2px);
+    }
+    .primary .row.sub .num { font-size: 24px; }
+    .primary .row.sub .unit { font-size: 14px; }
+    .pair {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      line-height: 1;
+    }
+    .pair .name, .shoe .name { font-size: 15px; color: var(--muted); }
+    .pair .val, .shoe .val { display: flex; align-items: baseline; gap: 6px; }
+    .pair .val .num, .shoe .val .num { font-size: 22px; font-weight: inherit; }
+    .pair .val .unit, .shoe .val .unit { font-size: 14px; color: var(--muted); }
+    .secondary .row.clock {
+      margin-bottom: 14px;
+    }
+    .secondary .row.clock .num {
+      font-size: 40px;
+      font-weight: inherit;
+      color: var(--text);
+      white-space: nowrap;
+    }
+    .secondary .row.sub .num {
+      font-size: 18px;
+      font-weight: inherit;
+      color: rgba(255, 255, 255, .72);
+    }
+    .secondary .row.wx {
+      justify-content: flex-end;
+      gap: 6px;
+      width: 100%;
+      align-items: baseline;
+    }
+    .secondary .row.wx .num {
+      font-size: 13px;
+      font-weight: inherit;
+      color: rgba(255, 255, 255, .72);
+    }
+    .secondary .row.wx .sep {
+      font-size: 12px;
+      color: rgba(255, 255, 255, .45);
+      padding: 0 2px;
+    }
+    .note2 {
+      margin-top: 18px;
+      color: #9a9a9a;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <h1>HUD 设计稿</h1>
+  <p class="lead">字色纯白、无描边。下面切字体看粗细和圆角，定了再改渲染。</p>
+
+  <div class="bar">
+    <span class="label">配色</span>
+    <button type="button" data-theme="warm" aria-pressed="true">B 褐土 · 沙</button>
+    <button type="button" data-theme="warm-deep" aria-pressed="false">B2 更深暖墨</button>
+    <button type="button" id="guides" aria-pressed="false">显示安全区</button>
+  </div>
+  <div class="bar" id="font-bar">
+    <span class="label">字体</span>
+    <button type="button" data-font="compact-reg" aria-pressed="false">Compact 中</button>
+    <button type="button" data-font="compact-bold" aria-pressed="false">Compact 粗</button>
+    <button type="button" data-font="compact-black" aria-pressed="true">Compact 特粗</button>
+    <button type="button" data-font="ns-bold" aria-pressed="false">NS 粗</button>
+    <button type="button" data-font="ns-black" aria-pressed="false">NS 特粗</button>
+    <button type="button" data-font="arial-rounded" aria-pressed="false">Arial Rounded</button>
+    <button type="button" data-font="pingfang" aria-pressed="false">苹方 粗</button>
+    <span class="hint">这台没有微软雅黑；苹方是 mac 上最接近的中文黑体。</span>
+  </div>
+
+  <div class="shell">
+    <div class="canvas">
+      <div class="guide watermark">水印区留空</div>
+      <div class="guide subtitle">字幕带 y=920–1080 留空</div>
+
+      <svg class="route" viewBox="40 10 180 220" aria-label="route">
+        <path class="path" d="M86 205 C72 165, 98 140, 130 145 C151 149, 165 124, 180 108 C192 95, 189 68, 164 55 C150 48, 143 33, 153 20" />
+        <circle class="start" cx="86" cy="205" r="4" />
+        <circle class="current" cx="165" cy="145" r="6" />
+      </svg>
+
+      <div class="panel topbar">
+        <div class="km left"><span class="num">2.48</span><span class="unit">km</span></div>
+        <div class="progress">
+          <div class="fill"></div>
+          <div class="knob"></div>
+        </div>
+        <div class="km right"><span class="num">12.05</span><span class="unit">km</span></div>
+      </div>
+
+      <div class="panel corner primary">
+        <div class="row pace"><span class="num">6</span><span class="mark">′</span><span class="num">15</span><span class="mark">″</span></div>
+        <div class="row sub"><span class="num">158</span><span class="unit">bpm</span></div>
+        <div class="row sub"><span class="num">172</span><span class="unit">spm</span></div>
+      </div>
+
+      <div class="panel shoe">
+        <span class="name">Cumulus</span>
+        <span class="val"><span class="num">642</span><span class="unit">km</span></span>
+      </div>
+
+      <div class="panel corner secondary">
+        <div class="row clock"><span class="num">06:06:13</span></div>
+        <div class="row sub"><span class="num">2026-04-23</span></div>
+        <div class="row wx">
+          <span class="num">13°C</span>
+          <span class="sep">/</span>
+          <span class="num">11°C</span>
+        </div>
+        <div class="row wx rh">
+          <span class="num">89%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="note2">只改预览。Compact / NS 是系统圆角可变字体，能出粗和特粗；Arial Rounded 只有粗，′″ 会回落到 Compact。</p>
+
+  <script>
+    const root = document.documentElement;
+    const FONTS = {
+      "compact-reg": {
+        font: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+        weight: "400",
+        mark: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+      },
+      "compact-bold": {
+        font: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+        weight: "700",
+        mark: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+      },
+      "compact-black": {
+        font: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+        weight: "900",
+        mark: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+      },
+      "ns-bold": {
+        font: '"HUD NS Rounded", ui-rounded, system-ui, sans-serif',
+        weight: "700",
+        mark: '"HUD NS Rounded", ui-rounded, system-ui, sans-serif',
+      },
+      "ns-black": {
+        font: '"HUD NS Rounded", ui-rounded, system-ui, sans-serif',
+        weight: "900",
+        mark: '"HUD NS Rounded", ui-rounded, system-ui, sans-serif',
+      },
+      "arial-rounded": {
+        font: '"HUD Arial Rounded", "Arial Rounded MT Bold", sans-serif',
+        weight: "400",
+        mark: '"HUD Compact Rounded", ui-rounded, system-ui, sans-serif',
+      },
+      pingfang: {
+        font: '"HUD PingFang", "PingFang SC", "苹方-简", sans-serif',
+        weight: "600",
+        mark: '"HUD PingFang", "PingFang SC", sans-serif',
+      },
+    };
+    const applyFont = (key) => {
+      const spec = FONTS[key];
+      if (!spec) return;
+      root.style.setProperty("--hud-font", spec.font);
+      root.style.setProperty("--hud-weight", spec.weight);
+      root.style.setProperty("--hud-mark-font", spec.mark);
+      document.querySelectorAll("button[data-font]").forEach((b) => {
+        b.setAttribute("aria-pressed", String(b.dataset.font === key));
+      });
+    };
+    document.querySelectorAll("button[data-theme]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        root.dataset.theme = btn.dataset.theme;
+        document.querySelectorAll("button[data-theme]").forEach((b) => {
+          b.setAttribute("aria-pressed", String(b === btn));
+        });
+      });
+    });
+    document.querySelectorAll("button[data-font]").forEach((btn) => {
+      btn.addEventListener("click", () => applyFont(btn.dataset.font));
+    });
+    const guides = document.getElementById("guides");
+    guides.addEventListener("click", () => {
+      const on = root.dataset.guides === "on";
+      root.dataset.guides = on ? "off" : "on";
+      guides.setAttribute("aria-pressed", String(!on));
+    });
+  </script>
+</body>
+</html>

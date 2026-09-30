@@ -1,0 +1,49 @@
+<layout>
+    <frame x="28" y="28" width="1008" height="62" bg="16,22,30,80" cr="20" opacity="0.52" name="context_top_rail">
+        <translate x="26" y="13">
+            <translate x="0" y="0">
+                <component type="metric" x="58" y="0" metric="odo" units="km" dp="2" size="31" align="right" rgb="255,255,255" outline="0,0,0,92" outline_width="2"/>
+                <component type="text" x="66" y="11" size="14" rgb="223,231,238,160">km</component>
+            </translate>
+
+            <translate x="126" y="0">
+                <translate x="0" y="14">
+                    <component type="bar" name="distance_progress_bar" width="560" height="8" metric="odo" units="m" min="0" max="10000" fill="255,255,255,8" outline="255,255,255,0" outline-width="0" bar="106,196,255,188" h-neg="106,196,255,188" h-pos="106,196,255,188" zero="255,255,255,0" cr="4"/>
+                </translate>
+            </translate>
+
+            <translate x="714" y="0">
+                <component type="text" name="distance_total_text" x="0" y="0" size="31" rgb="255,255,255" outline="0,0,0,92" outline_width="2">10.00 km</component>
+            </translate>
+        </translate>
+    </frame>
+
+    <frame x="28" y="862" width="220" height="190" bg="16,22,30,88" cr="24" opacity="0.60" name="performance_primary_panel">
+        <translate x="18" y="18">
+            <translate x="0" y="0">
+                <component type="metric" x="112" y="0" metric="speed" units="pace_km" format="pace" size="48" align="right" rgb="255,255,255" outline="0,0,0,96" outline_width="2"/>
+                <component type="text" x="124" y="14" size="16" rgb="223,231,238,160">/km</component>
+            </translate>
+
+            <translate x="0" y="54">
+                <component type="metric" x="112" y="0" metric="hr" dp="0" size="48" align="right" rgb="255,255,255" outline="0,0,0,96" outline_width="2"/>
+                <component type="text" x="124" y="14" size="16" rgb="223,231,238,160">bpm</component>
+            </translate>
+
+            <translate x="0" y="108">
+                <component type="metric" x="112" y="0" metric="cadence" units="spm" dp="0" size="48" align="right" rgb="255,255,255" outline="0,0,0,96" outline_width="2"/>
+                <component type="text" x="124" y="14" size="16" rgb="223,231,238,160">spm</component>
+            </translate>
+        </translate>
+    </frame>
+
+    <frame x="1656" y="862" width="236" height="190" bg="16,22,30,76" cr="24" opacity="0.50" name="time_corner_panel">
+        <translate x="24" y="22">
+            <component type="text" name="shoe_name_text" x="0" y="0" size="15" rgb="223,231,238,160" outline="0,0,0,84" outline_width="2">shoe name</component>
+            <component type="metric" x="152" y="18" name="shoe_mileage_metric" metric="shoe_odo" units="km" dp="2" size="36" align="right" rgb="255,255,255" outline="0,0,0,88" outline_width="2"/>
+            <component type="text" x="188" y="28" size="16" align="right" rgb="223,231,238,152">km</component>
+            <component type="datetime" x="0" y="74" format="%Y-%m-%d" size="15" rgb="223,231,238,166" outline="0,0,0,88" outline_width="2"/>
+            <component type="datetime" x="188" y="96" format="%H:%M:%S" size="36" align="right" rgb="255,255,255" outline="0,0,0,92" outline_width="2"/>
+        </translate>
+    </frame>
+</layout>

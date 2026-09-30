@@ -1,0 +1,72 @@
+<layout>
+    <!-- 暖墨沙面板。各块相对原布局整体 1.2x，块内字仍按原相对位置排。字体由渲染脚本指定（SF Compact Rounded Black）。字色纯白，无描边。 -->
+
+    <!-- 左上路线，无底框。360px，线宽 10，3 倍超采样。 -->
+    <translate x="40" y="40">
+        <component type="circuit-map" size="360" fill="232,201,164,255" outline="42,26,16,200" fill_width="10" outline_width="4"/>
+    </translate>
+
+    <!-- 顶栏居中胶囊，无描边 -->
+    <frame x="444" y="40" width="1032" height="77" bg="77,49,30,255" cr="38" opacity="0.87" name="context_top_rail">
+        <translate x="26" y="22">
+            <component type="metric" x="86" y="0" metric="odo" units="km" dp="2" size="26" align="right" rgb="255,255,255" outline_width="0"/>
+            <component type="text" x="94" y="6" size="16" rgb="255,255,255" outline_width="0">km</component>
+        </translate>
+        <translate x="173" y="31">
+            <component type="bar" name="distance_progress_knob" width="686" height="14" metric="odo" units="m" min="0" max="10000" fill="77,49,30,255" outline="255,255,255,0" outline-width="0" bar="77,49,30,255" h-neg="255,255,255,255" h-pos="255,255,255,255" zero="255,255,255,0" cr="7"/>
+        </translate>
+        <translate x="173" y="34">
+            <component type="bar" name="distance_progress_bar" width="686" height="10" metric="odo" units="m" min="0" max="10000" fill="28,16,10,170" outline="255,255,255,0" outline-width="0" bar="246,239,228,255" h-neg="246,239,228,255" h-pos="255,255,255,255" zero="255,255,255,0" cr="5"/>
+        </translate>
+        <translate x="876" y="22">
+            <component type="text" name="distance_total_text" x="0" y="0" size="26" rgb="255,255,255" outline_width="0">10.00</component>
+            <component type="text" name="distance_total_unit" x="77" y="6" size="16" rgb="255,255,255" outline_width="0">km</component>
+        </translate>
+    </frame>
+
+    <!-- 左下配速 235×154。配速与心率拉开，心率与步频更近。 -->
+    <frame x="40" y="809" width="235" height="154" bg="77,49,30,255" cr="22" opacity="0.87" name="performance_primary_panel">
+        <translate x="19" y="12">
+            <component type="metric" x="197" y="0" metric="speed" units="pace_km" format="pace_quote" size="53" align="right" rgb="255,255,255" outline_width="0"/>
+            <translate x="0" y="70">
+                <component type="metric" x="142" y="0" metric="hr" dp="0" size="29" align="right" rgb="255,255,255" outline_width="0"/>
+                <component type="text" x="149" y="7" size="17" rgb="255,255,255" outline_width="0">bpm</component>
+            </translate>
+            <translate x="0" y="103">
+                <component type="metric" x="142" y="0" metric="cadence" units="spm" dp="0" size="29" align="right" rgb="255,255,255" outline_width="0"/>
+                <component type="text" x="149" y="7" size="17" rgb="255,255,255" outline_width="0">spm</component>
+            </translate>
+        </translate>
+    </frame>
+
+    <!-- 配速下方跑鞋条，同宽更矮 -->
+    <frame x="40" y="982" width="235" height="58" bg="77,49,30,255" cr="22" opacity="0.87" name="shoe_chip_panel">
+        <translate x="19" y="14">
+            <translate name="shoe_mileage_group" x="0" y="0">
+                <component type="text" name="shoe_name_text" x="0" y="5" size="18" rgb="255,255,255" outline_width="0">shoe name</component>
+                <component type="metric" x="168" y="0" name="shoe_mileage_metric" metric="shoe_odo" units="km" dp="0" size="26" align="right" rgb="255,255,255" outline_width="0"/>
+                <component type="text" x="175" y="6" size="17" rgb="255,255,255" outline_width="0">km</component>
+            </translate>
+        </translate>
+    </frame>
+
+    <!-- 右下运动时长、日期、当天时间、气温/体感、湿度。无 GPS。 -->
+    <frame x="1597" y="823" width="283" height="217" bg="77,49,30,255" cr="22" opacity="0.87" name="context_secondary_panel">
+        <translate x="19" y="17">
+            <component type="metric" x="245" y="0" metric="elapsed" format="hms" size="48" align="right" rgb="255,255,255" outline_width="0"/>
+            <component type="datetime" x="245" y="74" format="%Y-%m-%d" size="22" align="right" rgb="255,255,255,211" outline_width="0"/>
+            <component type="datetime" x="245" y="106" format="%H:%M:%S" size="22" align="right" rgb="255,255,255,211" outline_width="0"/>
+            <translate name="weather_group" x="0" y="142">
+                <component type="metric" x="184" y="0" metric="wx_temp" dp="0" size="16" align="right" rgb="255,255,255,211" outline_width="0"/>
+                <component type="text" x="186" y="1" size="16" rgb="255,255,255,211" outline_width="0">°C</component>
+                <component type="text" x="206" y="1" size="14" rgb="255,255,255,120" outline_width="0">/</component>
+                <component type="metric" x="228" y="0" metric="wx_feels" dp="0" size="16" align="right" rgb="255,255,255,211" outline_width="0"/>
+                <component type="text" x="229" y="1" size="16" rgb="255,255,255,211" outline_width="0">°C</component>
+                <translate name="weather_rh_group" x="0" y="25">
+                    <component type="metric" x="230" y="0" metric="wx_rh" dp="0" size="16" align="right" rgb="255,255,255,211" outline_width="0"/>
+                    <component type="text" x="231" y="1" size="16" rgb="255,255,255,211" outline_width="0">%</component>
+                </translate>
+            </translate>
+        </translate>
+    </frame>
+</layout>
