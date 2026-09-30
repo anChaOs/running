@@ -17,7 +17,7 @@ AI 协作规则见 `CLAUDE.md`（`AGENT.md` 是它的软链）。
 ├── topics/                # 备选主题库
 ├── episodes/              # 一期一个文件夹
 ├── knowledge/wiki/        # 编译知识（先读 wiki/index.md）
-├── knowledge/raw/         # 知识来源只读
+├── knowledge/raw/         # 知识来源只读；bili-up 不在 MIT 内
 ├── knowledge/production/  # 拍摄 / HUD / 剪映 SOP
 ├── training/logs/         # 训练记录
 ├── training/reviews/      # 复盘
@@ -55,6 +55,24 @@ status：`idea` → `planned` → `shot` → `hud` → `edited` → `published`�
 ```
 
 说明在 `tools/hud/README.md`。自动拼接成片以后再做。
+
+## 许可
+
+作者原创使用 MIT，见 `LICENSE`。不是整仓同一许可。
+
+不适用 MIT 的路径：`knowledge/raw/running/bili-up/`、`knowledge/incoming/`、`knowledge/raw/running/coros-app-load-recovery-hrv-2026-09-19.md`。文件里嵌进的他人短引也不因此可以再授权。
+
+## 知识来源授权
+
+### `knowledge/raw/running/bili-up/`
+
+这里是学习笔记，不是作者的作品，**不在 MIT 里**。本仓库不授予复制、改编、再发布或商用这些原文的权利。
+
+- 来源是 B 站创作者的口播和专栏，主要是山雨小月、云健身（仰望尾迹云）。笔记里还有第三方整理（梨文）和论文引用。
+- 形态是作者整理的笔记和短引，不是完整字幕。口播摘自播放器中文 AI 字幕，没有人工校对，识别可能有错。
+- 视频、专栏、口播原文的著作权属于原作者。
+- 同一批笔记的副本和 zip 在 `knowledge/incoming/2026-09-22/`（`up-01` 到 `up-06`，以及 `packs/` 里对应的 zip）。副本同样不授权。
+- 引用请回到笔记里的 BV 号，链到原视频，不要把摘录当成可以再授权的素材。
 
 ## 边跑边说结构
 

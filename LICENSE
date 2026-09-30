@@ -1,0 +1,55 @@
+许可范围
+========
+
+Copyright (c) 2026 安超
+
+本仓库不是整仓同一许可。下面的路径清单决定什么适用 MIT、什么不授权。
+清单与后文 MIT 文本冲突时，以清单为准。
+
+适用 MIT 的部分
+---------------
+
+作者本人的原创，包括：
+
+- `tools/`、`templates/`、`.claude/skills/`
+- `episodes/`、`topics/`、`training/`、`inbox/`、`calendar/`
+- `knowledge/wiki/`、`knowledge/production/`
+- `knowledge/raw/running/physiology/`（作者写的文献笔记，不是论文 PDF 或论文原文）
+- 根目录说明（`README.md`、`CLAUDE.md`、`AGENTS.md` 等）
+
+这些文件里嵌进的他人短引（论文句子、口播原句、软件界面文案）不因此可以再授权，权利仍归原作者。
+
+不适用本许可的部分
+------------------
+
+下列路径不授予复制、改编、再发布或商用的权利。版权归原作者。本仓库只保存个人学习笔记：
+
+- `knowledge/raw/running/bili-up/`
+  B 站创作者口播和专栏的笔记与短引，主要来自山雨小月、云健身（仰望尾迹云），并含第三方整理与论文引用。不是完整字幕。详见 `README.md`「知识来源授权」。
+- `knowledge/incoming/`
+  上述笔记的检疫副本、zip，以及同批交件。正式笔记在 `knowledge/raw/`，许可状态不因副本位置而改变。
+- `knowledge/raw/running/coros-app-load-recovery-hrv-2026-09-19.md`
+  高驰 App 界面原文转写。
+
+MIT License
+-----------
+
+Copyright (c) 2026 安超
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of the materials listed under "适用 MIT 的部分" in this file ("the Software"),
+to deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
