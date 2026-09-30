@@ -1,14 +1,17 @@
-# HUD preview fonts (Linux)
+# HUD fonts (bundled)
 
-Bundled stand-ins so Linux CI/preview can approximate the **Mac production** face
-**Hiragino Sans GB W6** (冬青黑体简体 W6) without dual-font Latin+CJK mixing.
+**Production default on Mac and Linux:** `SourceHanSansSC-Heavy.otf`
+(Source Han Sans SC Heavy / Adobe). Same file everywhere so HUD renders match
+across machines — no dual-font Latin+CJK mixing, no Mac-only Hiragino preference.
 
 | File | Role |
 |------|------|
-| `SourceHanSansSC-Heavy.otf` | **Primary Linux preview** — Source Han Sans SC Heavy (Adobe). Same design lineage as Noto CJK; Heavy ≈ athletic Black weight. |
-| `NotoSansSC-VF.ttf` | Optional fallback; wrap uses `wght=900` if Heavy missing. |
+| `SourceHanSansSC-Heavy.otf` | **Default** — athletic ≈ Black weight; preferred by `resolve_hud_font()` first |
+| `NotoSansSC-VF.ttf` | Fallback if Heavy missing; wrap uses `wght=900` |
 
-Mac does **not** need these files (system Hiragino / PingFang).
+Override with `HUD_FONT_PATH` / `HUD_FONT_INDEX` / `HUD_FONT_WGHT` (e.g. system
+Hiragino Sans GB W6 on Mac). System faces are only auto-picked when the bundle
+is absent.
 
 Re-download Heavy if missing:
 ```bash

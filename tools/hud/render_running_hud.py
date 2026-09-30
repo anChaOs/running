@@ -29,22 +29,22 @@ WEATHER_CITIES = _weather.CITIES
 
 DEFAULT_TEMPLATE = HUD_DIR / "templates" / "gopro-dashboard-overlay-running-hud-landscape-map-safe.xml"
 def _default_hud_font_path() -> Path:
-    # Mac production: Hiragino Sans GB W6 (heavier/rounder). Alt: PingFang SC Semibold.
-    # Linux preview: bundled Source Han Sans SC Heavy (tools/hud/fonts/).
+    # Cross-platform default: bundled Source Han Sans SC Heavy (Mac+Linux).
     # Face index / wght axis applied inside gopro_dashboard_wrap.load_font.
+    # System Hiragino/PingFang/Noto only if bundle missing.
     bundled = HUD_DIR / "fonts" / "SourceHanSansSC-Heavy.otf"
     for candidate in (
+        bundled,
+        HUD_DIR / "fonts" / "NotoSansSC-VF.ttf",
         Path("/System/Library/Fonts/Hiragino Sans GB.ttc"),
         Path("/System/Library/Fonts/PingFang.ttc"),
         Path("/Library/Fonts/PingFang.ttc"),
-        bundled,
-        HUD_DIR / "fonts" / "NotoSansSC-VF.ttf",
         Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
         Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
     ):
         if candidate.exists():
             return candidate
-    return Path("/System/Library/Fonts/Hiragino Sans GB.ttc")
+    return bundled
 
 
 DEFAULT_FONT = _default_hud_font_path()

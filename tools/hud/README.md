@@ -31,10 +31,10 @@ brew install cairo pkg-config
 
 HUD 全文（中文键、拉丁数字/单位、配速、时长、日期、跑鞋等）使用 **同一偏粗字体族**（贴近旧 Noto Sans Black 运动感，避免扁平 UI 细 Bold）：
 
-- **macOS 生产默认：Hiragino Sans GB W6**（冬青黑体简体 W6，`/System/Library/Fonts/Hiragino Sans GB.ttc`）
-- macOS 备选：PingFang SC **Semibold**
-- **Linux 预览：Source Han Sans SC Heavy**（`tools/hud/fonts/SourceHanSansSC-Heavy.otf`，Adobe，≈ Black 字重；对应 Mac 的 W6/偏粗观感）
-- Linux 再回退：Noto Sans SC VF wght=900 → 系统 Noto Sans CJK SC Bold
+- **全平台生产默认：Source Han Sans SC Heavy**（`tools/hud/fonts/SourceHanSansSC-Heavy.otf`，Adobe，≈ Black 字重；Mac / Linux 同一文件，渲染一致）
+- 捆绑回退：Noto Sans SC VF wght=900（同目录）
+- 系统回退（仅当捆绑缺失）：macOS Hiragino Sans GB W6 / PingFang SC Semibold；Linux Noto Sans CJK SC Bold
+- 覆盖：环境变量 `HUD_FONT_PATH` / `HUD_FONT_INDEX` / `HUD_FONT_WGHT`
 
 字色纯白、无描边。`gopro_dashboard_wrap.py` 统一加载（含 TTC index / VF 轴），忽略仅拉丁的 `--font`。
 
@@ -383,7 +383,7 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml
 
 脚本默认还会使用：
 
-- 字体：macOS `Hiragino Sans GB W6`；Linux 预览 `Source Han Sans SC Heavy`
+- 字体：捆绑 `Source Han Sans SC Heavy`（Mac+Linux 默认）
 - 配置目录：`/tmp/gopro-overlay-config`
 - 缓存目录：`/tmp/gopro-overlay-cache`
 
@@ -415,7 +415,7 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml
 如果默认字体不可用，可以改：
 
 ```bash
---font /System/Library/Fonts/Hiragino\ Sans\ GB.ttc   # wrap 解析为统一偏粗 CJK+Latin 面
+--font tools/hud/fonts/SourceHanSansSC-Heavy.otf   # 默认已是此面；或设 HUD_FONT_PATH
 ```
 
 ### 4. FIT 找不到

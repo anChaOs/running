@@ -41,12 +41,12 @@ _orig_create_text = lx.Widgets.create_text
 # Prefer a heavier / slightly rounder athletic feel (old Noto Sans Black vibe),
 # NOT the flat UI look of Noto CJK Bold / PingFang Regular.
 #
-# Mac production (preferred): Hiragino Sans GB W6 (冬青黑体简体 W6) — system,
-#   CJK+Latin, bolder and a bit rounder than PingFang SC Regular/Medium.
-# Mac alt: PingFang SC Semibold (heaviest common PingFang SC weight in TTC).
-# Linux preview stand-in: Source Han Sans SC Heavy bundled under
-#   tools/hud/fonts/ (Adobe — same design lineage as Noto CJK, Heavy ≈ Black).
-#   Fallback: Noto Sans SC VF wght=900, then system Noto Sans CJK SC Bold.
+# Cross-platform production default: Source Han Sans SC Heavy bundled under
+#   tools/hud/fonts/SourceHanSansSC-Heavy.otf (Adobe — same lineage as Noto CJK,
+#   Heavy ≈ athletic Black). Same face on Mac and Linux for consistent renders.
+# Fallbacks (if bundle missing): Noto Sans SC VF wght=900 → Hiragino Sans GB W6
+#   → PingFang SC Semibold → system Noto Sans CJK SC Bold.
+# Override anytime with HUD_FONT_PATH / HUD_FONT_INDEX / HUD_FONT_WGHT.
 #
 # gopro-overlay --font path is overridden so every metric/text shares this face.
 # ---------------------------------------------------------------------------
@@ -148,7 +148,25 @@ def resolve_hud_font() -> tuple[str, int, str, list[float] | None]:
         axes = [float(env_wght)] if env_wght else None
         return env_path, idx, f"env HUD_FONT_PATH ({Path(env_path).name}#{idx})", axes
 
-    # Mac production: Hiragino Sans GB W6 (heavier / rounder than PingFang Regular)
+    # Cross-platform production default: bundled Source Han Sans SC Heavy
+    if _BUNDLED_HEAVY.exists():
+        return (
+            str(_BUNDLED_HEAVY),
+            0,
+            "Source Han Sans SC Heavy [bundled — Mac+Linux production default]",
+            None,
+        )
+
+    # Bundled alt: Noto Sans SC variable at Black (900)
+    if _BUNDLED_VF.exists():
+        return (
+            str(_BUNDLED_VF),
+            0,
+            "Noto Sans SC VF wght=900 [bundled fallback]",
+            [900.0],
+        )
+
+    # Mac system fallback: Hiragino Sans GB W6
     hira = Path("/System/Library/Fonts/Hiragino Sans GB.ttc")
     if hira.exists():
         picked = _pick_face(
@@ -158,10 +176,10 @@ def resolve_hud_font() -> tuple[str, int, str, list[float] | None]:
         )
         if picked:
             idx, label = picked
-            return str(hira), idx, f"{label} [Mac production — heavy/rounder]", None
-        return str(hira), 2, "Hiragino Sans GB#2 W6-ish [Mac production]", None
+            return str(hira), idx, f"{label} [Mac system fallback]", None
+        return str(hira), 2, "Hiragino Sans GB#2 W6-ish [Mac system fallback]", None
 
-    # Mac alt: PingFang SC Semibold (heaviest typical SC weight in PingFang.ttc)
+    # Mac alt: PingFang SC Semibold
     for pf in (
         Path("/System/Library/Fonts/PingFang.ttc"),
         Path("/Library/Fonts/PingFang.ttc"),
@@ -176,26 +194,8 @@ def resolve_hud_font() -> tuple[str, int, str, list[float] | None]:
         )
         if picked:
             idx, label = picked
-            return str(pf), idx, f"{label} [Mac alt — PingFang SC heavy]", None
-        return str(pf), 0, "PingFang.ttc#0 [Mac alt]", None
-
-    # Linux preview: Source Han Sans SC Heavy (bundled) ≈ athletic Black weight
-    if _BUNDLED_HEAVY.exists():
-        return (
-            str(_BUNDLED_HEAVY),
-            0,
-            "Source Han Sans SC Heavy [Linux preview ≈ Hiragino GB W6 / Black]",
-            None,
-        )
-
-    # Linux alt: Noto Sans SC variable at Black (900)
-    if _BUNDLED_VF.exists():
-        return (
-            str(_BUNDLED_VF),
-            0,
-            "Noto Sans SC VF wght=900 [Linux preview alt]",
-            [900.0],
-        )
+            return str(pf), idx, f"{label} [Mac system fallback — PingFang SC]", None
+        return str(pf), 0, "PingFang.ttc#0 [Mac system fallback]", None
 
     # Last resort: system Noto CJK SC Bold (flatter UI look)
     for noto in (
@@ -212,13 +212,12 @@ def resolve_hud_font() -> tuple[str, int, str, list[float] | None]:
         )
         if picked:
             idx, label = picked
-            return str(noto), idx, f"{label} [Linux last-resort — flatter than Heavy]", None
-        return str(noto), 2, f"{noto.name}#2 [Linux last-resort]", None
+            return str(noto), idx, f"{label} [system last-resort — flatter than Heavy]", None
+        return str(noto), 2, f"{noto.name}#2 [system last-resort]", None
 
     raise OSError(
-        "No unified CJK+Latin HUD font found. On Mac use Hiragino Sans GB / "
-        "PingFang SC; on Linux place SourceHanSansSC-Heavy.otf under tools/hud/fonts/ "
-        "or set HUD_FONT_PATH."
+        "No unified CJK+Latin HUD font found. Place SourceHanSansSC-Heavy.otf under "
+        "tools/hud/fonts/ (repo default) or set HUD_FONT_PATH."
     )
 
 
