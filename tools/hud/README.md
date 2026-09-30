@@ -29,13 +29,16 @@ macOS 如果后面遇到图形依赖问题，可补：
 brew install cairo pkg-config
 ```
 
-脚本当前默认使用系统字体 **SF Compact Rounded Black**（圆角特粗、纯白、无描边）：
+HUD 全文（中文键、拉丁数字/单位、配速、时长、日期、跑鞋等）使用 **同一偏粗字体族**（贴近旧 Noto Sans Black 运动感，避免扁平 UI 细 Bold）：
 
-```text
-/System/Library/Fonts/SFCompactRounded.ttf
-```
+- **全平台生产默认：Source Han Sans SC Heavy**（`tools/hud/fonts/SourceHanSansSC-Heavy.otf`，Adobe，≈ Black 字重；Mac / Linux 同一文件，渲染一致）
+- 捆绑回退：Noto Sans SC VF wght=900（同目录）
+- 系统回退（仅当捆绑缺失）：macOS Hiragino Sans GB W6 / PingFang SC Semibold；Linux Noto Sans CJK SC Bold
+- 覆盖优先级：`HUD_FONT_PATH`（+ 可选 `HUD_FONT_INDEX` / `HUD_FONT_WGHT`）→ CLI `--font` → 捆绑 Heavy
 
-温度单位写 `°C`，不要写 `℃`。这款字体没有 U+2103，真渲染会变成方框。
+字色纯白、无描边。`gopro_dashboard_wrap.py` 统一加载（含 TTC index / VF 轴）。Mac 上可用 `--font` 指向系统面（如 Hiragino）；设了 `HUD_FONT_PATH` 时环境变量优先。
+
+温度单位写 `°` / `°C` 分写，不要写 `℃`（部分字体缺 U+2103 会变成方框）。
 
 ## 1. `probe_video_times.py`
 
@@ -192,20 +195,28 @@ hud-renders/YYYY-MM-DD-run-a-hud-preview.mp4    # 跟原片同档的审片文件
 
 ### 天气
 
-生产流程用 `--weather-city shanghai`：只用 FIT 的时间窗，坐标走上海城市场点，**不发送 FIT GPS**。也可以先跑 `tools/hud/weather.py --out weather-hourly.json`，再 `--weather-json`。
-
-仍可用 FIT GPS 拉 [Open-Meteo](https://open-meteo.com/)（气温、体感、相对湿度），写进右下时间区块，不再显示 GPS：
+右下两枚胶囊（标签左、数值右）：
 
 ```text
-06:06:13
-2026-04-23
-13°C / 11°C
-89%
+0:36:15
+2026/09/30 · 06:32:04
+┌ AIR  88% · 23° ┐
+└ FEEL       27° ┘
 ```
 
-湿度单独最后一行。`/` 两边有空格。这会把经纬度（四位小数）发给 Open-Meteo 的 archive，失败再走 forecast。
+- **AIR**：湿度优先，`{rh}% · {temp}°`（湿度百分号 + 气温，中间淡 `·`）
+- **FEEL**：体感 `{feels}°`
+- 不用 `℃` 单字符；标签是英文 **AIR / FEEL**
 
-没有 GPS、拉取失败、或加 `--no-weather` 时，整块天气从模板里拿掉，只留时间和日期。已经备好小时数据时用 `--weather-json path.json`。JSON 默认写在素材目录 `weather-hourly.json`。
+**生产默认坐标：城市点，不是 FIT 轨迹 GPS。** 用 `--weather-city shanghai`：只取 FIT 的时间窗，经纬度用城市场点（见 `weather.py` 的 `CITIES`），**不发送 FIT GPS**。Open-Meteo 先打 archive，失败再 forecast（四位小数 lat/lon）。
+
+也可以：
+
+- `tools/hud/weather.py --city shanghai --start … --end … --out weather-hourly.json`，再 `--weather-json`
+- 不传 `--weather-city` 时仍可用 FIT 首点 GPS 拉天气（兼容旧流程）
+- `--no-weather` 或拉取失败：模板里去掉 `weather_group`，只留时长和日期
+
+JSON 默认写在素材目录 `weather-hourly.json`。
 
 设计稿在 `tools/hud/hud-layout-preview.html`，改布局先看预览，再改 XML。
 
@@ -380,7 +391,7 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml
 
 脚本默认还会使用：
 
-- 字体：`/System/Library/Fonts/SFCompactRounded.ttf`
+- 字体：捆绑 `Source Han Sans SC Heavy`（Mac+Linux 默认）
 - 配置目录：`/tmp/gopro-overlay-config`
 - 缓存目录：`/tmp/gopro-overlay-cache`
 
@@ -412,7 +423,8 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml
 如果默认字体不可用，可以改：
 
 ```bash
---font /System/Library/Fonts/SFCompactRounded.ttf
+--font /System/Library/Fonts/Hiragino\ Sans\ GB.ttc   # Mac：CLI 覆盖捆绑默认
+# 或：HUD_FONT_PATH=/path/to/face.otf HUD_FONT_INDEX=0
 ```
 
 ### 4. FIT 找不到

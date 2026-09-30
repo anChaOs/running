@@ -35,62 +35,291 @@ _orig_metric_accessor_from = lx.metric_accessor_from
 _orig_overlay_init = Overlay.__init__
 _orig_create_text = lx.Widgets.create_text
 
-# 跑鞋名含汉字时用冬青黑体 W6。SF Compact Rounded 没有 CJK 字形。
-CJK_FONT = "/System/Library/Fonts/Hiragino Sans GB.ttc"
-CJK_FONT_INDEX = 2
+# ---------------------------------------------------------------------------
+# Unified HUD typeface (ONE family for CJK + Latin — no dual-font mix).
+#
+# Prefer a heavier / slightly rounder athletic feel (old Noto Sans Black vibe),
+# NOT the flat UI look of Noto CJK Bold / PingFang Regular.
+#
+# Cross-platform production default: Source Han Sans SC Heavy bundled under
+#   tools/hud/fonts/SourceHanSansSC-Heavy.otf (Adobe — same lineage as Noto CJK,
+#   Heavy ≈ athletic Black). Same face on Mac and Linux for consistent renders.
+# Fallbacks (if bundle missing): Noto Sans SC VF wght=900 → Hiragino Sans GB W6
+#   → PingFang SC Semibold → system Noto Sans CJK SC Bold.
+# Resolve order for the unified face:
+#   1) HUD_FONT_PATH (+ optional HUD_FONT_INDEX / HUD_FONT_WGHT)
+#   2) CLI --font (gopro-overlay / render_running_hud.py)
+#   3) bundled SourceHanSansSC-Heavy.otf, then other fallbacks
+# ---------------------------------------------------------------------------
 
-# 对齐预览 Compact 特粗。font_variant 会掉回 Regular，每次都要再设一次。
-HUD_FONT_VARIATION = "Black"
+_HUD_DIR = Path(__file__).resolve().parent
+_BUNDLED_HEAVY = _HUD_DIR / "fonts" / "SourceHanSansSC-Heavy.otf"
+_BUNDLED_VF = _HUD_DIR / "fonts" / "NotoSansSC-VF.ttf"
 
 
-def _apply_hud_weight(loaded_font):
-    if not hasattr(loaded_font, "set_variation_by_name"):
-        return loaded_font
+def _ttc_face_names(path: Path) -> list[tuple[int, str, str]]:
+    """Return [(index, family, subfamily)] for a TTC/TTF via the name table."""
+    import struct
+
+    data = path.read_bytes()
+    if data[:4] == b"ttcf":
+        num = struct.unpack(">I", data[8:12])[0]
+        offsets = struct.unpack(f">{num}I", data[12 : 12 + 4 * num])
+    else:
+        offsets = (0,)
+
+    faces: list[tuple[int, str, str]] = []
+    for idx, offset in enumerate(offsets):
+        _scaler, num_tables = struct.unpack(">4sH", data[offset : offset + 6])
+        pos = offset + 12
+        name_off = None
+        name_len = 0
+        for _ in range(num_tables):
+            tag, _csum, off, length = struct.unpack(">4sIII", data[pos : pos + 16])
+            pos += 16
+            if tag == b"name":
+                name_off, name_len = off, length
+                break
+        if name_off is None:
+            faces.append((idx, "", ""))
+            continue
+        nd = data[name_off : name_off + name_len]
+        _fmt, count, string_offset = struct.unpack(">HHH", nd[:6])
+        names: dict[int, str] = {}
+        for i in range(count):
+            plat, enc, lang, name_id, length, soff = struct.unpack(
+                ">HHHHHH", nd[6 + i * 12 : 6 + (i + 1) * 12]
+            )
+            raw = nd[string_offset + soff : string_offset + soff + length]
+            text_val = None
+            if plat == 3 and enc == 1:
+                text_val = raw.decode("utf-16-be", errors="ignore")
+            elif plat == 0:
+                text_val = raw.decode("utf-16-be", errors="ignore")
+            elif plat == 1 and enc == 0:
+                text_val = raw.decode("mac-roman", errors="ignore")
+            if text_val is None:
+                continue
+            if name_id not in names or (plat == 3 and lang == 0x409):
+                names[name_id] = text_val
+        family = names.get(16) or names.get(1) or ""
+        sub = names.get(17) or names.get(2) or ""
+        faces.append((idx, family, sub))
+    return faces
+
+
+def _pick_face(
+    path: Path,
+    family_needles: tuple[str, ...],
+    prefer_subs: tuple[str, ...],
+    exclude_needles: tuple[str, ...] = (),
+) -> tuple[int, str] | None:
     try:
-        loaded_font.set_variation_by_name(HUD_FONT_VARIATION)
+        faces = _ttc_face_names(path)
     except OSError:
-        if hasattr(loaded_font, "set_variation_by_axes"):
-            loaded_font.set_variation_by_axes([900])
-    return loaded_font
+        return None
+    matched: list[tuple[int, int, str]] = []
+    for idx, family, sub in faces:
+        blob = f"{family} {sub}"
+        if any(x.lower() in blob.lower() for x in exclude_needles):
+            continue
+        if not any(n.lower() in blob.lower() for n in family_needles):
+            continue
+        rank = len(prefer_subs)
+        for i, pref in enumerate(prefer_subs):
+            if pref.lower() in sub.lower() or pref.lower() in blob.lower():
+                rank = i
+                break
+        label = f"{family} {sub}".strip() or path.name
+        matched.append((rank, idx, label))
+    if not matched:
+        return None
+    matched.sort()
+    _rank, idx, label = matched[0]
+    return idx, label
 
 
-def _needs_cjk_font(element) -> bool:
-    name = element.attrib.get("name", "")
-    body = element.text or ""
-    if name == "shoe_name_text":
-        return True
-    return any("一" <= ch <= "鿿" for ch in body)
+def resolve_hud_font() -> tuple[str, int, str, list[float] | None]:
+    """Pick one CJK+Latin face. Returns (path, ttc_index, label, variation_axes|None)."""
+    env_path = os.environ.get("HUD_FONT_PATH")
+    env_index = os.environ.get("HUD_FONT_INDEX")
+    env_wght = os.environ.get("HUD_FONT_WGHT")
+    if env_path and Path(env_path).exists():
+        idx = int(env_index) if env_index is not None else 0
+        axes = [float(env_wght)] if env_wght else None
+        return env_path, idx, f"env HUD_FONT_PATH ({Path(env_path).name}#{idx})", axes
+
+    # Cross-platform production default: bundled Source Han Sans SC Heavy
+    if _BUNDLED_HEAVY.exists():
+        return (
+            str(_BUNDLED_HEAVY),
+            0,
+            "Source Han Sans SC Heavy [bundled — Mac+Linux production default]",
+            None,
+        )
+
+    # Bundled alt: Noto Sans SC variable at Black (900)
+    if _BUNDLED_VF.exists():
+        return (
+            str(_BUNDLED_VF),
+            0,
+            "Noto Sans SC VF wght=900 [bundled fallback]",
+            [900.0],
+        )
+
+    # Mac system fallback: Hiragino Sans GB W6
+    hira = Path("/System/Library/Fonts/Hiragino Sans GB.ttc")
+    if hira.exists():
+        picked = _pick_face(
+            hira,
+            family_needles=("Hiragino Sans GB", "冬青黑体"),
+            prefer_subs=("W6", "W5", "W3"),
+        )
+        if picked:
+            idx, label = picked
+            return str(hira), idx, f"{label} [Mac system fallback]", None
+        return str(hira), 2, "Hiragino Sans GB#2 W6-ish [Mac system fallback]", None
+
+    # Mac alt: PingFang SC Semibold
+    for pf in (
+        Path("/System/Library/Fonts/PingFang.ttc"),
+        Path("/Library/Fonts/PingFang.ttc"),
+        Path("/System/Library/Fonts/Supplemental/PingFang.ttc"),
+    ):
+        if not pf.exists():
+            continue
+        picked = _pick_face(
+            pf,
+            family_needles=("PingFang SC", "苹方-简", "PingFangSC"),
+            prefer_subs=("Semibold", "Medium", "Regular", "Bold"),
+        )
+        if picked:
+            idx, label = picked
+            return str(pf), idx, f"{label} [Mac system fallback — PingFang SC]", None
+        return str(pf), 0, "PingFang.ttc#0 [Mac system fallback]", None
+
+    # Last resort: system Noto CJK SC Bold (flatter UI look)
+    for noto in (
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+    ):
+        if not noto.exists():
+            continue
+        picked = _pick_face(
+            noto,
+            family_needles=("Noto Sans CJK SC",),
+            prefer_subs=("Bold", "Regular"),
+            exclude_needles=("Mono",),
+        )
+        if picked:
+            idx, label = picked
+            return str(noto), idx, f"{label} [system last-resort — flatter than Heavy]", None
+        return str(noto), 2, f"{noto.name}#2 [system last-resort]", None
+
+    raise OSError(
+        "No unified CJK+Latin HUD font found. Place SourceHanSansSC-Heavy.otf under "
+        "tools/hud/fonts/ (repo default) or set HUD_FONT_PATH."
+    )
+
+
+HUD_FONT_PATH, HUD_FONT_INDEX, HUD_FONT_LABEL, HUD_FONT_AXES = resolve_hud_font()
+_hud_font_logged = False
+_cli_font_applied = False
+
+
+def _load_hud_face(size: int, path: str | None = None, index: int | None = None, axes=None):
+    path = path if path is not None else HUD_FONT_PATH
+    index = HUD_FONT_INDEX if index is None else index
+    axes = HUD_FONT_AXES if axes is None else axes
+    loaded = ImageFont.truetype(font=path, size=size, index=index)
+    if axes and hasattr(loaded, "set_variation_by_axes"):
+        try:
+            loaded.set_variation_by_axes(list(axes))
+        except OSError:
+            pass
+    return loaded
+
+
+def _apply_cli_font_if_needed(font: str) -> None:
+    """HUD_FONT_PATH > CLI --font > bundled/default from resolve_hud_font()."""
+    global HUD_FONT_PATH, HUD_FONT_INDEX, HUD_FONT_LABEL, HUD_FONT_AXES, _cli_font_applied
+    if _cli_font_applied:
+        return
+    _cli_font_applied = True
+    if os.environ.get("HUD_FONT_PATH"):
+        # Already resolved from env in resolve_hud_font(); CLI --font must not win.
+        return
+    if not font:
+        return
+    cli = Path(font).expanduser()
+    if not cli.exists():
+        return
+    # Same path as already resolved default → keep label/index/axes.
+    if cli.resolve() == Path(HUD_FONT_PATH).resolve():
+        return
+    idx = int(os.environ["HUD_FONT_INDEX"]) if os.environ.get("HUD_FONT_INDEX") else 0
+    axes = [float(os.environ["HUD_FONT_WGHT"])] if os.environ.get("HUD_FONT_WGHT") else None
+    HUD_FONT_PATH = str(cli.resolve())
+    HUD_FONT_INDEX = idx
+    HUD_FONT_AXES = axes
+    HUD_FONT_LABEL = f"CLI --font ({cli.name}#{idx})"
+
+
+def load_font(font: str, size: int = 32):
+    """Load unified HUD face. Order: HUD_FONT_PATH > --font > bundled Heavy."""
+    global _hud_font_logged
+    _apply_cli_font_if_needed(font)
+    if not _hud_font_logged:
+        print(f"HUD font (unified CJK+Latin, heavier): {HUD_FONT_LABEL}")
+        print(f"  file: {HUD_FONT_PATH}  index={HUD_FONT_INDEX}  axes={HUD_FONT_AXES}")
+        _hud_font_logged = True
+
+    loaded = _load_hud_face(size)
+
+    def font_variant(*args, **kwargs):
+        new_size = size
+        if args:
+            new_size = args[0]
+        new_size = kwargs.get("size", new_size)
+        return _load_hud_face(int(new_size))
+
+    loaded.font_variant = font_variant
+    return loaded
+
 
 
 def create_text(self, element, entry, **kwargs):
-    if not _needs_cjk_font(element):
+    """Weather value composites (right-aligned inside pills). Labels stay plain left text."""
+    name = element.attrib.get("name", "")
+    if name not in ("wx_env_values", "wx_body_values"):
         return _orig_create_text(self, element, entry, **kwargs)
-    if element.text is None:
-        raise OSError("Text components should have the text in the element like <component...>Text</component>")
-    size = lx.iattrib(element, "size", d=16, r=range(1, 2000))
-    font = ImageFont.truetype(font=CJK_FONT, size=size, index=CJK_FONT_INDEX)
+
+    font = self._font(element, "size", d=14)
+
+    def env_values():
+        e = entry()
+        temp = getattr(e, "wx_temp", None)
+        rh = getattr(e, "wx_rh", None)
+        t_s = "-" if temp is None else f"{int(round(float(temp.m)))}"
+        r_s = "-" if rh is None else f"{int(round(float(rh.m)))}"
+        return f"{r_s}% · {t_s}°"
+
+    def body_values():
+        e = entry()
+        feels = getattr(e, "wx_feels", None)
+        f_s = "-" if feels is None else f"{int(round(float(feels.m)))}"
+        return f"{f_s}°"
+
     return text_widget(
         at=lx.at(element),
-        value=lambda: element.text,
+        value=env_values if name == "wx_env_values" else body_values,
         font=font,
-        align=lx.attrib(element, "align", d="left"),
+        align=lx.attrib(element, "align", d="right"),
         direction=lx.attrib(element, "direction", d="ltr"),
         fill=lx.rgbattr(element, "rgb", d=(255, 255, 255)),
         stroke=lx.rgbattr(element, "outline", d=(0, 0, 0)),
         stroke_width=lx.iattrib(element, "outline_width", d=2),
     )
-
-
-def load_font(font: str, size: int = 32):
-    loaded = _orig_load_font(font, size)
-    _apply_hud_weight(loaded)
-    orig_variant = loaded.font_variant
-
-    def font_variant(*args, **kwargs):
-        return _apply_hud_weight(orig_variant(*args, **kwargs))
-
-    loaded.font_variant = font_variant
-    return loaded
 
 
 def metric_accessor_from(name: str):
@@ -99,6 +328,7 @@ def metric_accessor_from(name: str):
         "wx_feels": lambda e: getattr(e, "wx_feels", None),
         "wx_rh": lambda e: getattr(e, "wx_rh", None),
         "elapsed": lambda e: getattr(e, "elapsed", None),
+        "shoe_odo": lambda e: getattr(e, "shoe_odo", None),
     }
     if name in extra:
         return extra[name]
@@ -313,6 +543,12 @@ def gopro_dashboard_arguments(args=None):
     want_overlay = False
     filtered: list[str] = []
     skip_next = False
+    drop_value_flags = {
+        "--shoe-name",
+        "--shoe-total-km-after-run",
+        "-sn",
+        "-sk",
+    }
     for i, token in enumerate(argv):
         if skip_next:
             skip_next = False
@@ -323,6 +559,12 @@ def gopro_dashboard_arguments(args=None):
             continue
         if token.startswith("--generate=") and token.split("=", 1)[1] == "overlay":
             want_overlay = True
+            continue
+        # render_running_hud 会透传鞋参数；真值走环境变量 / 已解析 XML，不进 stock CLI
+        if token in drop_value_flags:
+            skip_next = True
+            continue
+        if any(token.startswith(f"{flag}=") for flag in drop_value_flags):
             continue
         filtered.append(token)
     parsed = _orig_arguments(filtered)
@@ -335,14 +577,15 @@ def gopro_dashboard_arguments(args=None):
 _ROUTE_SCALE = 3
 
 
-def _draw_location_marker(draw, position, size: int = 6) -> None:
-    # 小白瓷点，细褐边。比沙色路线亮一档，但不做成靶心。
+def _draw_location_marker(draw, position, size: int = 12) -> None:
+    # 白瓷圆点，褐边。loc-size 是半径（像素）。线宽约 10，点要比线明显更大。
     x, y = position
+    outline_w = 3 if size >= 11 else 2
     draw.ellipse(
         [(x - size, y - size), (x + size, y + size)],
         fill=(255, 255, 255, 255),
         outline=(42, 26, 16, 255),
-        width=2,
+        width=outline_w,
     )
 
 
@@ -384,13 +627,68 @@ def _circuit_draw(self, image, draw):
     frame = self.image.copy()
     frame_draw = ImageDraw.Draw(frame)
     if not self.privacy_zone.encloses(location):
-        _draw_location_marker(frame_draw, self.scale(location), 7)
+        _draw_location_marker(frame_draw, self.scale(location), getattr(self, "_hud_marker_size", 12))
     image.alpha_composite(frame, (0, 0))
 
 
+class _CircleKnobBar:
+    """进度条末端画实心圆，而不是 Bar 自带的 5% 高亮方头。"""
+
+    def __init__(self, bar, diameter: int, fill, outline):
+        self.bar = bar
+        self.diameter = diameter
+        self.fill = fill
+        self.outline = outline
+
+    def draw(self, image, draw):
+        self.bar.draw(image, draw)
+        cx = self.bar.x_coord(self.bar.reading())
+        cy = self.bar.size.y / 2
+        radius = self.diameter / 2
+        draw.ellipse(
+            [(cx - radius, cy - radius), (cx + radius, cy + radius)],
+            fill=self.fill,
+            outline=self.outline,
+            width=2,
+        )
+
+
+_orig_create_bar = lx.Widgets.create_bar
+_orig_create_circuit_map = lx.Widgets.create_circuit_map
+
+
+def create_bar(self, element, entry, **kwargs):
+    knob = element.attrib.pop("knob", None)
+    knob_size = element.attrib.pop("knob-size", None)
+    try:
+        bar = _orig_create_bar(self, element, entry, **kwargs)
+    finally:
+        if knob is not None:
+            element.attrib["knob"] = knob
+        if knob_size is not None:
+            element.attrib["knob-size"] = knob_size
+    if knob != "circle":
+        return bar
+    diameter = int(knob_size) if knob_size else 18
+    return _CircleKnobBar(bar, diameter, (255, 255, 255, 255), (42, 26, 16, 255))
+
+
+def create_circuit_map(self, element, entry, **kwargs):
+    raw = element.attrib.pop("loc-size", None)
+    try:
+        widget = _orig_create_circuit_map(self, element, entry, **kwargs)
+    finally:
+        if raw is not None:
+            element.attrib["loc-size"] = raw
+    widget._hud_marker_size = int(raw) if raw else 12
+    return widget
+
+
+lx.Widgets.create_bar = create_bar
+lx.Widgets.create_circuit_map = create_circuit_map
+lx.Widgets.create_text = create_text
 lx.quantity_formatter_for = quantity_formatter_for
 lx.metric_accessor_from = metric_accessor_from
-lx.Widgets.create_text = create_text
 go_args.gopro_dashboard_arguments = gopro_dashboard_arguments
 go_font.load_font = load_font
 Overlay.__init__ = overlay_init
