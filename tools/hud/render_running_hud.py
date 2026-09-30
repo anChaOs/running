@@ -28,7 +28,26 @@ WEATHER_CITIES = _weather.CITIES
 
 
 DEFAULT_TEMPLATE = HUD_DIR / "templates" / "gopro-dashboard-overlay-running-hud-landscape-map-safe.xml"
-DEFAULT_FONT = Path("/System/Library/Fonts/SFCompactRounded.ttf")
+def _default_hud_font_path() -> Path:
+    # Mac production: Hiragino Sans GB W6 (heavier/rounder). Alt: PingFang SC Semibold.
+    # Linux preview: bundled Source Han Sans SC Heavy (tools/hud/fonts/).
+    # Face index / wght axis applied inside gopro_dashboard_wrap.load_font.
+    bundled = HUD_DIR / "fonts" / "SourceHanSansSC-Heavy.otf"
+    for candidate in (
+        Path("/System/Library/Fonts/Hiragino Sans GB.ttc"),
+        Path("/System/Library/Fonts/PingFang.ttc"),
+        Path("/Library/Fonts/PingFang.ttc"),
+        bundled,
+        HUD_DIR / "fonts" / "NotoSansSC-VF.ttf",
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"),
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+    ):
+        if candidate.exists():
+            return candidate
+    return Path("/System/Library/Fonts/Hiragino Sans GB.ttc")
+
+
+DEFAULT_FONT = _default_hud_font_path()
 DEFAULT_CONFIG_DIR = Path("/tmp/gopro-overlay-config")
 DEFAULT_CACHE_DIR = Path("/tmp/gopro-overlay-cache")
 FFMPEG_PROFILES = HUD_DIR / "ffmpeg-profiles.json"
@@ -244,7 +263,7 @@ def main() -> int:
         action="store_true",
         help="Use the platform-safe full-route map HUD template (same as default unless --template overrides it)",
     )
-    parser.add_argument("--font", default=str(DEFAULT_FONT), help="Font path for gopro-dashboard-overlay")
+    parser.add_argument("--font", default=str(DEFAULT_FONT), help="Font path passed to gopro-overlay; wrap overrides to unified PingFang SC / Noto Sans CJK SC (CJK+Latin one face)")
     parser.add_argument(
         "--video-end-time-mode",
         "--video-time-mode",

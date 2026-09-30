@@ -29,13 +29,16 @@ macOS 如果后面遇到图形依赖问题，可补：
 brew install cairo pkg-config
 ```
 
-脚本当前默认使用系统字体 **SF Compact Rounded Black**（圆角特粗、纯白、无描边）：
+HUD 全文（中文键、拉丁数字/单位、配速、时长、日期、跑鞋等）使用 **同一偏粗字体族**（贴近旧 Noto Sans Black 运动感，避免扁平 UI 细 Bold）：
 
-```text
-/System/Library/Fonts/SFCompactRounded.ttf
-```
+- **macOS 生产默认：Hiragino Sans GB W6**（冬青黑体简体 W6，`/System/Library/Fonts/Hiragino Sans GB.ttc`）
+- macOS 备选：PingFang SC **Semibold**
+- **Linux 预览：Source Han Sans SC Heavy**（`tools/hud/fonts/SourceHanSansSC-Heavy.otf`，Adobe，≈ Black 字重；对应 Mac 的 W6/偏粗观感）
+- Linux 再回退：Noto Sans SC VF wght=900 → 系统 Noto Sans CJK SC Bold
 
-温度单位写 `°C`，不要写 `℃`。这款字体没有 U+2103，真渲染会变成方框。
+字色纯白、无描边。`gopro_dashboard_wrap.py` 统一加载（含 TTC index / VF 轴），忽略仅拉丁的 `--font`。
+
+温度单位写 `°` / `°C` 分写，不要写 `℃`（部分字体缺 U+2103 会变成方框）。
 
 ## 1. `probe_video_times.py`
 
@@ -199,11 +202,11 @@ hud-renders/YYYY-MM-DD-run-a-hud-preview.mp4    # 跟原片同档的审片文件
 ```text
 06:06:13
 2026-04-23
-13°C / 11°C
+13°C · 27°C
 89%
 ```
 
-湿度单独最后一行。`/` 两边有空格。这会把经纬度（四位小数）发给 Open-Meteo 的 archive，失败再走 forecast。
+湿度单独最后一行，只有百分号。气温和体感同一行，中间是淡一点的 `·`，没有中文标签。这会把经纬度（四位小数）发给 Open-Meteo 的 archive，失败再走 forecast。
 
 没有 GPS、拉取失败、或加 `--no-weather` 时，整块天气从模板里拿掉，只留时间和日期。已经备好小时数据时用 `--weather-json path.json`。JSON 默认写在素材目录 `weather-hourly.json`。
 
@@ -380,7 +383,7 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml
 
 脚本默认还会使用：
 
-- 字体：`/System/Library/Fonts/SFCompactRounded.ttf`
+- 字体：macOS `Hiragino Sans GB W6`；Linux 预览 `Source Han Sans SC Heavy`
 - 配置目录：`/tmp/gopro-overlay-config`
 - 缓存目录：`/tmp/gopro-overlay-cache`
 
@@ -412,7 +415,7 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml
 如果默认字体不可用，可以改：
 
 ```bash
---font /System/Library/Fonts/SFCompactRounded.ttf
+--font /System/Library/Fonts/Hiragino\ Sans\ GB.ttc   # wrap 解析为统一偏粗 CJK+Latin 面
 ```
 
 ### 4. FIT 找不到
