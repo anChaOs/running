@@ -1,6 +1,6 @@
 ---
 name: p3-assemble
-description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。字幕默认外挂，不要烧进成片。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
+description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。成片音频峰值限制 ≤ −1 dB（先降风噪再推人声）。字幕默认外挂，不要烧进成片。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
 ---
 
 # 拼接 + 核对
@@ -65,6 +65,15 @@ cp episodes/YYYY-MM-DD-slug/subtitles.srt \
 - 统一 60 fps、`settb=1/60`（open/close 和 preview 时间基不同，不统一 xfade 会失败）
 - 视频 HEVC videotoolbox，码率对齐 preview；音频 AAC 192k
 
+## 音频（成片必做）
+
+这不是改 HUD 代码，是成片导出时的听感底线：
+
+- **峰值限制 ≤ −1 dB**（ceiling −1 或 −1.5 dB）。实测口播顶到 0 dB 会削波，刺耳。
+- 先降 POV 跑段风噪，再推人声；不要整轨盲目加大。
+- 录的时候尽量加风棉/死猫；开场自拍口播清楚，切到 POV 后音量别突然炸。
+- 拼完用 IINA 听一遍开场、第一段 run、风声最大处；削波或风盖过人声就不算过。
+
 只有用户明确要求硬字幕时才加 `--ass episodes/.../subtitles.ass`。
 
 先看接缝小样（不拼全片）：
@@ -120,6 +129,7 @@ iina --mpv-geometry=320x180-8+8 \
 - 跑鞋名和 `-sk` 与 `training/logs/shoes.md` 一致
 - 天气是 `13°C / 12°C` 这种，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
+- 音频峰值 ≤ −1 dB，无明显削波；POV 风噪不盖过人声
 
 通过后：`episode.md` 的 `status` 改为 `edited`，`assets.md` 制作状态 `assemble: done`、`qc: done`。
 
@@ -142,6 +152,7 @@ SRT 没有位置信息，默认贴底栏，可能压 HUD。公开前在 B 站、
 | xfade 报 timebase mismatch | 没做 `fps=60,settb=1/60`，concat 后没再 settb |
 | 主轨没有 HUD | 拼了原片而不是 `*-hud-preview.mp4` |
 | 平台字幕压 HUD | SRT 没有位置信息，属预期；公开前在网页播放器开 CC |
+| 口播刺耳 / 风盖过人声 | 峰值顶到 0 dB 削波，或没先降风噪就推音量；限制器 ceiling −1 dB 后重听 |
 
 ## 完成后
 
