@@ -6,11 +6,11 @@
 - 标题：我理解的Personal Agent
 - 封面句：Personal Agent 怎么帮我干活？
 - 一句话观点：我理解的 personal agent，核心是一台属于 AI 自己的电脑，只为我一个人干活。现在火起来，是因为模型变强了，电脑也有人配好了。我懒，追求的是 human not in the loop：活它自己干，我尽量不在循环里。
-- 这期边界：讲我理解的定义、Muse / dots / Instinct、我自己的三个场景。dots 只讲它怎么跟 ChatGPT、Codex 联动，额度怎么分三本账。不讲怎么搭，不比哪家最好，不讲贵不贵。
+- 这期边界：讲我理解的定义、Muse / dots / Instinct、我自己的三个场景。dots 只讲它和 Grok Bot 的三点区别。不讲怎么搭，不比哪家最好，不讲贵不贵。
 - 训练场景：轻松跑 70–80 分钟。配速放到能说话
 - 拍摄分段：open / run-a / run-b / run-c / close
 - 平台：B 站 / YouTube 全长
-- 证据：OpenClaw、Hermes、Muse、dots、Instinct 的时间和设计，Muse 卖键盘，OSWorld 的数，是事实。Fable 5 只看屏幕通关《宝可梦火红》，来自 Anthropic 官网。游戏内通关时间 50 小时 9 分，是日媒从官方时延片读到的，不是 Anthropic 公布的墙钟。dots 跟 ChatGPT / Codex / Work 联动、三本账，来自 OpenAI 文档。出处在 `plan.md` 参考。调 HUD、对字幕、管 bug 是个人经历。「核心是一台电脑」「火起来是因为模型变强」是我的理解
+- 证据：OpenClaw、Hermes、Muse、dots、Instinct 的时间和设计，Muse 卖键盘，OSWorld 的数，是事实。Fable 5 只看屏幕通关《宝可梦火红》，来自 Anthropic 官网。游戏内通关时间 50 小时 9 分，是日媒从官方时延片读到的，不是 Anthropic 公布的墙钟。dots 和 Grok Bot 的区别，来自两家官方文档。出处在 `plan.md` 参考。调 HUD、对字幕、管 bug 是个人经历。「核心是一台电脑」「火起来是因为模型变强」是我的理解
 - 和已有期：新角度。4/24 那期讲 HUD 流程本身，这期讲我和 agent 怎么分工
 
 ## 为什么值得拍
@@ -31,7 +31,7 @@
 
 ### run-a
 
-记忆点：一台电脑、72%、火红五十小时、卖键盘、三本账、叫不起来、三次电话
+记忆点：一台电脑、72%、火红五十小时、卖键盘、每人一个、共用电脑、草稿、三次电话
 
 > 我理解的 personal agent，核心是一台电脑。
 >
@@ -53,15 +53,13 @@
 >
 > （提示：Matt Robb、二手市场卖键盘、「一直允许」、10 加元、地址、「我在」、去看看你给 AI 开了哪些权限）
 >
-> 再说 dots。
+> 再说 dots。dots 是 OpenAI 的，我用的是 Grok Bot。两个最大的区别有三个。
 >
-> dots 住在 ChatGPT 里。它可以自己在云电脑上干活，也可以把活派给 Codex，或者派给 ChatGPT Work。
+> 第一，dots 现在每人一个。Grok Bot 可以建好几个，一个管视频，一个管公司的 bug，它们之间还能互相发消息、交接任务。
 >
-> 派出去的任务是单独一条对话，不会把你跟 dots 说的所有话都带过去。云上的代码任务，得你先在 Codex 里把环境建好，dots 才能开。连给 dots 的电脑，也不等于连给了 Codex。这两套权限是分开的。
+> 第二，我的几个 Bot 共用一台云电脑。一个 Bot 存的文件、登录的网站，另一个 Bot 直接就能用。
 >
-> Codex 里叫不起来 dots。要它接着干，去 ChatGPT 或 Slack 找它。只有这条 Codex 任务本来就是 dots 开的，它才能在进度里盯着，再发指令。
->
-> 额度是三本账。跟它聊天，不扣 ChatGPT 的对话额度。它自己在云电脑上干活，走另一本账，上线第一个月额度放得很宽，后面怎么算官方还没公布。一旦让它去开 Codex 或者 Work 的任务，按普通 Codex 扣，和你自己点是同一池。
+> 第三，dots 没事的时候会自己在后台翻我的资料，主动来找我。Grok Bot 主要按我定好的时间表去做。发消息之前，它先给我一份草稿，我点了发送才发。
 >
 > 再说 Instinct 的设计。
 >
