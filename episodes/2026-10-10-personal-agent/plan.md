@@ -23,10 +23,19 @@
 - OpenClaw https://en.wikipedia.org/wiki/OpenClaw
 - Hermes Agent（Nous Research）https://github.com/NousResearch/hermes-agent
 - OSWorld（Xie et al., 2024）https://os-world.github.io/
+- Anthropic：Claude Fable 5 通关《宝可梦火红》https://www.anthropic.com/news/claude-fable-5-mythos-5
+- GameSpark：官方时延片里游戏内时间 50 小时 9 分 https://www.gamespark.jp/article/2026/06/10/167798.html
 - Matt Robb 的 X 帖子 https://x.com/MattRobbt/status/2104090601411293303
 - The Verge 关于 Muse 卖键盘的报道 https://www.theverge.com/ai-artificial-intelligence/1001886/meta-muse-ai-facebook-marketplace-security-concerns
+- OpenAI Introducing Dots https://openai.com/index/introducing-dots/
+- OpenAI Dots：任务和记忆 https://learn.chatgpt.com/docs/dots/tasks-and-memory
+- OpenAI Dots：怎么联系它 https://learn.chatgpt.com/docs/dots/channels
+- Grok Bot：电脑 https://docs.x.ai/grok-bot/computer-and-apps
+- Grok Bot：多个 Bot 协作 https://docs.x.ai/grok-bot/chat-and-collaboration
+- Grok Bot：审批与草稿 https://docs.x.ai/grok-bot/approvals-security-and-privacy
 - Noah Shinn 发布 Instinct 的 X 帖子 https://x.com/noahrshinn/status/2092691344456351744
 - Colossus 播客：Instinct https://colossus.com/episode/instinct-the-personal-agent/
+- 第四种黑猩猩CHIMP：不做App，不做网页，0营销费用，怎么做100亿美元的Personal Agent？ https://www.bilibili.com/video/BV1Nxa269EiM/
 
 ### YouTube
 
@@ -37,7 +46,16 @@
 - OpenClaw https://en.wikipedia.org/wiki/OpenClaw
 - Hermes Agent（Nous Research）https://github.com/NousResearch/hermes-agent
 - OSWorld（Xie et al., 2024）https://os-world.github.io/
+- Anthropic：Claude Fable 5 通关《宝可梦火红》https://www.anthropic.com/news/claude-fable-5-mythos-5
+- GameSpark：官方时延片里游戏内时间 50 小时 9 分 https://www.gamespark.jp/article/2026/06/10/167798.html
 - Matt Robb 的 X 帖子 https://x.com/MattRobbt/status/2104090601411293303
 - The Verge 关于 Muse 卖键盘的报道 https://www.theverge.com/ai-artificial-intelligence/1001886/meta-muse-ai-facebook-marketplace-security-concerns
+- OpenAI Introducing Dots https://openai.com/index/introducing-dots/
+- OpenAI Dots：任务和记忆 https://learn.chatgpt.com/docs/dots/tasks-and-memory
+- OpenAI Dots：怎么联系它 https://learn.chatgpt.com/docs/dots/channels
+- Grok Bot：电脑 https://docs.x.ai/grok-bot/computer-and-apps
+- Grok Bot：多个 Bot 协作 https://docs.x.ai/grok-bot/chat-and-collaboration
+- Grok Bot：审批与草稿 https://docs.x.ai/grok-bot/approvals-security-and-privacy
 - Noah Shinn 发布 Instinct 的 X 帖子 https://x.com/noahrshinn/status/2092691344456351744
 - Colossus 播客：Instinct https://colossus.com/episode/instinct-the-personal-agent/
+- 第四种黑猩猩CHIMP：不做App，不做网页，0营销费用，怎么做100亿美元的Personal Agent？ https://www.bilibili.com/video/BV1Nxa269EiM/
