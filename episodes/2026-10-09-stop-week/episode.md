@@ -2,7 +2,7 @@
 date: 2026-10-09
 slug: stop-week
 title: 停跑一周，怎么办？
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-09-stop-week/
 ---
@@ -18,3 +18,8 @@ media: ~/Movies/running-content/2026-10-09-stop-week/
 | `talk.md` | 当天边跑边说提纲 |
 
 封面句：停跑一周，怎么办？
+
+## 发布
+
+- B 站：https://www.bilibili.com/video/BV1Tsps6kE82
+- YouTube：https://youtu.be/Z6CpPDQsCI0

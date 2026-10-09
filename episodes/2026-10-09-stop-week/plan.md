@@ -41,3 +41,8 @@
 - Mujika & Padilla, 2000. https://doi.org/10.2165/00007256-200030020-00002
 - 山雨小月 https://www.bilibili.com/video/BV1384y1a7rt
 - 云健身-仰望尾迹云 https://www.bilibili.com/video/BV1mg4y1f7Y7
+
+## 发布
+
+- B 站：https://www.bilibili.com/video/BV1Tsps6kE82
+- YouTube：https://youtu.be/Z6CpPDQsCI0

@@ -40,7 +40,7 @@ iina --mpv-geometry=320x180-8+8 \
   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
 ```
 
-成片旁边的 `YYYY-MM-DD-run-final.srt` 会自动挂上。不要推荐 ffplay。抽查：open 第一句、第一段 run 开头、各 run 接缝、close 第一句。看字是否跟嘴、两条会不会重叠、是不是单行。
+成片旁边的 `YYYY-MM-DD-run-final.srt` 会自动挂上。不要推荐 ffplay。抽查：open 第一句、第一段 run 开头、各 run 接缝、close 第一句。看字是否跟嘴、两条会不会重叠、是不是单行。出点跟说完：气口后的短人声不要当成下一句的整句，正词开口时条子不能已经没了。入点略早可以，早收不行。
 
 SRT 贴底栏，可能压 HUD。公开前用私密/不公开稿在网页播放器开 CC 看一眼。
 
