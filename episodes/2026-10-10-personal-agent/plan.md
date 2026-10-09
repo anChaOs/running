@@ -28,9 +28,11 @@
 - Matt Robb 的 X 帖子 https://x.com/MattRobbt/status/2104090601411293303
 - The Verge 关于 Muse 卖键盘的报道 https://www.theverge.com/ai-artificial-intelligence/1001886/meta-muse-ai-facebook-marketplace-security-concerns
 - OpenAI Introducing Dots https://openai.com/index/introducing-dots/
-- OpenAI Meet dots（联动和额度）https://learn.chatgpt.com/docs/dots
 - OpenAI Dots：任务和记忆 https://learn.chatgpt.com/docs/dots/tasks-and-memory
 - OpenAI Dots：怎么联系它 https://learn.chatgpt.com/docs/dots/channels
+- Grok Bot：电脑 https://docs.x.ai/grok-bot/computer-and-apps
+- Grok Bot：多个 Bot 协作 https://docs.x.ai/grok-bot/chat-and-collaboration
+- Grok Bot：审批与草稿 https://docs.x.ai/grok-bot/approvals-security-and-privacy
 - Noah Shinn 发布 Instinct 的 X 帖子 https://x.com/noahrshinn/status/2092691344456351744
 - Colossus 播客：Instinct https://colossus.com/episode/instinct-the-personal-agent/
 
@@ -48,8 +50,10 @@
 - Matt Robb 的 X 帖子 https://x.com/MattRobbt/status/2104090601411293303
 - The Verge 关于 Muse 卖键盘的报道 https://www.theverge.com/ai-artificial-intelligence/1001886/meta-muse-ai-facebook-marketplace-security-concerns
 - OpenAI Introducing Dots https://openai.com/index/introducing-dots/
-- OpenAI Meet dots（联动和额度）https://learn.chatgpt.com/docs/dots
 - OpenAI Dots：任务和记忆 https://learn.chatgpt.com/docs/dots/tasks-and-memory
 - OpenAI Dots：怎么联系它 https://learn.chatgpt.com/docs/dots/channels
+- Grok Bot：电脑 https://docs.x.ai/grok-bot/computer-and-apps
+- Grok Bot：多个 Bot 协作 https://docs.x.ai/grok-bot/chat-and-collaboration
+- Grok Bot：审批与草稿 https://docs.x.ai/grok-bot/approvals-security-and-privacy
 - Noah Shinn 发布 Instinct 的 X 帖子 https://x.com/noahrshinn/status/2092691344456351744
 - Colossus 播客：Instinct https://colossus.com/episode/instinct-the-personal-agent/
