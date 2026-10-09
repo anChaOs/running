@@ -20,7 +20,7 @@ description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/ru
 3. 保存为 `~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-data.fit`。多场只留和跑步重叠的那一个。
 4. FIT 日限额大约 50 个，一场只下一份。
 
-MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间窗，不要把 FIT GPS 发给天气接口。MCP 不可用时，才退回手机导出的 `上海市_跑步*.fit` / `乳酸阈*.fit`。
+MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间窗，不要把 FIT GPS 发给天气接口。MCP 不可用时，才退回手机导出的 FIT（文件名可能是 `上海市_跑步*.fit` 或课表名）。
 
 ## 不要做的事
 
