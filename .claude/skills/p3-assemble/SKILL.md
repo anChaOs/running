@@ -118,7 +118,7 @@ iina --mpv-geometry=320x180-8+8 \
 - 外挂跟嘴、单行、不要太长；没有 `\N` 两行；用词跟口播，没有被改写成另一种说法
 - 没有两条字幕叠在一起
 - 跑鞋名和 `-sk` 与 `training/logs/shoes.md` 一致
-- 天气是 `13°C / 12°C` 这种，不是方框 `℃`
+- 天气是「数字°C / 数字°C」，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
 
 通过后：`episode.md` 的 `status` 改为 `edited`，`assets.md` 制作状态 `assemble: done`、`qc: done`。

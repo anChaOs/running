@@ -262,7 +262,11 @@ def keep_windows(
         windows[-1] = (windows[-1][0], min(duration, last_end + tail))
     protect_from = max(0.0, duration - END_PROTECT)
     if protect_from < duration:
-        windows.append((protect_from, duration))
+        # 最后一句已在片尾附近时接到片尾，避免句尾落在语音结束和片尾保护段之间的空洞里
+        if windows and windows[-1][1] >= protect_from - 2.0:
+            windows[-1] = (windows[-1][0], duration)
+        else:
+            windows.append((protect_from, duration))
     merged: list[tuple[float, float]] = []
     for a, b in windows:
         if b - a < 0.04:
