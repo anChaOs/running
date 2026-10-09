@@ -1,15 +1,26 @@
 ---
 name: p3-ingest
-description: 把手机未重命名导出（VID_*.mp4、DCIM、手表 FIT）收进 ~/Movies/running-content/YYYY-MM-DD-slug/，按时间改成 open/run-*/close，写 assets.md。用户说收素材、重命名、ingest、手机导出时用。必须保留或校正 mtime，HUD 用它当视频结束时间。
+description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/running-content/YYYY-MM-DD-slug/，按时间改成 open/run-*/close，写 assets.md。FIT 用高驰 MCP 拉，不要等手表拷贝。用户说收素材、重命名、ingest、手机导出时用。必须保留或校正 mtime，HUD 用它当视频结束时间。
 ---
 
 # 收素材并命名
 
-小米导出常见 `VID_YYYYMMDD_HHMMSS.mp4`。FIT 常见 `上海市_跑步YYYYMMDDHHMMSS.fit` 或 `乳酸阈...fit`。大文件只放仓库外。
+小米导出常见 `VID_YYYYMMDD_HHMMSS.mp4`。FIT 用高驰 MCP 拉，落到 `YYYY-MM-DD-run-data.fit`。大文件只放仓库外。
 
 ## 前置
 
 日期、slug、原始文件夹路径。角色分配要给用户看过再 `--apply`。
+
+## FIT：高驰 MCP
+
+目录里没有当天 FIT 时，**用高驰 MCP 拉**，不要让用户从手表/App 再拷一份。国内账号节点是 `https://mcpcn.coros.com/mcp`（见 `knowledge/production/COROS-MCP.md`）。未授权就走 OAuth，浏览器回调失败则把地址栏 URL 交给 `mcp__coros__complete_authentication`。
+
+1. `querySportRecords` 按**拍摄日**筛跑步记录。对上视频时间窗的那一场。同一天有多场，按开跑时间和视频重叠来挑，不要拿相邻那天的课。
+2. `downloadActivityFitFiles` 拉该场 FIT。客户端吃不下二进制时改用 `queryActivityFitFileDownloadUrls`，再 `curl` 到媒体目录。
+3. 保存为 `~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-data.fit`。多场只留和跑步重叠的那一个。
+4. FIT 日限额大约 50 个，一场只下一份。
+
+MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间窗，不要把 FIT GPS 发给天气接口。MCP 不可用时，才退回手机导出的 `上海市_跑步*.fit` / `乳酸阈*.fit`。
 
 ## 不要做的事
 
@@ -35,7 +46,7 @@ description: 把手机未重命名导出（VID_*.mp4、DCIM、手表 FIT）收�
 - 第一段通常 `open`（跑前），最后一段 `close`（跑后），中间 `run-a`、`run-b`…
 - 只有跑中：`--no-open --no-close`
 - 空镜标成 `broll-01`，不要混进 `run-*`（HUD 会扫全部 `*-run-*.mp4`）
-- 多个 FIT：用和跑步时间重叠的那一个，命名 `YYYY-MM-DD-run-data.fit`
+- FIT 已由高驰 MCP 写成 `YYYY-MM-DD-run-data.fit`。目录里还有别的 FIT 时，只留和跑步时间重叠的那一个
 - 高驰截图（`Screenshot_*` / `*coros*` / `截图*`）改名为 `YYYY-MM-DD-stats-01.jpg`。拼成片时叠到 close 左侧
 
 `VID_` 文件名是开始时间。脚本若发现 `mtime` 和「开始 + 时长」相差超过 5 分钟，会把 `mtime` 改成结束时间。这是 HUD `--video-end-time-mode file-modified` 的前提。把将要改写的 mtime 打给用户看一眼。
