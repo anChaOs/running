@@ -35,6 +35,7 @@
 - Grok Bot：审批与草稿 https://docs.x.ai/grok-bot/approvals-security-and-privacy
 - Noah Shinn 发布 Instinct 的 X 帖子 https://x.com/noahrshinn/status/2092691344456351744
 - Colossus 播客：Instinct https://colossus.com/episode/instinct-the-personal-agent/
+- 第四种黑猩猩CHIMP：不做App，不做网页，0营销费用，怎么做100亿美元的Personal Agent？ https://www.bilibili.com/video/BV1Nxa269EiM/
 
 ### YouTube
 
@@ -57,3 +58,4 @@
 - Grok Bot：审批与草稿 https://docs.x.ai/grok-bot/approvals-security-and-privacy
 - Noah Shinn 发布 Instinct 的 X 帖子 https://x.com/noahrshinn/status/2092691344456351744
 - Colossus 播客：Instinct https://colossus.com/episode/instinct-the-personal-agent/
+- 第四种黑猩猩CHIMP：不做App，不做网页，0营销费用，怎么做100亿美元的Personal Agent？ https://www.bilibili.com/video/BV1Nxa269EiM/
