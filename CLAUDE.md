@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 主线：边跑边说（当天训练当场景，只讲一个观点）；破三训练记录；跑步理论转译；训练实验复盘；比赛和装备实战。
 
-配菜：自身经历、社会热点、AI、金融投资理财。挂在跑步场景里说，不另开杂谈账号。配菜卡放 `topics/`。能沉淀的进 `knowledge/wiki/` 对应种类，日记和过期热点不进 wiki。
+配菜：自身经历、社会热点、AI、金融投资理财。默认挂在跑步场景里说，不另开杂谈账号；用户明确要整期讲时，可以整期讲，仍在边跑边说里拍。配菜卡放 `topics/`。能沉淀的进 `knowledge/wiki/` 对应种类，日记和过期热点不进 wiki。
 
 ## 写作规则
 

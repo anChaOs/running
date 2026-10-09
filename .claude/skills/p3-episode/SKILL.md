@@ -96,6 +96,6 @@ hud-preview + open/close
 改 `-sk`：重跑 HUD，再 assemble。
 改封面句：只重跑 `p3-cover`。
 
-## 4. 状态
+## 3. 状态
 
 `episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；assemble 核对通过后 `edited`。
