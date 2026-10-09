@@ -63,7 +63,7 @@ description: 用 whisper.cpp large-v3-turbo 转写口播，只纠明显错字和
 - 不要在字幕校准前写简介，也不要用 `talk.md` 写简介
 - 不要按停顿检测切条（ASR 的 `-ml` 会造成 0 间隙，停顿切不可靠）
 - 不要用 tiny / small；只用 `ggml-large-v3-turbo.bin`
-- 不要从 Hugging Face 拉模型，用 ModelScope
+- 转写模型不要从 Hugging Face 拉，用下面的 ModelScope 地址
 - 不要把校正做成「语义改写 / 摘要 / 更像字幕的句子」
 - 不要把 whisper 吐出的繁体当「忠于原句」留下
 - 有 HUD preview 时，不要拿未剪的 `run-*` 原片去转写或对口型（时间轴会对不上成片）

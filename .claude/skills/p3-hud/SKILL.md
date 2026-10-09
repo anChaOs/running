@@ -89,7 +89,7 @@ preview 出完后，对 **preview** 做句间粗剪（原片 `run-*` 不剪，HU
 ~/Movies/running-content/.models/ggml-silero-v5.1.2.bin
 ```
 
-没有就从 `https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin` 拉到这个路径（约 864K）。CLI 是 brew 的 `whisper-vad-speech-segments`，打印的时间是百分之一秒。只剪 `max(2×均值, 均值+1.2s)` 以上的停顿，收到均值 + 安全余量，左右留肩，片尾 3 秒不剪。对比旧能量门限加 `--speech-detect band`。
+没有就从 `https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin` 拉到这个路径（约 864K）。ModelScope 没有这个模型；直连不通就把域名换成 `hf-mirror.com`。CLI 是 brew 的 `whisper-vad-speech-segments`，打印的时间是百分之一秒。只剪 `max(2×均值, 均值+1.2s)` 以上的停顿，收到均值 + 安全余量，左右留肩，片尾 3 秒不剪。对比旧能量门限加 `--speech-detect band`。
 
 拼成片用粗剪后的 **preview**。`--preview` 会先渲透明层再叠回原片同档，alpha 是渲染中间件，不是成片交付。不走剪映可以不理 `*-hud-alpha.mov`。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
 
