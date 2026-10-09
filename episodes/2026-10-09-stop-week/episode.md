@@ -2,7 +2,7 @@
 date: 2026-10-09
 slug: stop-week
 title: 停跑一周，怎么办？
-status: hud
+status: edited
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-09-stop-week/
 ---

@@ -49,5 +49,5 @@
 - hud: done（`-sn "Plaid 1.5" -sk 483.91`；run-a / run-c preview 已句间粗剪；run-b 有 61s 无口播的间歇，未剪）
 - subs: done
 - cover: done（run-c 第 180 秒；封面句「停跑一周，怎么办？」）
-- assemble: pending
-- qc: pending
+- assemble: done（`2026-10-09-run-final.mp4` 1040.1s；close 用 close-stats）
+- qc: done
