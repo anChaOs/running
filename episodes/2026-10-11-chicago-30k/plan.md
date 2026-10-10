@@ -20,6 +20,8 @@
 
 参考：
 
+- Marathon Handbook：Clayton Young 的奥运备战与 YouTube https://marathonhandbook.com/clayton-young-olympic-training/
+- LetsRun：Clayton Young 腘绳肌撕裂仍冲美国纪录 https://www.letsrun.com/news/2026/10/clayton-young-has-a-torn-hamstring-and-hes-still-planning-to-chase-the-american-record-in-chicago/
 - 世界田联：芝加哥马拉松 2026 赛前预览 https://worldathletics.org/news/preview/chicago-marathon-2026-kiplimo-feysa
 - LetsRun：2026 芝加哥马拉松男子预览 https://www.letsrun.com/news/2026/10/2026-chicago-marathon-mens-preview-jacob-kiplimo-is-the-heavy-favorite-can-anyone-stop-him/
 - NBC Chicago：报名人数和参赛人数 https://www.nbcchicago.com/news/sports/chicago-marathon/record-number-of-runners-applied-for-the-2026-bank-of-america-chicago-marathon/3992514/
@@ -41,6 +43,8 @@
 
 参考：
 
+- Marathon Handbook：Clayton Young 的奥运备战与 YouTube https://marathonhandbook.com/clayton-young-olympic-training/
+- LetsRun：Clayton Young 腘绳肌撕裂仍冲美国纪录 https://www.letsrun.com/news/2026/10/clayton-young-has-a-torn-hamstring-and-hes-still-planning-to-chase-the-american-record-in-chicago/
 - 世界田联：芝加哥马拉松 2026 赛前预览 https://worldathletics.org/news/preview/chicago-marathon-2026-kiplimo-feysa
 - LetsRun：2026 芝加哥马拉松男子预览 https://www.letsrun.com/news/2026/10/2026-chicago-marathon-mens-preview-jacob-kiplimo-is-the-heavy-favorite-can-anyone-stop-him/
 - NBC Chicago：报名人数和参赛人数 https://www.nbcchicago.com/news/sports/chicago-marathon/record-number-of-runners-applied-for-the-2026-bank-of-america-chicago-marathon/3992514/
