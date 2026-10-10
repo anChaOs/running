@@ -20,6 +20,7 @@
 
 参考：
 
+- Deseret News（Yahoo 转载）：Clayton Young 的工程师兼职 https://sports.yahoo.com/clayton-young-long-winding-road-030000995.html
 - Marathon Handbook：Clayton Young 的奥运备战与 YouTube https://marathonhandbook.com/clayton-young-olympic-training/
 - LetsRun：Clayton Young 腘绳肌撕裂仍冲美国纪录 https://www.letsrun.com/news/2026/10/clayton-young-has-a-torn-hamstring-and-hes-still-planning-to-chase-the-american-record-in-chicago/
 - 世界田联：芝加哥马拉松 2026 赛前预览 https://worldathletics.org/news/preview/chicago-marathon-2026-kiplimo-feysa
@@ -43,6 +44,7 @@
 
 参考：
 
+- Deseret News（Yahoo 转载）：Clayton Young 的工程师兼职 https://sports.yahoo.com/clayton-young-long-winding-road-030000995.html
 - Marathon Handbook：Clayton Young 的奥运备战与 YouTube https://marathonhandbook.com/clayton-young-olympic-training/
 - LetsRun：Clayton Young 腘绳肌撕裂仍冲美国纪录 https://www.letsrun.com/news/2026/10/clayton-young-has-a-torn-hamstring-and-hes-still-planning-to-chase-the-american-record-in-chicago/
 - 世界田联：芝加哥马拉松 2026 赛前预览 https://worldathletics.org/news/preview/chicago-marathon-2026-kiplimo-feysa
