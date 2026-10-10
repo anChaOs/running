@@ -29,7 +29,6 @@
 - CITIUS Mag：基普里莫、科斯盖加测药检 https://citiusmag.com/articles/brigid-kosgei-jacob-kiplimo-enhanced-drug-testing-chicago-marathon
 - Runner's World：Vinny Mauri https://www.runnersworld.com/news/a74068581/vinny-mauri-chicago-marathon-2026/
 - LetsRun：Vinny Mauri 的训练 https://www.letsrun.com/news/2026/10/after-one-of-the-most-insane-marathon-buildups-ever-how-fast-can-strava-legend-vinny-mauri-run-at-the-chicago-marathon/
-- LetsRun：芝加哥赛前消息（Patrick Cullen）https://www.letsrun.com/news/2026/10/chicago-marathon-scoop-young-chases-ar-on-a-torn-hamstring-hicks-goes-full-send-kosgei-targets-6530-1st-half/
 - JOC：大迫杰 2:04:55 日本纪录 https://www.joc.or.jp/news/20251207037704.html
 - 日本田联：日本纪录表 https://www.jaaf.or.jp/record/japan/?segment=1
 - Number：大迫杰赛前采访 https://number.bunshun.jp/articles/-/872274
@@ -51,7 +50,6 @@
 - CITIUS Mag：基普里莫、科斯盖加测药检 https://citiusmag.com/articles/brigid-kosgei-jacob-kiplimo-enhanced-drug-testing-chicago-marathon
 - Runner's World：Vinny Mauri https://www.runnersworld.com/news/a74068581/vinny-mauri-chicago-marathon-2026/
 - LetsRun：Vinny Mauri 的训练 https://www.letsrun.com/news/2026/10/after-one-of-the-most-insane-marathon-buildups-ever-how-fast-can-strava-legend-vinny-mauri-run-at-the-chicago-marathon/
-- LetsRun：芝加哥赛前消息（Patrick Cullen）https://www.letsrun.com/news/2026/10/chicago-marathon-scoop-young-chases-ar-on-a-torn-hamstring-hicks-goes-full-send-kosgei-targets-6530-1st-half/
 - JOC：大迫杰 2:04:55 日本纪录 https://www.joc.or.jp/news/20251207037704.html
 - 日本田联：日本纪录表 https://www.jaaf.or.jp/record/japan/?segment=1
 - Number：大迫杰赛前采访 https://number.bunshun.jp/articles/-/872274
