@@ -56,6 +56,7 @@
   → p3-hud          hud-renders/*-hud-preview.mp4 + cover-*.jpg
   → p3-assemble     YYYY-MM-DD-run-final.mp4 + 抽帧核对
   → p3-subs         对着成片 whisper，subtitles.srt / txt，手改后再对口型，status=edited
+  → （发布后）      用户说发布完毕并给齐 B 站 + YouTube 链接：记链接、status=published，并清该期 asr/qc/封面候选/上传用成片副本（见 p3-subs）
 
 满 7 天、要腾本机
   → p3-archive      /Volumes/My Passport/running-content/YYYYMM/
