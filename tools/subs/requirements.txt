@@ -1,0 +1,8 @@
+# 字幕对时 / 质检（macOS Apple Silicon 可直接 pip 装，CPU 跑）
+#   .venv/bin/pip install -r tools/subs/requirements.txt
+faster-whisper>=1.1,<2
+# faster-whisper 1.2.1 与 av 19 不兼容（open() 的 metadata_errors 参数）
+av<19
+opencc-python-reimplemented
+numpy
+jieba

@@ -13,6 +13,8 @@ media: ~/Movies/running-content/YYYY-MM-DD-topic/
 
 当天训练：
 
+专名：（口播会说到的产品名、人名、英文术语，用顿号隔开；只给字幕识别纠拼写）
+
 ## 文件
 
 - `plan.md`：拍摄 / 发布计划
