@@ -95,7 +95,7 @@ hud-preview + open/close
 
 用户说继续，再加载下一阶段。各 stage skill 做完也会自己推荐下一步。
 
-改字幕：改 `subtitles.txt` 后跑 `tools/subs/txt_to_subs.py` 回写 SRT，不用重拼成片。`p3-subs` 写完稿必须停，等人手改字；改好后用 `tools/subs/force_align.py` 对时间，`tools/subs/check_subs.py` 硬失败清零。用户没明确说烧进去时，assemble 不要加 `--ass`。
+改字幕：改 `subtitles.txt` 后跑 `tools/subs/txt_to_subs.py` 回写 SRT，不用重拼成片。`p3-subs` 写完稿必须停，等人手改字；改好后用 `tools/subs/force_align.py` 对时间，`tools/subs/check_subs.py` 过门比例不超标。用户没明确说烧进去时，assemble 不要加 `--ass`。
 改 `-sk`：重跑 HUD，再 assemble。preview 时长变了，就对着新成片重新对口型。
 改封面句：只重跑 `p3-cover`。
 

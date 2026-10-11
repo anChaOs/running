@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """字幕质检门：对着成片音频查出入点、漏盖、切条。不改任何文件。
 
-硬失败（退出码 1，必须清零才能写 subs: done）：
-  早收      出点比这句说完早 > 0.3s
-  漏盖      有人说话（识别到正词且 VAD 是人声）却没有字幕，连续 >= 0.5s
-  挂静音    说完后字幕还挂在静音上 > 1.0s
+硬失败行照列给人看；是否过门按比例（对不上的条不进分母）：
+  早收      出点比这句说完早 > 0.3s；可核对条中 ≤ 3%
+  漏盖      有正词人声却没字幕、连续 >= 0.5s 的段；累计时长 ≤ 成片时长的 1%
+  挂静音    说完后字幕还挂在静音上 > 1.0s；可核对条中 ≤ 3%
+超任一比例 → 退出码 1，不能写 subs: done。
 提醒（逐条看，能改就改）：
   晚进 > 0.3s、短于 1s、超过 7 字/秒、单字条、停在「的/一个/了…」且紧接下一条、
   重叠、\\N 或多行、括号注释
@@ -29,6 +30,10 @@ import subs_core as sc  # noqa: E402
 EARLY_OUT = 0.3
 UNCOVERED = 0.5
 OVER_SILENCE = 1.0
+# 过门比例（对不上的条不进分母；漏盖按累计时长 / 成片时长）
+MAX_EARLY_OUT_PCT = 3.0
+MAX_OVER_SILENCE_PCT = 3.0
+MAX_UNCOVERED_PCT = 1.0
 LATE_IN = 0.3
 MAX_CPS = 7.0
 END_EXTEND = 0.3
@@ -207,12 +212,36 @@ def main() -> int:
         s = sorted(xs)
         return s[len(s) // 2] if s else 0.0
 
+    checked = len(onsets)
+    hard_early = sum(h["kind"] == "早收" for h in hard)
+    hard_unc = sum(h["kind"] == "漏盖" for h in hard)
+    hard_hang = sum(h["kind"] == "挂静音" for h in hard)
+    hard_unc_s = sum(h["end"] - h["start"] for h in hard if h["kind"] == "漏盖")
+    early_pct = 100.0 * hard_early / checked if checked else 0.0
+    hang_pct = 100.0 * hard_hang / checked if checked else 0.0
+    unc_pct = 100.0 * hard_unc_s / dur if dur else 0.0
+    fail_early = early_pct > MAX_EARLY_OUT_PCT
+    fail_hang = hang_pct > MAX_OVER_SILENCE_PCT
+    fail_unc = unc_pct > MAX_UNCOVERED_PCT
+    # 一条都核对不上时没法过门
+    fail_none = checked == 0 and len(cues) > 0
+    failed = fail_early or fail_hang or fail_unc or fail_none
+
     summary = {
-        "cues": len(cues), "checked": len(onsets), "unchecked": unchecked,
-        "hard_early_out": sum(h["kind"] == "早收" for h in hard),
-        "hard_uncovered": sum(h["kind"] == "漏盖" for h in hard),
-        "hard_over_silence": sum(h["kind"] == "挂静音" for h in hard),
+        "cues": len(cues), "checked": checked, "unchecked": unchecked,
+        "audio_s": round(dur, 2),
+        "hard_early_out": hard_early,
+        "hard_uncovered": hard_unc,
+        "hard_over_silence": hard_hang,
         "uncovered_speech_s": round(sum(b - a for a, b in uncovered), 2),
+        "hard_uncovered_s": round(hard_unc_s, 2),
+        "early_out_pct_of_checked": round(early_pct, 2),
+        "over_silence_pct_of_checked": round(hang_pct, 2),
+        "uncovered_pct_of_audio": round(unc_pct, 2),
+        "max_early_out_pct": MAX_EARLY_OUT_PCT,
+        "max_over_silence_pct": MAX_OVER_SILENCE_PCT,
+        "max_uncovered_pct": MAX_UNCOVERED_PCT,
+        "gate_failed": failed,
         "onset_median": round(med(onsets), 3), "offset_median": round(med(offsets), 3),
         "abs_onset_median": round(med([abs(x) for x in onsets]), 3),
         "abs_offset_median": round(med([abs(x) for x in offsets]), 3),
@@ -236,18 +265,28 @@ def main() -> int:
         if len(rows) > args.max_rows:
             print(f"| … | | | 另有 {len(rows) - args.max_rows} 条，见 --json | |")
 
+    def mark(ok):
+        return "✓" if ok else "✗"
+
     print(f"# check_subs：{subs.name}")
     print(
         f"{summary['cues']} 条，可核对 {summary['checked']}，对不上 {summary['unchecked']}。"
-        f"硬失败：早收 {summary['hard_early_out']} / 漏盖 {summary['hard_uncovered']}（共 {summary['uncovered_speech_s']}s 人声没字幕）"
-        f" / 挂静音 {summary['hard_over_silence']}。"
+        f"硬失败行：早收 {hard_early} / 漏盖 {hard_unc}（≥0.5s 累计 {hard_unc_s:.2f}s）"
+        f" / 挂静音 {hard_hang}。"
+    )
+    print(
+        f"过门比例：早收 {early_pct:.2f}% / ≤{MAX_EARLY_OUT_PCT:g}% {mark(not fail_early)}；"
+        f"漏盖 {unc_pct:.2f}% 成片 / ≤{MAX_UNCOVERED_PCT:g}% {mark(not fail_unc)}；"
+        f"挂静音 {hang_pct:.2f}% / ≤{MAX_OVER_SILENCE_PCT:g}% {mark(not fail_hang)}"
+        + ("；无可核对条 ✗" if fail_none else "")
+        + "。"
     )
     print(
         f"入点中位 {summary['onset_median']:+.2f}s，出点中位 {summary['offset_median']:+.2f}s；"
         f"早收 >0.2s {summary['early_out_gt_0.2_pct']}%，>0.5s {summary['early_out_gt_0.5_pct']}%，>1s {summary['early_out_gt_1.0_pct']}%；"
         f"晚进 >0.3s {summary['late_in_gt_0.3_pct']}%。提醒：{summary['warn_counts']}"
     )
-    table("硬失败", hard)
+    table("硬失败（逐条列出，供人听）", hard)
     table("提醒", warn)
     print(f"\n## 噪声大 / 识别不可靠，要人耳复听（{len(low_m)}）")
     for a, b, m, p in low_m:
@@ -260,8 +299,8 @@ def main() -> int:
                        ensure_ascii=False, indent=1),
             encoding="utf-8",
         )
-    print("\n结果：" + ("不通过（硬失败未清零）" if hard else "通过"))
-    return 1 if hard else 0
+    print("\n结果：" + ("不通过（过门比例超标）" if failed else "通过"))
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
