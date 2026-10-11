@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """字幕质检门：对着成片音频查出入点、漏盖、切条。不改任何文件。
 
-硬失败行照列给人看；是否过门按比例（对不上的条不进分母）：
-  早收      出点比这句说完早 > 0.3s；可核对条中 ≤ 3%
-  漏盖      有正词人声却没字幕、连续 >= 0.5s 的段；累计时长 ≤ 成片时长的 1%
-  挂静音    说完后字幕还挂在静音上 > 1.0s；可核对条中 ≤ 3%
-超任一比例 → 退出码 1，不能写 subs: done。
+硬失败行照列给人看。机器过门看两层：
+  比例（对不上的条不进分母）：
+    早收      出点比这句说完早 > 0.3s；可核对条中 ≤ 3%
+    漏盖      有正词人声却没字幕、连续 >= 0.5s 的段；累计时长 ≤ 成片时长的 1%
+    挂静音    说完后字幕还挂在静音上 > 1.0s；可核对条中 ≤ 3%
+  绝对硬门槛：
+    严重早收  出点比说完早 > 0.5s 的条必须为 0
+超比例或严重早收非 0 → 退出码 1（机器未过门）。
+机器过门 ≠ 可以写 subs: done：硬失败行仍须人听，用户确认（改好了 / 可以了）后才能写。
 提醒（逐条看，能改就改）：
   晚进 > 0.3s、短于 1s、超过 7 字/秒、单字条、停在「的/一个/了…」且紧接下一条、
   重叠、\\N 或多行、括号注释
@@ -28,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import subs_core as sc  # noqa: E402
 
 EARLY_OUT = 0.3
+SEVERE_EARLY_OUT = 0.5  # 严重早收：绝对硬门槛，条数必须为 0
 UNCOVERED = 0.5
 OVER_SILENCE = 1.0
 # 过门比例（对不上的条不进分母；漏盖按累计时长 / 成片时长）
@@ -217,20 +222,23 @@ def main() -> int:
     hard_unc = sum(h["kind"] == "漏盖" for h in hard)
     hard_hang = sum(h["kind"] == "挂静音" for h in hard)
     hard_unc_s = sum(h["end"] - h["start"] for h in hard if h["kind"] == "漏盖")
+    severe_early = sum(1 for x in offsets if x < -SEVERE_EARLY_OUT)
     early_pct = 100.0 * hard_early / checked if checked else 0.0
     hang_pct = 100.0 * hard_hang / checked if checked else 0.0
     unc_pct = 100.0 * hard_unc_s / dur if dur else 0.0
     fail_early = early_pct > MAX_EARLY_OUT_PCT
     fail_hang = hang_pct > MAX_OVER_SILENCE_PCT
     fail_unc = unc_pct > MAX_UNCOVERED_PCT
+    fail_severe = severe_early > 0
     # 一条都核对不上时没法过门
     fail_none = checked == 0 and len(cues) > 0
-    failed = fail_early or fail_hang or fail_unc or fail_none
+    failed = fail_early or fail_hang or fail_unc or fail_severe or fail_none
 
     summary = {
         "cues": len(cues), "checked": checked, "unchecked": unchecked,
         "audio_s": round(dur, 2),
         "hard_early_out": hard_early,
+        "hard_severe_early_out": severe_early,
         "hard_uncovered": hard_unc,
         "hard_over_silence": hard_hang,
         "uncovered_speech_s": round(sum(b - a for a, b in uncovered), 2),
@@ -241,6 +249,7 @@ def main() -> int:
         "max_early_out_pct": MAX_EARLY_OUT_PCT,
         "max_over_silence_pct": MAX_OVER_SILENCE_PCT,
         "max_uncovered_pct": MAX_UNCOVERED_PCT,
+        "severe_early_out_s": SEVERE_EARLY_OUT,
         "gate_failed": failed,
         "onset_median": round(med(onsets), 3), "offset_median": round(med(offsets), 3),
         "abs_onset_median": round(med([abs(x) for x in onsets]), 3),
@@ -277,7 +286,8 @@ def main() -> int:
     print(
         f"过门比例：早收 {early_pct:.2f}% / ≤{MAX_EARLY_OUT_PCT:g}% {mark(not fail_early)}；"
         f"漏盖 {unc_pct:.2f}% 成片 / ≤{MAX_UNCOVERED_PCT:g}% {mark(not fail_unc)}；"
-        f"挂静音 {hang_pct:.2f}% / ≤{MAX_OVER_SILENCE_PCT:g}% {mark(not fail_hang)}"
+        f"挂静音 {hang_pct:.2f}% / ≤{MAX_OVER_SILENCE_PCT:g}% {mark(not fail_hang)}；"
+        f"严重早收(>{SEVERE_EARLY_OUT:g}s) {severe_early} / =0 {mark(not fail_severe)}"
         + ("；无可核对条 ✗" if fail_none else "")
         + "。"
     )
@@ -299,8 +309,25 @@ def main() -> int:
                        ensure_ascii=False, indent=1),
             encoding="utf-8",
         )
-    print("\n结果：" + ("不通过（过门比例超标）" if failed else "通过"))
-    return 1 if failed else 0
+    if failed:
+        reasons = []
+        if fail_early:
+            reasons.append("早收比例超标")
+        if fail_unc:
+            reasons.append("漏盖比例超标")
+        if fail_hang:
+            reasons.append("挂静音比例超标")
+        if fail_severe:
+            reasons.append(f"严重早收(>{SEVERE_EARLY_OUT:g}s)非 0")
+        if fail_none:
+            reasons.append("无可核对条")
+        print("\n结果：机器未过门（" + "；".join(reasons) + "）。修好后再跑。不要写 subs: done。")
+        return 1
+    print(
+        "\n结果：机器过门（比例达标且无严重早收）。"
+        "硬失败行仍须人听；用户确认「改好了 / 可以了」之前，不要写 subs: done。"
+    )
+    return 0
 
 
 if __name__ == "__main__":

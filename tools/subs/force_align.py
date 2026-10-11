@@ -5,7 +5,7 @@
 2. 定稿文字和识别字序列按字对齐，只用连续对上的字做锚点
 3. 对不上的条：在前后锚点之间切短窗，用这几条定稿文字当提示重听一次
 4. 还对不上：短窗内按人声时长比例分（标 interp，要人听）；窗太长就保留原时间（标 unanchored）
-5. Silero VAD 咬点：入点贴开口（略早），出点盖住说完，句间留白，最短约 1 秒
+5. Silero VAD 咬点：入点贴开口（略早；气口「嗯/那」不吸附），出点盖住说完优先于不重叠，句间留白约 0.22s，最短约 1 秒
 
 不做整段均分，不出等步长的阶梯。对不上的条一律列出来。
 """
@@ -21,14 +21,16 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import subs_core as sc  # noqa: E402
 
-LEAD = 0.10        # 入点比开口早一点
-SNAP_IN = 0.35     # 开口前这么近有人声岛起点，就贴上去
-SNAP_FWD = 1.20    # 起点落在静音里，往后找人声岛开头的最远距离
-HOLD = 0.20        # 说完后再挂一会儿
-EXTEND_OUT = 0.50  # 说完后这么近还在同一人声岛里，出点跟到岛尾
-GAP = 0.08         # 两条之间最小空隙
+LEAD = 0.10              # 入点比开口早一点
+SNAP_IN = 0.35           # 开口前这么近有人声岛起点，就贴上去
+SNAP_FWD = 1.20          # 起点落在静音里，往后找人声岛开头的最远距离
+HOLD = 0.20              # 说完后再挂一会儿
+EXTEND_OUT = 0.50        # 说完后这么近还在同一人声岛里，出点可跟到岛尾（共享岛除外）
+PAUSE_BETWEEN = 0.22     # 句间留白（旧 PAUSE_BETWEEN；不要被 LEAD+HOLD 吃光）
 MIN_DUR = 1.00
-MAX_TAIL = 0.90    # 出点最多比说完晚这么多（check_subs 硬线是 1.0）
+MAX_TAIL = 0.90          # 出点最多比说完晚这么多（check_subs 硬线是 1.0）
+FILLER_ISLAND_MAX = 0.50 # 气口后短于此时长的人声岛当「嗯/那」，不吸附下一句入点
+FILLER_AFTER_MAX = 0.85  # 上一条说完后这么近出现的短岛才算气口填充
 GUIDED_MAX_WIN = 90.0
 GUIDED_CHUNK = 28.0
 INTERP_MAX_WIN = 10.0
@@ -144,70 +146,121 @@ def interp_pass(cues, spans, vad, audio_dur):
         i = j
 
 
+def _is_breath_filler(a: float, b: float, prev_se: float | None) -> bool:
+    """气口后的短人声岛（「嗯」「那」一类），不要当成下一句入点吸附目标。"""
+    if b - a > FILLER_ISLAND_MAX:
+        return False
+    if prev_se is None:
+        return False
+    if a < prev_se - 0.05:
+        return False
+    if a - prev_se > FILLER_AFTER_MAX:
+        return False
+    return True
+
+
 def place(cues, spans, vad, audio_dur):
-    """人声范围 → 字幕出入点。"""
+    """人声范围 → 字幕出入点。
+
+    优先级：出点盖住说完 > 句间留白 ≈ 不重叠。冲突时推迟下一条入点，
+    绝不把上一条出点砍到说完之前（制造早收）。共享 VAD 岛按词级边界切开，
+    不要两条都延到岛尾再砍上一条。
+    """
     n = len(cues)
     ok = [sp.source != "unanchored" and sp.ss is not None for sp in spans]
     raw_ss = [sp.ss if ok[i] else cues[i].start for i, sp in enumerate(spans)]
     st = [0.0] * n
     en = [0.0] * n
-    se_ref = [0.0] * n
+    se_ref = [0.0] * n  # 词级说完；出点不得早于它
     for i, (c, sp) in enumerate(zip(cues, spans)):
         if not ok[i]:
             st[i], en[i], se_ref[i] = c.start, c.end, c.end
             continue
         ss, se = sp.ss, sp.se
-        # 入点：开口前不远有人声岛起点就贴上（不越过上一条的说完）
-        floor = spans[i - 1].se if i > 0 and ok[i - 1] else 0.0
-        cands = [a for a, b in vad if ss - SNAP_IN <= a <= ss + 0.15 and a >= floor]
+        word_se = se
+        prev_se = spans[i - 1].se if i > 0 and ok[i - 1] else None
+        floor = prev_se if prev_se is not None else 0.0
+        # 入点：开口前不远有人声岛起点就贴上；气口短岛（嗯/那）排除
+        cands = [
+            a for a, b in vad
+            if ss - SNAP_IN <= a <= ss + 0.15 and a >= floor
+            and not _is_breath_filler(a, b, prev_se)
+        ]
         if cands:
             ss = min(cands, key=lambda a: abs(a - ss))
         elif sc.island_at(ss, vad, tol=0.0) is None or (
-            (spans[i - 1].se if i > 0 and spans[i - 1].se is not None else None) is not None and abs(ss - (spans[i - 1].se if i > 0 and spans[i - 1].se is not None else None)) < 0.05
+            prev_se is not None and abs(ss - prev_se) < 0.05
         ):
-            # 识别的词起点粘在上一个词尾 / 落在静音里：挪到后面最近的人声岛开头
-            nxt_isl = [a for a, b in vad if ss < a <= min(ss + SNAP_FWD, se - 0.1)]
+            nxt_isl = [
+                a for a, b in vad
+                if ss < a <= min(ss + SNAP_FWD, se - 0.1)
+                and not _is_breath_filler(a, b, prev_se)
+            ]
             if nxt_isl:
                 ss = nxt_isl[0]
-        # 出点：只往后延，不往前缩；延到同一人声岛尾，但不越过下一条开口
-        nxt_ss = raw_ss[i + 1] if i + 1 < n else audio_dur
-        isl = sc.island_at(se, vad, tol=0.15)
-        if isl and isl[1] - se <= EXTEND_OUT:
-            se = max(se, isl[1])
+        # 出点覆盖：只往后延。共享岛按词级边界（下一条开口）切开，不整岛延再砍
+        cover_se = word_se
+        isl = sc.island_at(word_se, vad, tol=0.15)
+        if isl and isl[1] - word_se <= EXTEND_OUT:
+            cap = isl[1]
+            nxt_ss = raw_ss[i + 1] if i + 1 < n else audio_dur
+            if nxt_ss < isl[1] and nxt_ss > word_se - 0.05:
+                cap = min(cap, nxt_ss)
+            cover_se = max(word_se, cap)
         st[i] = max(0.0, ss - LEAD)
-        en[i] = se + HOLD
-        se_ref[i] = se
+        en[i] = cover_se + HOLD
+        se_ref[i] = word_se
 
     for i in range(1, n):
         if st[i] < st[i - 1] + 0.05:
             st[i] = st[i - 1] + 0.05
 
+    pause = PAUSE_BETWEEN
     for i in range(n):
-        nxt = st[i + 1] if i + 1 < n else audio_dur
-        if en[i] > nxt - GAP:
-            if se_ref[i] <= nxt - GAP:
-                en[i] = nxt - GAP
-            elif i + 1 < n and se_ref[i] + GAP - st[i + 1] <= 0.3:
-                # 本条还没说完下一条就要开口：差得不多，下一条稍让
-                en[i] = se_ref[i]
-                st[i + 1] = en[i] + GAP
-            else:
-                en[i] = nxt - GAP
         if ok[i]:
+            en[i] = max(en[i], se_ref[i])  # 出点必须盖住说完
             en[i] = min(en[i], se_ref[i] + MAX_TAIL)
-        if en[i] - st[i] < MIN_DUR:  # 最短时长：先往后补，再往前补
-            nxt = st[i + 1] if i + 1 < n else audio_dur
-            en[i] = max(en[i], min(st[i] + MIN_DUR, nxt - GAP))
+        if i + 1 < n and en[i] > st[i + 1] - pause:
+            # 冲突：宁可推迟下一条，也不砍上一条出点到说完之前
+            need = se_ref[i] if ok[i] else st[i] + 0.2
+            room = st[i + 1] - pause
+            if need <= room:
+                # 说完还能放下：只收掉多余 HOLD，保住说完
+                en[i] = max(need, min(en[i], room))
+            else:
+                en[i] = max(en[i], need)
+                st[i + 1] = en[i] + pause
+        if en[i] - st[i] < MIN_DUR:  # 最短时长：先往后补（保住句间留白），再往前补
+            nxt_limit = (st[i + 1] - pause) if i + 1 < n else audio_dur
+            en[i] = max(en[i], min(st[i] + MIN_DUR, nxt_limit))
+            if ok[i]:
+                en[i] = max(en[i], se_ref[i])
         if en[i] - st[i] < MIN_DUR:
             prev = en[i - 1] if i > 0 else 0.0
-            st[i] = min(st[i], max(en[i] - MIN_DUR, prev + GAP))
-    # 收尾：绝不重叠
+            st[i] = min(st[i], max(en[i] - MIN_DUR, prev + pause))
+            if i > 0 and st[i] < en[i - 1] + pause:
+                # 往前补会吃掉上一条留白：改推迟本条，让上一条出点不动
+                st[i] = en[i - 1] + pause
+                if ok[i]:
+                    en[i] = max(en[i], se_ref[i], st[i] + min(MIN_DUR, 0.2))
+
+    # 收尾：不重叠 + 句间留白；冲突只推迟下一条，绝不早收上一条
     for i in range(n - 1):
-        if en[i] > st[i + 1] - GAP:
-            en[i] = st[i + 1] - GAP
+        if ok[i]:
+            en[i] = max(en[i], se_ref[i])
+        if en[i] > st[i + 1] - pause:
+            st[i + 1] = en[i] + pause
+        if en[i] <= st[i]:
+            en[i] = max(st[i] + 0.2, se_ref[i] if ok[i] else st[i] + 0.2)
+            st[i + 1] = max(st[i + 1], en[i] + pause)
+    # 连锁推迟后仍保持单调
+    for i in range(1, n):
+        if st[i] < st[i - 1] + 0.05:
+            st[i] = st[i - 1] + 0.05
         if en[i] <= st[i]:
             en[i] = st[i] + 0.2
-            st[i + 1] = max(st[i + 1], en[i] + GAP)
+            if ok[i]:
+                en[i] = max(en[i], se_ref[i])
     return [sc.Cue(round(a, 2), round(b, 2), c.text) for a, b, c in zip(st, en, cues)]
 
 
