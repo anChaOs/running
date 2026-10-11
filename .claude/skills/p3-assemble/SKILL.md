@@ -25,7 +25,7 @@ HUD 和封面走 `p3-hud`（并行），字幕走 `p3-subs`。只换封面走 `p
 
 ## 前置
 
-`hud-renders/*-run-*-hud-preview.mp4` 齐。`open` / `close` 可缺。字幕可缺（先拼母版再听写也可以；没有 SRT 时核对跳过对口型）。
+`hud-renders/*-run-*-hud-preview.mp4` 齐。`open` / `close` 可缺。不要等字幕。已有 SRT 则拷到成片旁边。
 
 有高驰截图 `YYYY-MM-DD-stats-*.jpg` 时，先叠到 close 左侧（半透明、多张均分轮播），再拼。原 close 不动：
 
@@ -47,7 +47,7 @@ HUD 和封面走 `p3-hud`（并行），字幕走 `p3-subs`。只换封面走 `p
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
 ```
 
-有已定稿的字幕时，把外挂拷到成片旁边方便上传和本地播放器自动挂：
+已有 SRT 时拷到成片旁边：
 
 ```bash
 cp episodes/YYYY-MM-DD-slug/subtitles.srt \
@@ -60,7 +60,7 @@ cp episodes/YYYY-MM-DD-slug/subtitles.srt \
 
 - 只吃 `hud-renders/*-run-*-hud-preview.mp4`
 - `open → 第一段 run` 叠化 0.2 秒，HUD 从 run 起
-- run 与 run：一阵风刮过（各约 0.08 秒横向拖影刮出/刮入），叠 `tools/assemble/sfx/whoosh.wav`。吃的是两段头尾，成片时长不变，字幕轴不用重算
+- run 与 run：一阵风刮过（各约 0.08 秒横向拖影刮出/刮入），叠 `tools/assemble/sfx/whoosh.wav`。吃的是两段头尾，成片时长不变
 - `最后一段 run → close` 叠化 0.2 秒，close 无 HUD
 - 统一 60 fps、`settb=1/60`（open/close 和 preview 时间基不同，不统一 xfade 会失败）
 - 视频 HEVC videotoolbox，码率对齐 preview；音频 AAC 192k
@@ -97,7 +97,7 @@ cp episodes/YYYY-MM-DD-slug/subtitles.srt \
 
 ## 核对（拼完立刻做）
 
-至少抽这几帧，写到媒体目录 `qc/`（成片上没有字幕，不要从成片里找字幕帧）：
+至少抽这几帧，写到媒体目录 `qc/`（成片画面没有字幕，不要从成片里找字幕帧）：
 
 1. open 开头（应无 HUD）
 2. open→run 接缝（HUD 刚出现）
@@ -111,39 +111,18 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
   -frames:v 1 ~/Movies/running-content/YYYY-MM-DD-slug/qc/<label>.jpg
 ```
 
-有 SRT 时用 **IINA** 对口型（不要推荐 ffplay）。成片旁边已有同名 `YYYY-MM-DD-run-final.srt`，IINA 会自动挂外挂。抽查 open 第一句、第一段 run 开头、各 run 接缝、close 第一句：
-
-```bash
-iina --mpv-geometry=320x180-8+8 \
-  ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
-```
-
-小窗、贴右上角（IINA 在 macOS 上 `-0-0` 是右上，不是右下）。同名 `YYYY-MM-DD-run-final.srt` 会自动挂。
-
 清单：
 
 - open / close 没有 HUD
 - 成片画面里没有烧进去的字幕
-- 外挂跟嘴、单行、不要太长；没有 `\N` 两行；用词跟口播，没有被改写成另一种说法。入点略早可以，出点必须盖住说完；气口短人声不要当成下一句整句
-- 没有两条字幕叠在一起
-- 没有把一个词组切成两条（上一条停在「的」「一个」，下一条接着补完）；单独一两个字的条子要是完整的词
 - 跑鞋名和 `-sk` 与 `training/logs/shoes.md` 一致
 - 天气是「数字°C / 数字°C」，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
 - 音频峰值 ≤ −1 dB，无明显削波；POV 风噪不盖过人声
 
-通过后：`episode.md` 的 `status` 改为 `edited`，`assets.md` 制作状态 `assemble: done`、`qc: done`。
+通过后：`assets.md` 的 `assemble: done`、`qc: done`。`episode.md` 仍是 `hud`。字幕核对在 `p3-subs`。
 
-失败则指出该重跑哪个 skill：鞋错 → `p3-hud`；字幕错 → 改 txt/SRT，**不用重拼**；接缝错 → 查 open/close 是否被当成 run。不要把失败写成 `edited`。
-
-## 上传外挂
-
-| 平台 | 文件 | 哪里挂 |
-| --- | --- | --- |
-| B 站 | `subtitles.srt` | 稿件管理 / 字幕；创作中心只收 SRT |
-| YouTube | `subtitles.srt` | Studio → 字幕 → 添加「中文（简体）」→ 上传文件 |
-
-SRT 没有位置信息，默认贴底栏，可能压 HUD。公开前在 B 站、YouTube 网页播放器开 CC 看一眼。
+失败则指出该重跑哪个 skill：鞋错 → `p3-hud`；接缝错 → 查 open/close 是否被当成 run。
 
 ## 常见翻车
 
@@ -157,36 +136,8 @@ SRT 没有位置信息，默认贴底栏，可能压 HUD。公开前在 B 站、
 
 ## 完成后
 
-核对通过后立刻告诉用户：全长成片流程结束，没有下一个制作 skill。不要再推荐 `/p3-qc`，除非核对失败、要再抽一轮。
+画面声音核对通过。不要再推荐 `/p3-qc`，除非核对失败。不要给发布文案。
 
-**先不要给发布流程和文案。** 用户还没看过成片。这一条只给 IINA 怎么打开（不要推荐 ffplay），请他们审片。路径换成当前期，不要留 `YYYY-MM-DD-slug`：
-
-```bash
-iina --mpv-geometry=320x180-8+8 \
-  ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
-```
-
-小窗贴右上角。成片旁边已有同名 `YYYY-MM-DD-run-final.srt` 才会自动挂。没出字按 `v`，或菜单「字幕 → 显示字幕」。
-
-看完没问题再说，例如「没问题了 / 可以发了」，再给发布流程和文案。还要改成片就按他们说的改，不要把文案先甩过去。
-
-用户确认可以发之后，从该期 `plan.md` 抄标题、封面句、简介、标签。简介应已在 `p3-subs` 对口型完成后按字幕写好；还缺就读校准后的 `subtitles.txt` 补进 `plan.md`，不要按 `talk.md` 补，也不要在字幕没校准前写。不要现场编一套和字幕不一致的。
-
-成片再复制一份，文件名用标题原文（`plan.md` 里那句），扩展名仍是 `.mp4`。生产文件 `YYYY-MM-DD-run-final.mp4` 不要改名。上传用这份副本：B 站和 YouTube 会拿文件名当标题，就不用再填一次。标题里若有 `/` 才换成 `-`，其余标点保持原样。
-
-简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。摘要只总结字幕里实际说了什么，短句。不要推理，不要方法论，不要复读「严肃业余跑者，当天训练当天讲」。不要写「这期不是 xxx」这类否定句，除非标题或题材会让人误认（比如鞋期才点当天脚感）。已发布的旧期简介不要回改。大多数期没有「参考」，就只有摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后加「参考」：只写出处，不写实验结果。论文附 DOI。视频优先用当前发布平台的地址，B 站用 B 站链接，YouTube 用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没说的不列。`plan.md` 里已有就按平台原样抄；漏了再补上，不要改摘要。摘要两个平台相同，有参考时参考按平台分开。
-
-同一条回复里写清：
-
-| 用途 | 文件 |
-| --- | --- |
-| 成片（上传用） | 媒体目录里那份以标题命名的 `.mp4` |
-| 封面 16:9 | `cover-1920x1080.jpg` |
-| 封面 3:4 | `cover-1080x1440.jpg` |
-| 外挂字幕 | `subtitles.srt`（B 站创作中心只收 SRT；YouTube 加「中文（简体）」） |
-
-步骤：上传成片 → 换封面 → 挂 SRT → **先不公开**，网页播放器开 CC 看会不会压 HUD → 再转公开。不要替用户上传。
-
-还要 60–90 秒短视频才提 `/p3-jianying`。
-
-发布后把链接写进该期 `episode.md` / `plan.md`，`status` 改为 `published`。用户说「发到 B 站了 BV…」时再记。
+> 下一步用 `/p3-subs`，可以直接发：
+>
+> `/p3-subs`

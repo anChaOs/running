@@ -44,7 +44,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `tools/hud/` | HUD 时间探测与批量渲染 |
 | `tools/assemble/` | 全长成片拼接、封面 |
 | `tools/subs/` | txt 收成外挂 SRT |
-| `.claude/skills/` | 按需加载；主题库 `p3-library`，选题 `p3-topic`，成片入口 `p3-episode` |
+| `.claude/skills/` | 按需加载；主题库 `p3-library`，选题 `p3-topic`，成片入口 `p3-episode`，归档 `p3-archive` |
 
 新一期用 `templates/episode.md`。口播可用 `templates/run-talk-video.md`。知识页用 `templates/wiki-page.md`，规则见 `knowledge/CLAUDE.md`。
 
@@ -56,9 +56,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 inbox 碎片 / 灵光一闪 → skill `p3-library` 进主题库 → 有拍摄日 skill `p3-topic` 定题和口播卡 → 建 episodes/YYYY-MM-DD-slug/
   → talk.md 口播提纲 → 拍跑前/跑中/跑后/B-roll，拿到当天 FIT
   → 收进 ~/Movies/running-content/YYYY-MM-DD-slug/ 并统一命名
-  → 成片走 skill `p3-episode`（按需：ingest / 鞋账本 / HUD / 字幕 / 拼接核对）
+  → 成片走 skill `p3-episode`（按需：ingest / 鞋账本 / HUD / 拼接核对 / 字幕）
   → 或进剪映做 60–90 秒发布剪辑（skill `p3-jianying`）
   → 需要则打磨 script.md → 发布后把 status 改为 published
+  → 满 7 天走 skill `p3-archive` 搬到 Passport `running-content/YYYYMM/`
   → 有长期价值的 ingest 进 knowledge/wiki/，周期结束做 training/reviews
 ```
 

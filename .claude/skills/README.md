@@ -38,6 +38,7 @@
   p3-assemble     叠化拼接（默认不烧字幕）+ 抽帧核对
   p3-qc           只再核对；默认已在 assemble 里做过
   p3-jianying     60–90 秒剪映，不走全长脚本
+  p3-archive      满 7 天的素材搬到 Passport running-content/YYYYMM/
 ```
 
 ## 产物顺序
@@ -53,8 +54,11 @@
   → p3-ingest       ~/Movies/running-content/YYYY-MM-DD-slug/
   → p3-shoes        -sn / -sk（跑完后累计 km）
   → p3-hud          hud-renders/*-hud-preview.mp4 + cover-*.jpg
-  → p3-subs         subtitles.srt / txt，停下来手改后再拼
-  → p3-assemble     YYYY-MM-DD-run-final.mp4（不烧字幕）+ 抽帧核对，status=edited
+  → p3-assemble     YYYY-MM-DD-run-final.mp4 + 抽帧核对
+  → p3-subs         对着成片 whisper，subtitles.srt / txt，手改后再对口型，status=edited
+
+满 7 天、要腾本机
+  → p3-archive      /Volumes/My Passport/running-content/YYYYMM/
 ```
 
 任意一步都可以停。改字幕只改 sidecar，不用重拼。改 `-sk` 要重渲 HUD 再拼。
