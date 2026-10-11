@@ -2,7 +2,7 @@
 date: 2026-10-10
 slug: personal-agent
 title: 我理解的Personal Agent
-status: planned
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-10-personal-agent/
 ---
@@ -20,3 +20,8 @@ media: ~/Movies/running-content/2026-10-10-personal-agent/
 - `plan.md`：拍摄 / 发布计划
 - `talk.md`：边跑边说提纲
 - `assets.md`：素材索引（模板 `templates/assets.md`）
+
+## 发布
+
+- B 站：https://www.bilibili.com/video/BV12KpG6TE3F
+- YouTube：https://youtu.be/7RVzSGFHHYY

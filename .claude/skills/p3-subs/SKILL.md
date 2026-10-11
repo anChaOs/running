@@ -1,6 +1,6 @@
 ---
 name: p3-subs
-description: 用 whisper.cpp large-v3-turbo 转写口播，只纠明显错字和显著卡顿，再切成单行短条 SRT。忠于原句，不改写、不压缩。写完先停，等人手改字。改好后再对口型调时间，不要在改字前精调。对口型完成后才按字幕写简介。默认外挂，不要烧进成片。用户说字幕、转写、whisper、对口型、改字幕时用。不要用 talk.md 估时，不要按停顿切条，禁用 tiny/small。写完字幕不要立刻拼接。
+description: 用 whisper.cpp large-v3-turbo 对着成片转写口播，只纠明显错字和显著卡顿，再切成单行短条 SRT。忠于原句，不改写、不压缩。写完先停，等人手改字。改好后再对口型调时间，不要在改字前精调。对口型完成后才按字幕写简介。默认外挂，不要烧进成片。用户说字幕、转写、whisper、对口型、改字幕时用。不要用 talk.md 估时，不要按停顿切条，禁用 tiny/small。没有成片先走 p3-assemble。
 ---
 
 # 字幕（忠于原句）
@@ -19,7 +19,7 @@ description: 用 whisper.cpp large-v3-turbo 转写口播，只纠明显错字和
 2. **校正**：只做下面「可以做」，绝不做「不能做」
 3. **切条**：按气口 / 短语拆成单行短条；字一个都不改。时间沿用 whisper 段时间，长句按词边界切开，**不对口型**
 4. 写 `subtitles.srt` + `subtitles.txt`，立刻停，等人手改字
-5. 用户说改好了之后：**只改时间、不改字**，对着分段音频/HUD preview 对口型，再拼成片
+5. 用户说改好了之后：**只改时间、不改字**，对着成片 `run-final` 对口型。外挂拷到成片旁边。
 
 ## 校正：可以做
 
@@ -46,16 +46,7 @@ description: 用 whisper.cpp large-v3-turbo 转写口播，只纠明显错字和
 
 ## 前置
 
-已命名的 `open` / `run-*` / `close`，或已有无字幕成片时间轴。校正和切条之后必须等人手改字；改好后再对口型，再走 `p3-assemble`。只改字不重转写。不要在等人改字之前精调时间。
-
-**听哪条音频：** 成片吃的是粗剪后的时长，转写必须跟它对齐。
-
-| 段 | 听这条 | 不要听 |
-| --- | --- | --- |
-| open / close | 媒体目录里的 `*-open.mp4` / `*-close.mp4`（ingest 已粗剪） | `*-open-raw.mp4` / `*-close-raw.mp4` |
-| run-* | `hud-renders/*-hud-preview.mp4`（p3-hud 后已句间粗剪） | 未剪的 `*-run-*.mp4`、`*-hud-preview-raw.mp4`、alpha |
-
-还没有 HUD preview 时先不要转写 run；等 `/p3-hud` 粗剪完。对口型用同一批音频。`R0..Rn` 用 preview 的时长，不要用未剪原片。
+需要 `YYYY-MM-DD-run-final.mp4`。没有则先 `/p3-assemble`。转写听成片一条，时间就是成片轴。写完稿等人手改字，改好了再对口型。只改字不重转写。
 
 ## 不要做的事
 
@@ -66,7 +57,6 @@ description: 用 whisper.cpp large-v3-turbo 转写口播，只纠明显错字和
 - 转写模型不要从 Hugging Face 拉，用下面的 ModelScope 地址
 - 不要把校正做成「语义改写 / 摘要 / 更像字幕的句子」
 - 不要把 whisper 吐出的繁体当「忠于原句」留下
-- 有 HUD preview 时，不要拿未剪的 `run-*` 原片去转写或对口型（时间轴会对不上成片）
 - 听不清的不要编
 - 不要把字幕烧进成片，也不要 mux 进 mp4
 
@@ -80,32 +70,22 @@ https://www.modelscope.cn/models/cjc1887415157/whisper.cpp/resolve/master/ggml-l
 
 放到 `~/Movies/running-content/.models/ggml-large-v3-turbo.bin`。依赖 `brew install whisper-cpp`。不要用 small / tiny。
 
-按上面「听哪条音频」分别抽 16 kHz 单声道，识别稿放媒体目录 `asr/`。run 的 wav/srt 用 preview 文件名（如 `YYYY-MM-DD-run-a-preview.wav`），不要覆盖未剪原片的识别稿。
+对成片抽 16 kHz 单声道，识别稿放媒体目录 `asr/`，文件名跟成片走（如 `YYYY-MM-DD-run-final.wav`）。
 
 ```bash
-ffmpeg -y -i <clip.mp4> -vn -ac 1 -ar 16000 asr/<clip>.wav
+ffmpeg -y -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
+  -vn -ac 1 -ar 16000 asr/YYYY-MM-DD-run-final.wav
 
 whisper-cli \
   -m ~/Movies/running-content/.models/ggml-large-v3-turbo.bin \
-  -f asr/<clip>.wav \
+  -f asr/YYYY-MM-DD-run-final.wav \
   -l zh \
   -osrt -oj \
-  -of asr/<clip> \
+  -of asr/YYYY-MM-DD-run-final \
   -nth 0.7 \
   -t 8 \
   -np
 ```
-
-## 映射到成片时间轴
-
-`open` 时长 `Do`（工作文件，已粗剪），各 run `R0..Rn`（**HUD preview 粗剪后的时长**，不是未剪 `run-*`），叠化 `X=0.2`：
-
-- open 从 0
-- 第一段 run 从 `Do - X`
-- 其后 run 硬切累加
-- close 从 `Do + sum(R) - 2X` 开始叠化
-
-没有 open 时第一段 run 从 0。已有无字幕成片时，也可以对成片抽音频一次转写，省掉偏移。
 
 ## 写 SRT / txt
 
@@ -136,7 +116,7 @@ txt 一行一条，时间是成片轴：
 
 ## 停下来，等人手改字
 
-写完 SRT、txt **立刻停**。不要对口型、不要拼接、不要烧字幕。第一稿时间只是 whisper 段时间加按字数切开，不是口型。
+写完 SRT、txt **立刻停**。不要对口型、不要烧字幕、不要写简介。第一稿时间只是 whisper 段时间加按字数切开，不是口型。
 
 把 txt 路径发给用户：
 
@@ -146,7 +126,7 @@ txt 一行一条，时间是成片轴：
 
 ## 改好字之后：对口型
 
-用户说「改好了 / 可以拼」之后，先回写 SRT，再对口型，**不要直接拼**。
+用户说「改好了」之后，先回写 SRT，再对口型。
 
 1. 若动了 txt：
 
@@ -158,7 +138,7 @@ txt 一行一条，时间是成片轴：
    覆盖同目录 `subtitles.srt`
 2. **对口型**（只改时间；口播用词不改）：
    - 对齐前先按「写 SRT / txt」的切口规则扫一遍，词组被拆成两条的先并回去再对时间。并后入点取前一条的入点，出点取后一条的出点。中间的停顿若正好落在词组边界上，就在那里切成两条；停顿在词组中间，就整条挂着，不要为停顿把词拆开。这是修切条，不是改嘴里说的字。
-   - 用转写时同一批音频（open/close 工作文件，run 用粗剪后 HUD preview），叠该段字幕（成片轴扣回片段起点）
+   - 对着成片 `YYYY-MM-DD-run-final.mp4` 听。本地预览用 IINA，成片旁边放同名 sidecar SRT
    - 字出在嘴动时；话说完再收，不要用 3.2 秒语速上限提前切掉
    - **宁可早出，不能早收。** 入点略早可以；出点必须盖住这几个字说完。气口之后的短人声，可能是上一句最后一个词，也可能是「那」「嗯」「呃」。不要把下一句钉在这截上——正词还在后面的停顿之后，条子已经没了。
    - Whisper 常把四五秒揉成一段。出点不要跟这段的起点，跟人声岛上这几个字真正说完。对不准就切短窗再听，不要用整段识别的起止当出点。
@@ -166,34 +146,49 @@ txt 一行一条，时间是成片轴：
    - 仍保持单行、大约 2～4 秒
    - 改的是 `subtitles.txt` 的时间，再跑一遍 `txt_to_subs.py`
    - 批量对齐用 `tools/subs/align_cue_times.py`：识别段按字对齐，Silero VAD 咬入点、出点、句间留白。脚本会把入点咬在气口短人声上，**不能只跑脚本就当对完。** 不要为对齐改字。只改 sidecar，不用重拼成片。
-3. 再走 `p3-assemble`（**不要** `--ass`；拼完会立刻核对）
+   - 对完扫一遍：单行、没有 `\N`、两条不重叠、词组没被拆开；用词跟口播，没有被改写成另一种说法
+3. 外挂拷到成片旁边，方便 IINA 自动挂：
 
-对口型完成后 `assets.md` 改成 `subs: done`。
+```bash
+cp episodes/YYYY-MM-DD-slug/subtitles.srt \
+   ~/Movies/running-content/YYYY-MM-DD-slug/
+cp episodes/YYYY-MM-DD-slug/subtitles.srt \
+   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.srt
+```
+
+对口型完成后 `assets.md` 改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。
 
 然后才写简介：读校准后的 `subtitles.txt`，短句总结本期实际说了什么，写入该期 `plan.md` 的简介栏。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。大多数期没有「参考」，只写摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI。视频优先用当前平台的地址：B 站简介用 B 站链接，YouTube 简介用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没念到的不列。摘要两个平台相同，有参考时参考按平台分开。
 
 ## 完成后
 
-分两段说，不要把「等人改」和「可以拼」混在一次里。
+分两段说，不要把「等人改」和「对口型」混在一次里。
 
 **刚写完稿（`waiting-review`）**
 
-立刻停。不要对口型、不要拼接、不要烧字幕、不要写简介。
+立刻停。不要对口型、不要烧字幕、不要写简介。
 
 > 这一轮只改字。优先动 `episodes/YYYY-MM-DD-slug/subtitles.txt`（换成当前期路径）。时间先别动。改好了直接发：
 >
 > `改好了`
 
-**用户说改好了 / 可以拼**
+**用户说改好了**
 
-回写 SRT、对口型、再回写 SRT，并按字幕把简介写入 `plan.md` 之后：
+回写 SRT、对口型、拷到成片旁边，简介写入 `plan.md`。IINA 审片（不要推荐 ffplay）：
 
-> 下一步用 `/p3-assemble`，可以直接发：
->
-> `/p3-assemble`
+```bash
+iina --mpv-geometry=320x180-8+8 \
+  ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
+```
 
-封面还没有（默认应已在 `p3-hud` 里做完）：
+小窗贴右上角。同名 `YYYY-MM-DD-run-final.srt` 会自动挂。
 
-> `/p3-cover 封面句「<这一期封面句>」`
+**先不要给发布流程。** 用户说「没问题了 / 可以发了」再给：从 `plan.md` 抄标题、封面句、简介。成片再复制一份，文件名用标题原文，只有 `/` 换成 `-`，其余标点不动。生产文件 `YYYY-MM-DD-run-final.mp4` 不要改名。上传成片 → 换封面 → 挂 SRT（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。不要替用户上传。
 
-assemble **不要**加 `--ass`。
+| 用途 | 文件 |
+| --- | --- |
+| 成片（上传用） | 媒体目录里以标题命名的 `.mp4` |
+| 封面 | `cover-1920x1080.jpg` / `cover-1080x1440.jpg` |
+| 外挂 | `subtitles.srt` |
+
+发布后记链接，`status` 改为 `published`。还要 60–90 秒短视频才提 `/p3-jianying`。

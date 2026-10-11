@@ -16,6 +16,7 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
 - 不要把 FIT GPS 发给 Open-Meteo
 - 不要用生涯总里程直接当 HUD `-sk`
 - 不要覆盖已有 `open/run-*/close`、HUD、成片，除非用户明确要重做
+- 不要在成片流程里自行搬盘或删原片；归档走 `p3-archive`
 
 ## 产物图
 
@@ -26,13 +27,13 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
   p3-shoes          → -sn / -sk（跑完后累计 km）
 
 run-* + FIT + -sk
-  p3-hud       → hud-renders/*-hud-preview.mp4 + cover-*.jpg（封面并行，用原片 run-a）
-
-口播音频（分段或成片时间轴）
-  p3-subs  → asr/* + 忠于原句 subtitles.srt / .txt（校正不改写；外挂）
+  p3-hud       → hud-renders/*-hud-preview.mp4 + cover-*.jpg（封面并行，用原片 run-*）
 
 hud-preview + open/close
-  p3-assemble   → YYYY-MM-DD-run-final.mp4（不烧字幕）+ 抽帧核对，status=edited
+  p3-assemble   → YYYY-MM-DD-run-final.mp4 + 抽帧核对
+
+成片音频
+  p3-subs  → asr/* + 忠于原句 subtitles.srt / .txt（校正不改写；外挂；status=edited）
 
 换封面句
   p3-cover       → 只重出 cover-*.jpg，不重渲 HUD
@@ -50,11 +51,12 @@ hud-preview + open/close
 | 只收素材 | 原始视频 | `p3-ingest`（缺目录则先 `p3-scaffold`） |
 | 只记鞋 | 鞋名 + 里程口径 | `p3-shoes` |
 | 只做 HUD | 已命名 `run-*` + FIT + `-sk` | `p3-shoes`（若还没有 `-sk`）→ `p3-hud`（顺带封面） |
-| 只做字幕 | 已命名片段或成片时间轴 | `p3-subs` |
-| 只换封面 | `run-a` + 标题 | `p3-cover` |
 | 只拼接 | HUD preview | `p3-assemble`（默认不烧字幕；拼完立刻核对） |
+| 只做字幕 | 成片 `run-final` | `p3-subs` |
+| 只换封面 | `run-*` + 标题 | `p3-cover` |
 | 再核对 | 成片 | `p3-qc` |
 | 剪映短片 | HUD overlay | `p3-jianying` |
+| 归档 / 腾空间 | 满 7 天的本地媒体目录 | `p3-archive` |
 | 全长成片 | 原始素材或已收好的目录 | 按序走完需要的阶段 |
 
 用户没说目标时，列出已有产物和缺的阶段，请他们选今天停在哪一步。
@@ -71,7 +73,7 @@ hud-preview + open/close
 6. **里程口径**：开跑前 / 跑完后 / 现在的生涯总里程。生涯总里程要减去本场 km 才是开跑前。本场 km 用 FIT。
 7. **天气**：默认上海城市场点 `--weather-city shanghai`。明确不要则 `--no-weather`。
 8. **封面句**：默认 `episode.md` / `talk.md` 标题，系列名「破三实验室」。跟 HUD 一起做，除非用户只要换封面。
-9. **今天停在哪**：ingest / hud / subs / assemble / full。
+9. **今天停在哪**：ingest / hud / assemble / subs / full。
 
 ## 完成后 / 引导下一步
 
@@ -83,19 +85,21 @@ hud-preview + open/close
 | 没有 `open` / `run-*` | `/p3-ingest 原始文件在 <路径>` |
 | 没有这一场 `-sk` | `/p3-shoes 鞋是 <HUD 名>，这是开跑前/跑完后 <数字> 公里` |
 | 没有 HUD preview | `/p3-hud`（封面一并做） |
-| 没有字幕稿 | `/p3-subs` |
-| 只要换封面 | `/p3-cover 封面句「<封面句>」` |
 | 没有成片 | `/p3-assemble`（拼完立刻核对） |
+| 没有字幕稿 | `/p3-subs`（对着成片转写） |
+| 只要换封面 | `/p3-cover 封面句「<封面句>」` |
 | 成片要再核对 | `/p3-qc` |
 | 只要 60–90 秒 | `/p3-jianying` |
 | 还没有选题 / `talk.md` | `/p3-topic` |
+| 满 7 天要腾本机 | `/p3-archive` |
 
 用户说继续，再加载下一阶段。各 stage skill 做完也会自己推荐下一步。
 
-改字幕：改 `subtitles.txt` 后跑 `tools/subs/txt_to_subs.py` 回写 SRT，不用重拼成片。`p3-subs` 写完稿必须停，等人手改字；改好后再对口型，再拼。用户没明确说烧进去时，assemble 不要加 `--ass`。
-改 `-sk`：重跑 HUD，再 assemble。
+改字幕：改 `subtitles.txt` 后跑 `tools/subs/txt_to_subs.py` 回写 SRT，不用重拼成片。`p3-subs` 写完稿必须停，等人手改字；改好后再对着成片对口型。用户没明确说烧进去时，assemble 不要加 `--ass`。
+改 `-sk`：重跑 HUD，再 assemble。preview 时长变了，就对着新成片重新对口型。
 改封面句：只重跑 `p3-cover`。
 
 ## 3. 状态
 
-`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；assemble 核对通过后 `edited`。
+`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；字幕对口型完成后 `edited`。
+`assets.md`：assemble 画面核对通过后 `assemble: done`、`qc: done`；此时 `episode.md` 仍是 `hud`。

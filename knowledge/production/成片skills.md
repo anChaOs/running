@@ -11,10 +11,11 @@
 | `p3-ingest` | 收素材、命名、校正 mtime | `VID_*.mp4`、FIT | `open/run-*/close`、`assets.md` |
 | `p3-shoes` | 算 HUD `-sk` | 鞋名 + 开跑前/跑完后/生涯总里程 | `training/logs/shoes.md` 更新 |
 | `p3-hud` | 同档 preview（出完 VAD 句间粗剪）+ 透明层中间件，并行出封面 | 已命名 run + FIT + `-sk` | `hud-renders/` + `cover-*.jpg` |
-| `p3-subs` | whisper + 忠于原句 SRT（只纠错、删显著卡顿；外挂） | 分段音频 | `subtitles.srt` / `.txt` |
-| `p3-cover` | 只换封面 / 重抽 | `run-a` + 封面句 | `cover-*.jpg` |
-| `p3-assemble` | 叠化拼接（默认不烧字幕）+ 立刻抽帧核对 | HUD preview | `*-run-final.mp4` + 外挂 SRT + `qc/*.jpg` |
-| `p3-qc` | 只再核对 / 重抽 | 成片 | `qc/*.jpg`，status=edited |
+| `p3-subs` | whisper + 忠于原句 SRT（只纠错、删显著卡顿；外挂） | 成片音频 | `subtitles.srt` / `.txt` |
+| `p3-cover` | 只换封面 / 重抽 | `run-*` + 封面句 | `cover-*.jpg` |
+| `p3-assemble` | 叠化拼接（默认不烧字幕）+ 立刻抽帧核对 | HUD preview | `*-run-final.mp4` + `qc/*.jpg` |
+| `p3-qc` | 只再核对 / 重抽 | 成片 | `qc/*.jpg`；有校准字幕才 `edited` |
 | `p3-jianying` | 60–90 秒发布剪辑 | 原片 + HUD alpha | 剪映工程 / 发布版 |
+| `p3-archive` | 满 7 天素材归档到 Passport | 本地 `YYYY-MM-DD-slug/` | `running-content/YYYYMM/`，核过再删本地 |
 
 每个 skill 做完必须主动推荐下一步，并给出可复制提示词（`/p3-xxx …`）。正文只用占位符，对用户说话时换成当前期真实值。命令和翻车记录写在各自 skill 里，这里不复制。

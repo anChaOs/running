@@ -1,6 +1,6 @@
 ---
 name: p3-qc
-description: 只再核对一次成片。默认成片流程里抽帧核对已在 p3-assemble 里拼完立刻做。用户说再核对、抽帧、QC、审片、接缝不对时用。通过后把 episode status 改为 edited。
+description: 只再核对一次成片。默认成片流程里抽帧核对已在 p3-assemble 里拼完立刻做。用户说再核对、抽帧、QC、审片、接缝不对时用。画面声音通过且已有校准字幕才把 episode status 改为 edited。
 ---
 
 # 成片核对（补做 / 重做）
@@ -55,20 +55,10 @@ SRT 贴底栏，可能压 HUD。公开前用私密/不公开稿在网页播放�
 - 天气是「数字°C / 数字°C」，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
 
-通过后：`episode.md` 的 `status` 改为 `edited`，`assets.md` 制作状态 `qc: done`。
+画面声音通过后：`assets.md` 制作状态 `qc: done`。已有校准字幕才把 `episode.md` 改为 `edited`。
 
 失败则指出该重跑哪个 skill：鞋错 → `p3-hud`；字幕错 → 改 txt/SRT，**不用重拼**；接缝错 → 查 open/close 是否被当成 run。
 
 ## 完成后
 
-核对通过后立刻告诉用户：全长成片流程结束，没有下一个制作 skill。发布提示词把当前期路径填进去。
-
-> 可以发了。没有制作 skill 了。B 站、YouTube 同一条成片，字幕都挂 `subtitles.srt`（创作中心不收 ASS）。先不公开，开 CC 看会不会压 HUD。封面用媒体目录里的 `cover-*.jpg`。
->
-> 文件在 `~/Movies/running-content/YYYY-MM-DD-slug/`。
->
-> 还要一条 60–90 秒短视频，发：
->
-> `/p3-jianying`
-
-发布后把链接写进该期 `episode.md` / `plan.md`，`status` 改为 `published`。用户说「发到 B 站了 BV…」时再记，不要替他们上传。
+还没有字幕：`/p3-subs`。已有校准字幕：不要再推荐制作 skill，发布按 `p3-subs`。
