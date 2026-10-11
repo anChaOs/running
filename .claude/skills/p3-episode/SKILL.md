@@ -16,7 +16,7 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
 - 不要把 FIT GPS 发给 Open-Meteo
 - 不要用生涯总里程直接当 HUD `-sk`
 - 不要覆盖已有 `open/run-*/close`、HUD、成片，除非用户明确要重做
-- 不要在成片流程里自行搬盘或删原片；归档走 `p3-archive`。发布完毕且两边链接都齐时，清临时文件走 `p3-subs`（只删 asr/qc/封面候选/上传用成片副本，不动原片与 `run-final`）
+- 不要在成片流程里自行搬盘或删原片；归档走 `p3-archive`。发布完毕且两边链接都齐时，清临时文件走 `p3-subs`（只删 asr/qc/封面候选/`hud-renders`/上传用成片副本，不动原片与 `run-final`）
 
 ## 产物图
 
