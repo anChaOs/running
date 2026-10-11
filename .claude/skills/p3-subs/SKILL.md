@@ -221,8 +221,9 @@ iina --mpv-geometry=320x180-8+8 \
 | `qc/` | 抽帧核对图 |
 | `cover-candidates/` | 封面候选帧 |
 | `cover-frame.jpg` | 封面抽帧原图（若有） |
+| `hud-renders/` | HUD preview / 透明层中间件；可再跑 `p3-hud` 生成 |
 | 以 `plan.md` 标题命名的上传用 `.mp4` | 发布时复制出去的那份；不是 `YYYY-MM-DD-run-final.mp4` |
 
-不要删：`open` / `run-*` / `close`（含 `*-raw`）、FIT、`*-stats-*.jpg`、`weather-hourly.json`、`YYYY-MM-DD-run-final.mp4`（及旁边的 `.srt`）、`cover-1920x1080.jpg` / `cover-1080x1440.jpg`、`hud-renders/`、仓库 `episodes/` 里的字幕源稿、跑鞋账本。
+不要删：`open` / `run-*` / `close`（含 `*-raw`）、FIT、`*-stats-*.jpg`、`weather-hourly.json`、`YYYY-MM-DD-run-final.mp4`（及旁边的 `.srt`）、`cover-1920x1080.jpg` / `cover-1080x1440.jpg`、仓库 `episodes/` 里的字幕源稿、跑鞋账本。
 
 清完把实际删掉的路径报给用户。这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。
