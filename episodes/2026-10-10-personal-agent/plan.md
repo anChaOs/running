@@ -12,50 +12,39 @@
 
 ## 简介
 
-摘要等字幕完成并校准后再写。不要按口播卡写。两个平台摘要相同。参考只写出处，对口型之后没说出口的条目删掉。
+两个平台摘要相同。参考只写出处。
 
 ### B 站
 
 个人视频制作来自：https://github.com/anChaOs/running
 
+今天轻松跑，聊 Personal Agent。我理解的核心，是 AI 有一台专门给自己用的电脑。OpenClaw、Hermes 早就能做，但要自己配，那时候模型也不够强。今年 Computer Use 起来以后，Claude Fable 只看屏幕通关了宝可梦火红，GPT-6 Astra 把同类电脑操作测试打到接近满分。Meta 的 Muse、OpenAI 的 dots、创业公司 Instinct 都把电脑配好了。Muse 有个卖二手键盘、把买家约到家楼下的故事。我自己用 Grok Bot 做跑步视频的 HUD 和字幕，也拿它管公司的 bug，尽量 human not in the loop。人一进循环就慢。主线还是先破三。
+
 参考：
 
 - OpenClaw https://en.wikipedia.org/wiki/OpenClaw
 - Hermes Agent（Nous Research）https://github.com/NousResearch/hermes-agent
-- OSWorld（Xie et al., 2024）https://os-world.github.io/
 - Anthropic：Claude Fable 5 通关《宝可梦火红》https://www.anthropic.com/news/claude-fable-5-mythos-5
-- GameSpark：官方时延片里游戏内时间 50 小时 9 分 https://www.gamespark.jp/article/2026/06/10/167798.html
-- Matt Robb 的 X 帖子 https://x.com/MattRobbt/status/2104090601411293303
-- The Verge 关于 Muse 卖键盘的报道 https://www.theverge.com/ai-artificial-intelligence/1001886/meta-muse-ai-facebook-marketplace-security-concerns
 - OpenAI Introducing Dots https://openai.com/index/introducing-dots/
-- OpenAI Dots：任务和记忆 https://learn.chatgpt.com/docs/dots/tasks-and-memory
-- OpenAI Dots：怎么联系它 https://learn.chatgpt.com/docs/dots/channels
-- Grok Bot：电脑 https://docs.x.ai/grok-bot/computer-and-apps
-- Grok Bot：多个 Bot 协作 https://docs.x.ai/grok-bot/chat-and-collaboration
-- Grok Bot：审批与草稿 https://docs.x.ai/grok-bot/approvals-security-and-privacy
-- Noah Shinn 发布 Instinct 的 X 帖子 https://x.com/noahrshinn/status/2092691344456351744
-- Colossus 播客：Instinct https://colossus.com/episode/instinct-the-personal-agent/
-- 第四种黑猩猩CHIMP：不做App，不做网页，0营销费用，怎么做100亿美元的Personal Agent？ https://www.bilibili.com/video/BV1Nxa269EiM/
+- Grok Bot https://docs.x.ai/grok-bot/computer-and-apps
+- Instinct https://colossus.com/episode/instinct-the-personal-agent/
 
 ### YouTube
 
 个人视频制作来自：https://github.com/anChaOs/running
 
+今天轻松跑，聊 Personal Agent。我理解的核心，是 AI 有一台专门给自己用的电脑。OpenClaw、Hermes 早就能做，但要自己配，那时候模型也不够强。今年 Computer Use 起来以后，Claude Fable 只看屏幕通关了宝可梦火红，GPT-6 Astra 把同类电脑操作测试打到接近满分。Meta 的 Muse、OpenAI 的 dots、创业公司 Instinct 都把电脑配好了。Muse 有个卖二手键盘、把买家约到家楼下的故事。我自己用 Grok Bot 做跑步视频的 HUD 和字幕，也拿它管公司的 bug，尽量 human not in the loop。人一进循环就慢。主线还是先破三。
+
 参考：
 
 - OpenClaw https://en.wikipedia.org/wiki/OpenClaw
 - Hermes Agent（Nous Research）https://github.com/NousResearch/hermes-agent
-- OSWorld（Xie et al., 2024）https://os-world.github.io/
 - Anthropic：Claude Fable 5 通关《宝可梦火红》https://www.anthropic.com/news/claude-fable-5-mythos-5
-- GameSpark：官方时延片里游戏内时间 50 小时 9 分 https://www.gamespark.jp/article/2026/06/10/167798.html
-- Matt Robb 的 X 帖子 https://x.com/MattRobbt/status/2104090601411293303
-- The Verge 关于 Muse 卖键盘的报道 https://www.theverge.com/ai-artificial-intelligence/1001886/meta-muse-ai-facebook-marketplace-security-concerns
 - OpenAI Introducing Dots https://openai.com/index/introducing-dots/
-- OpenAI Dots：任务和记忆 https://learn.chatgpt.com/docs/dots/tasks-and-memory
-- OpenAI Dots：怎么联系它 https://learn.chatgpt.com/docs/dots/channels
-- Grok Bot：电脑 https://docs.x.ai/grok-bot/computer-and-apps
-- Grok Bot：多个 Bot 协作 https://docs.x.ai/grok-bot/chat-and-collaboration
-- Grok Bot：审批与草稿 https://docs.x.ai/grok-bot/approvals-security-and-privacy
-- Noah Shinn 发布 Instinct 的 X 帖子 https://x.com/noahrshinn/status/2092691344456351744
-- Colossus 播客：Instinct https://colossus.com/episode/instinct-the-personal-agent/
-- 第四种黑猩猩CHIMP：不做App，不做网页，0营销费用，怎么做100亿美元的Personal Agent？ https://www.bilibili.com/video/BV1Nxa269EiM/
+- Grok Bot https://docs.x.ai/grok-bot/computer-and-apps
+- Instinct https://colossus.com/episode/instinct-the-personal-agent/
+
+## 发布
+
+- B 站：https://www.bilibili.com/video/BV12KpG6TE3F
+- YouTube：https://youtu.be/7RVzSGFHHYY
