@@ -2,7 +2,7 @@
 
 ## 本地素材目录
 
-`/Users/anchao/Movies/running-content/2026-10-11-chicago-30k`
+`~/Movies/running-content/2026-10-11-chicago-30k/`
 
 ## 重命名结果
 

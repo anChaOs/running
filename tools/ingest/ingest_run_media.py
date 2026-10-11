@@ -193,6 +193,17 @@ def maybe_fix_mtime(path: Path, start: datetime | None, duration: float | None, 
     return msg
 
 
+def display_media_dir(media_dir: Path) -> str:
+    """assets.md 里写成 ~/Movies/...，不要展开成 /Users/...。"""
+    resolved = media_dir.expanduser().resolve()
+    home_media = (Path.home() / "Movies/running-content").resolve()
+    try:
+        rel = resolved.relative_to(home_media)
+    except ValueError:
+        return str(resolved)
+    return f"~/Movies/running-content/{rel}/"
+
+
 def write_assets_md(
     dest: Path,
     media_dir: Path,
@@ -206,7 +217,7 @@ def write_assets_md(
         "",
         "## 本地素材目录",
         "",
-        f"`{media_dir}`",
+        f"`{display_media_dir(media_dir)}`",
         "",
         "## 重命名结果",
         "",
