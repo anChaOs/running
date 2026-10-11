@@ -96,9 +96,10 @@ hud-preview + open/close
 用户说继续，再加载下一阶段。各 stage skill 做完也会自己推荐下一步。
 
 改字幕：改 `subtitles.txt` 后跑 `tools/subs/txt_to_subs.py` 回写 SRT，不用重拼成片。`p3-subs` 写完稿必须停，等人手改字；改好后再对着成片对口型。用户没明确说烧进去时，assemble 不要加 `--ass`。
-改 `-sk`：重跑 HUD，再 assemble，再按需重对口型。
+改 `-sk`：重跑 HUD，再 assemble。preview 时长变了，就对着新成片重新对口型。
 改封面句：只重跑 `p3-cover`。
 
 ## 3. 状态
 
-`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；assemble 画面核对通过后 `assemble: done`，status 仍是 `hud`；字幕对口型完成后 `edited`。
+`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；字幕对口型完成后 `edited`。
+`assets.md`：assemble 画面核对通过后 `assemble: done`、`qc: done`；此时 `episode.md` 仍是 `hud`。

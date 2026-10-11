@@ -170,11 +170,11 @@ description: 边跑边说选题对谈。用户说选题、想拍什么、没主�
 
 | 情况 | 写到哪 |
 | --- | --- |
-| 主线或整期配菜、已有拍摄日 | 先 `p3-scaffold`，分段口播写入该期 `talk.md` |
+| 主线或整期配菜、已有拍摄日 | 先 `p3-scaffold`，分段口播写入该期 `talk.md`。同步 `mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug`，仓库目录和素材目录一起有 |
 | 还没拍摄日（主线或配菜） | `/p3-library` 写入 `topics/`，不要写 `talk.md` |
 | 调研里有长期价值的知识 / 历史 | ingest 进 `knowledge/wiki/`（来源放 `raw/`），和主题卡分开 |
 
-`episode.md` 的 `status` 用 `idea` 或 `planned`。
+`episode.md` 的 `status` 用 `idea` 或 `planned`。已经在选题里建过期、只改 `talk.md` 时，也要确认素材目录在；没有就补建。
 
 ## 完成后
 

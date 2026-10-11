@@ -21,7 +21,7 @@ description: 新建一期 episodes/YYYY-MM-DD-slug 和 episode.md。用户说建
 2. 从 `templates/episode.md` 建 `episodes/YYYY-MM-DD-slug/episode.md`。
 3. 需要口播卡再拷 `templates/run-talk-video.md` → `talk.md`；素材索引用 `templates/assets.md`。空壳 `talk.md` 里也加上简介占位：`等字幕完成并校准后再写。不要按本口播卡写。` 不要写简介正文。
 4. `status` 先 `planned`；素材进目录后再改 `shot`。
-5. 建空的媒体目录（可选）：
+5. 建空的媒体目录。选题落盘、建期都要建，不要标成可选：
 
 ```bash
 mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug
