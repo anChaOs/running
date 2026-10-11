@@ -208,3 +208,21 @@ iina --mpv-geometry=320x180-8+8 \
 | 外挂 | `subtitles.srt` |
 
 发布后记链接，`status` 改为 `published`。还要 60–90 秒短视频才提 `/p3-jianying`。
+
+### 发布后清临时文件
+
+触发：用户说「发布完毕 / 发完了 / 已发布」之类，并且同时给了 **B 站 BV（或完整 B 站链接）** 和 **YouTube 链接**。先写链接、改 `status=published`，再清这一期媒体目录里可再生成的临时文件。
+
+媒体目录：`~/Movies/running-content/YYYY-MM-DD-slug/`。只删下面这些（缺了就跳过，不要报错停住）：
+
+| 删 | 说明 |
+| --- | --- |
+| `asr/` | 转写中间产物 |
+| `qc/` | 抽帧核对图 |
+| `cover-candidates/` | 封面候选帧 |
+| `cover-frame.jpg` | 封面抽帧原图（若有） |
+| 以 `plan.md` 标题命名的上传用 `.mp4` | 发布时复制出去的那份；不是 `YYYY-MM-DD-run-final.mp4` |
+
+不要删：`open` / `run-*` / `close`（含 `*-raw`）、FIT、`*-stats-*.jpg`、`weather-hourly.json`、`YYYY-MM-DD-run-final.mp4`（及旁边的 `.srt`）、`cover-1920x1080.jpg` / `cover-1080x1440.jpg`、`hud-renders/`、仓库 `episodes/` 里的字幕源稿、跑鞋账本。
+
+清完把实际删掉的路径报给用户。这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。
