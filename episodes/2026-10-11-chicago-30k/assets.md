@@ -59,7 +59,7 @@
 
 - ingest: done
 - hud: done（`-sn "SC Trainer" -sk 2455.10`；preview 不句间粗剪，长空白是风景）
-- subs: pending
+- subs: done
 - cover: done（run-d 第 171 秒；封面句「30km LSD 基普里莫能破纪录吗？」）
-- assemble: pending
-- qc: pending
+- assemble: done（`2026-10-11-run-final.mp4` 911.6s；close 用 close-stats；音频峰值 −2.5 dB，跑中说话做过动态压缩）
+- qc: done

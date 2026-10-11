@@ -2,7 +2,7 @@
 date: 2026-10-11
 slug: chicago-30k
 title: 世纪公园 | 30km LSD
-status: hud
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-11-chicago-30k/
 ---
@@ -15,8 +15,15 @@ media: ~/Movies/running-content/2026-10-11-chicago-30k/
 
 封面句：30km LSD 基普里莫能破纪录吗？
 
+专名：基普里莫、大迫杰、Vinny Mauri、Clayton Young、李宁、科杰尔查、Conner Mantz、萨维、丰配友、基普图姆、飞电、Planet Fitness、Strava、LetsRun、芝加哥马拉松
+
 ## 文件
 
 - `plan.md`：拍摄 / 发布计划
 - `talk.md`：边跑边说提纲
 - `assets.md`：素材索引（模板 `templates/assets.md`）
+
+## 发布
+
+- B 站：https://www.bilibili.com/video/BV1MGpE64EHo
+- YouTube：https://youtu.be/pWyalE7f3Mo
