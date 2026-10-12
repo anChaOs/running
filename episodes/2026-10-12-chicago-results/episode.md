@@ -2,7 +2,7 @@
 date: 2026-10-12
 slug: chicago-results
 title: 芝加哥马拉松 | 结果如何？
-status: shot
+status: hud
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-12-chicago-results/
 ---
