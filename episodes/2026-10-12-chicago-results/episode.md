@@ -2,9 +2,12 @@
 date: 2026-10-12
 slug: chicago-results
 title: 芝加哥马拉松 | 结果如何？
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-12-chicago-results/
+youtube: https://youtu.be/lB-BPp_CnaA
+bilibili: https://www.bilibili.com/video/BV1nYpR6UEMv
+bilibili_bvid: BV1nYpR6UEMv
 ---
 
 # 2026-10-12 芝加哥马拉松 | 结果如何？
@@ -23,6 +26,9 @@ media: ~/Movies/running-content/2026-10-12-chicago-results/
 - `talk.md`：边跑边说提纲
 - `assets.md`：素材索引（模板 `templates/assets.md`）
 
-上传成片（生产成片原地改名，`status` 仍为 `edited`）：
-`~/Movies/running-content/2026-10-12-chicago-results/芝加哥马拉松 | 结果如何？.mp4`
-外挂：`subtitles.srt`（不要改成标题名）
+## 发布
+
+- YouTube：https://youtu.be/lB-BPp_CnaA
+- Bilibili：BV1nYpR6UEMv（https://www.bilibili.com/video/BV1nYpR6UEMv）
+- 成片：`~/Movies/running-content/2026-10-12-chicago-results/芝加哥马拉松 | 结果如何？.mp4`
+- 外挂：`subtitles.srt`（不改成标题名）
