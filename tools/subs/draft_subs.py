@@ -2,7 +2,7 @@
 """成片音频 → 字幕初稿（单行短条）。给人改字用，时间只是草稿。
 
 faster-whisper large-v3-turbo 词级时间（专名表当提示，只纠拼写）。
-切条顺序：先在标点和词间停顿（落在词组边界上）切，再按长度切；孤字并到邻条。
+切条顺序：先在标点和词间停顿（落在词组边界上）切，再按长度切；孤字并到邻条；再确定性合并「数字+单位/概数尾巴」和少量固定搭配。
 繁体统一转简体。不删字、不改写；校正交给人和 p3-subs 的规则。
 
 产物：
@@ -33,6 +33,14 @@ HANG_HEAD = ("的", "了", "里", "们", "着", "过", "中的", "呢", "吧", "
 # 这些词开头的下一条更自然：切在它们前面加分，停在它们上面减分
 OPENERS = ("但是", "但", "所以", "然后", "因为", "而且", "也", "就是", "那", "并且", "或者", "比如", "甚至", "包括", "当然")
 PUNCT_ONLY = re.compile(r"^[，,。.！？!?、；;：:…\-—]+$")
+# 数字后的单位 / 概数尾巴：不要拆到下一行（芝马期实踩：18-19|度了、2055|几）
+UNIT_TAIL_HEAD = re.compile(
+    r"^(度了|度|几|公里|千米|公斤|千克|米|分|秒|%|％|℃|°c|左右|多|来|倍)"
+)
+# 极少数固定搭配：上一 cue 收尾 + 下一 cue 起头 应并（保守，宁少勿滥）
+COLLOC_PAIRS = (
+    ("精神", "图腾"),
+)
 
 
 def clean_word(w: str) -> str:
@@ -111,6 +119,9 @@ def score_cut(ws, k) -> float:
         s -= 3
     if sc.norm(nxt) in OPENERS:
         s += 1.5
+    # 数字 | 单位/概数：强惩罚，避免「18-19 / 度了」「2055 / 几」
+    if re.search(r"\d$", bare) and nxt and UNIT_TAIL_HEAD.match(sc.norm(nxt)):
+        s -= 5
     return s
 
 
@@ -151,7 +162,43 @@ def split_words(words) -> list[list]:
             merged[-1] = merged[-1] + c
         else:
             merged.append(c)
-    return merged
+    return merge_cut_fixes(merged)
+
+
+def _ends_with_number(text: str) -> bool:
+    t = re.sub(r"[，,。！？!?、；;：:\s…]+$", "", sc.to_simplified(text).strip())
+    return bool(re.search(r"\d$", t))
+
+
+def _starts_with_unit_tail(text: str) -> bool:
+    return bool(UNIT_TAIL_HEAD.match(sc.norm(text)))
+
+
+def _colloc_join(a: str, b: str) -> bool:
+    a_n, b_n = sc.norm(a), sc.norm(b)
+    return any(a_n.endswith(left) and b_n.startswith(right) for left, right in COLLOC_PAIRS)
+
+
+def merge_cut_fixes(groups: list[list]) -> list[list]:
+    """初稿切完后再并一轮：数字+单位/概数尾巴；少量固定搭配。只并切分、不改字。"""
+    if not groups:
+        return groups
+    out: list[list] = [groups[0]]
+    for g in groups[1:]:
+        prev = out[-1]
+        a, b = text_of(prev), text_of(g)
+        join = False
+        if _ends_with_number(a) and _starts_with_unit_tail(b):
+            join = True
+        elif _colloc_join(a, b):
+            join = True
+        # 数字+单位允许略超 HARD_CHARS；搭配也给一点余量
+        limit = HARD_CHARS + (4 if join else 0)
+        if join and nchars(prev) + nchars(g) <= limit:
+            out[-1] = prev + g
+        else:
+            out.append(g)
+    return out
 
 
 def main() -> int:
