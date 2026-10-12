@@ -11,7 +11,7 @@ description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽
 ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
 ```
 
-HUD 和封面走 `p3-hud`（并行），字幕走 `p3-subs`。只换封面走 `p3-cover`。只再核对一次走 `p3-qc`。
+HUD 走 `p3-hud`，封面走 `p3-cover`（二者并行），字幕走 `p3-subs`。只换封面走 `p3-cover`。只再核对一次走 `p3-qc`。
 
 ## 不要做的事
 

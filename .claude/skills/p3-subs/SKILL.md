@@ -238,7 +238,6 @@ iina --mpv-geometry=320x180-8+8 \
 | `asr/` | 转写中间产物 |
 | `qc/` | 抽帧核对图 |
 | `cover-candidates/` | 封面候选帧 |
-| `cover-frame.jpg` | 封面抽帧原图（若有） |
 | `hud-renders/` | HUD preview / 透明层中间件；可再跑 `p3-hud` 生成 |
 
 不要删：`open` / `run-*` / `close`（含 `*-raw`）、FIT、`*-stats-*.jpg`、`weather-hourly.json`、以标题命名的成片 `.mp4`（发布前由 `run-final` 原地改名而来）、`subtitles.srt`（及可选的 `YYYY-MM-DD-run-final.srt`）、`*-run-final-pre-*.mp4` 等备份、`cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg`、仓库 `episodes/` 里的字幕源稿、跑鞋账本。
