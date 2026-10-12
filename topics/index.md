@@ -9,3 +9,4 @@
 | slug | 一句话 | 种类 | 体量 | 状态 |
 |------|--------|------|------|------|
 | [berlin-marathon](berlin-marathon.md) | 柏林马拉松｜中国出征（2026-09-23） | running | large | used |
+| [body-weight](body-weight.md) | 半马 PB 时约 65kg，现约 68.5kg（+3.5kg）；单独一期聊体重 | running | small | seed |
