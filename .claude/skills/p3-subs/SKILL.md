@@ -229,17 +229,44 @@ iina --mpv-geometry=320x180-8+8 \
 
 ### 发布后清临时文件
 
-触发：用户说「发布完毕 / 发完了 / 已发布」之类，并且同时给了 **B 站 BV（或完整 B 站链接）** 和 **YouTube 链接**。先写链接、改 `status=published`，再清这一期媒体目录里可再生成的临时文件。
+**真源在此。** 其它 skill / 文档只引用本节，不要另写一份保留/删除清单。
 
-媒体目录：`~/Movies/running-content/YYYY-MM-DD-slug/`。只删下面这些（缺了就跳过，不要报错停住）：
+触发：用户说「发布完毕 / 发完了 / 已发布」之类，并且同时给了 **B 站 BV（或完整 B 站链接）** 和 **YouTube 链接**。先写链接、改 `status=published`，再清这一期媒体目录。
+
+媒体目录：`~/Movies/running-content/YYYY-MM-DD-slug/`。
+
+#### 保留（KEEP）
+
+| 保留 | 说明 |
+| --- | --- |
+| 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
+| 成片 | 以标题命名的最终 `.mp4`（由 `run-final` 原地改名而来） |
+| 字幕 | `subtitles.srt`（制作期可选的 `YYYY-MM-DD-run-final.srt` 可留） |
+| 封面 | `cover.jpg`、`cover-1920x1080.jpg`、`cover-4x3-1920x1440.jpg`、`cover-1080x1440.jpg` |
+| 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
+| 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
+
+仓库 `episodes/` 里的字幕源稿、跑鞋账本一律不动。
+
+#### 删除（DELETE）
+
+缺了就跳过，不要报错停住：
 
 | 删 | 说明 |
 | --- | --- |
+| `*-run-final-pre-*.mp4` | 拼片备份（冷开场前、修剪前等）；发布后不再需要回退 |
+| `close-stats` 等渲染中间件 | 叠了数据的 close 中间件、其它可再生成的渲染产物 |
+| 剪过的 `open` / `close` | **仅当**已有对应 `open-raw` / `close-raw` 时删；没有 `-raw` 则上面 KEEP 已要求保留 |
+| `hud-renders/` | HUD preview / 透明层；可再跑 `p3-hud` |
 | `asr/` | 转写中间产物 |
 | `qc/` | 抽帧核对图 |
 | `cover-candidates/` | 封面候选帧 |
-| `hud-renders/` | HUD preview / 透明层中间件；可再跑 `p3-hud` 生成 |
+| `cold-open/` | 冷开场中间件 |
+| `*.bak`、`.DS_Store` | 备份后缀与系统垃圾 |
 
-不要删：`open` / `run-*` / `close`（含 `*-raw`）、FIT、`*-stats-*.jpg`、`weather-hourly.json`、以标题命名的成片 `.mp4`（发布前由 `run-final` 原地改名而来）、`subtitles.srt`（及可选的 `YYYY-MM-DD-run-final.srt`）、`*-run-final-pre-*.mp4` 等备份、`cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg`、仓库 `episodes/` 里的字幕源稿、跑鞋账本。
+#### 流程（PROCESS）
 
-清完把实际删掉的路径报给用户。这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。
+1. **先列清单再动手。** 用 `du -sh` / `ls -lh` 列出拟删项与拟留项及体积，报给用户确认。用户没明确同意前不要删。
+2. **进废纸篓，禁止 `rm`。** 在 macOS 上把确认要删的路径 **move 进废纸篓**（`mv … ~/.Trash/`，或已安装的 `trash` CLI）。不要用 `rm` / `rm -rf`。同名冲突时先改名再移入。
+3. 清完把实际移入废纸篓的路径与腾出的体积报给用户。
+4. 这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。
