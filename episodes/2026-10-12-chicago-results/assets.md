@@ -23,8 +23,11 @@
 - `1791760738404.jpg`（手持自拍）
 - `1791760738436.jpg`（手持自拍）
 - COROS 截图已改名：`2026-10-12-stats-01.jpg`
-- 定稿封面：`cover.jpg`（v4b gritty night；真人抠图+粗白描边；封面句「真的假的 心率186？」）
-- 候选：`cover-candidates/cover-cutout-v4a/b/c-1920x1080.jpg`（选用 b）
+- 定稿封面（v4b 真人抠图+粗白描边；句「真的假的 心率186？」）：
+  - `cover.jpg` / `cover-1920x1080.jpg` / `cover-16x9-1920x1080.jpg` — **16:9** 个人空间（1920×1080，选用 v4b）
+  - `cover-4x3-1920x1440.jpg`（及轻量 `cover-4x3-1440x1080.jpg`）— **4:3** B 站首页推荐（按比例重排，非裁切）
+  - `cover-1080x1440.jpg` / `cover-3x4-1080x1440.jpg` — **3:4** 小红书
+- 候选：`cover-candidates/cover-cutout-v4a/b/c-1920x1080.jpg`（选用 b）；多比例脚本 `cover-candidates/make_cover_ratios.py`
 
 ### 成片备注
 
@@ -33,7 +36,7 @@
   - 句2 `close` **76.98–81.90**「那句话怎么说的来着 / 后来者总有机会」（原 76.50）
   - bumper：`cold-open/bumper-hardcut-raw.mp4`（offset **10.024s**）
   - 备份：`2026-10-12-run-final-pre-coldopen.mp4`（及 `2026-10-12-run-final-pre-trimfix.mp4`）保留原名
-  - 发布前成片已原地改名：`芝加哥马拉松 | 结果如何？.mp4`（同名 `.srt`）
+  - 发布前成片已原地改名：`芝加哥马拉松 | 结果如何？.mp4`（**只改成片名**；外挂仍用 `subtitles.srt`，不改成标题名）
   - 字幕：body 全部 +10.024s，文首加冷开场 4 条
 
 ## 时间顺序依据
@@ -58,8 +61,8 @@
 - ingest: done
 - hud: done
 - subs: done
-- cover: done (v4b → cover.jpg；句：真的假的 心率186？)
+- cover: done (v4b；16:9 cover.jpg/cover-1920x1080/cover-16x9；4:3 cover-4x3-1920x1440；3:4 cover-1080x1440；句：真的假的 心率186？)
 - assemble: done（生产成片已原地改名 `芝加哥马拉松 | 结果如何？.mp4`；已 prepend 硬切冷开场 raw；备份 `2026-10-12-run-final-pre-coldopen.mp4` / `2026-10-12-run-final-pre-trimfix.mp4` 保留原名）
 - cold-open: done (硬切；原片 run-c + close，无 HUD/stats；句首起切；offset 10.024s)
 - qc: done (抽帧：HUD 进出正确、无烧字幕、鞋名惊碳Fly 可见、接缝叠化正常)
-- upload: ready（`芝加哥马拉松 | 结果如何？.mp4` + 同名 `.srt`；标题标点含 `|` 原样保留；无 `run-final` 副本）
+- upload: ready（成片 `芝加哥马拉松 | 结果如何？.mp4`；外挂 `subtitles.srt`；标题标点含 `|` 原样保留；无 `run-final` 副本；SRT 不跟成片改名）

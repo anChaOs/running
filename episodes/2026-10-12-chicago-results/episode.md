@@ -25,4 +25,4 @@ media: ~/Movies/running-content/2026-10-12-chicago-results/
 
 上传成片（生产成片原地改名，`status` 仍为 `edited`）：
 `~/Movies/running-content/2026-10-12-chicago-results/芝加哥马拉松 | 结果如何？.mp4`
-同名外挂：`芝加哥马拉松 | 结果如何？.srt`
+外挂：`subtitles.srt`（不要改成标题名）

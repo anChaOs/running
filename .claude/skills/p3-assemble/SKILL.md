@@ -153,10 +153,11 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 
 用户说可以发了、要准备上传时（通常在 `p3-subs` 定稿之后）：
 
-1. 把媒体目录里的生产成片 `YYYY-MM-DD-run-final.mp4` **原地改名**为 `plan.md` / `episode.md` 标题原文 + `.mp4`；同名 sidecar `.srt` 一并改名。
-2. **文件名保留标题全部标点**，包括 `|`、`？`、空格等。**不要**把 `|` 换成 `-`，也不要另复制一份副本。
-3. 备份文件（如 `*-run-final-pre-coldopen.mp4`、`*-run-final-pre-trimfix.mp4`）**保留原名**，不要跟着改。
-4. `assets.md`：`assemble` 注明新文件名；加 `upload: ready`。`episode.md` 的 `status` 仍为 `edited`，发完两边链接齐了才 `published`。
+1. **只改成片名**：把媒体目录里的生产成片 `YYYY-MM-DD-run-final.mp4` **原地改名**为 `plan.md` / `episode.md` 标题原文 + `.mp4`。
+2. **不要改字幕文件名。** 上传外挂始终用 `subtitles.srt`（仓库 `episodes/.../subtitles.srt` 与媒体目录同名拷贝）。**不要**把 SRT 改成标题名。制作阶段若曾拷过 `YYYY-MM-DD-run-final.srt`（给 IINA 同名挂载用），可保留，但发布上传优先 `subtitles.srt`。
+3. **文件名保留标题全部标点**，包括 `|`、`？`、空格等。**不要**把 `|` 换成 `-`，也不要另复制一份成片副本。
+4. 备份文件（如 `*-run-final-pre-coldopen.mp4`、`*-run-final-pre-trimfix.mp4`）**保留原名**，不要跟着改。
+5. `assets.md`：`assemble` 注明新成片文件名；加 `upload: ready`（成片=标题名 `.mp4`，外挂=`subtitles.srt`）。`episode.md` 的 `status` 仍为 `edited`，发完两边链接齐了才 `published`。
 
 详细发布清单与清临时文件见 `p3-subs`。
 

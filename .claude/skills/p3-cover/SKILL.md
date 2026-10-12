@@ -34,15 +34,19 @@ description: 只换封面或重抽封面。默认成片流程里封面已在 p3-
   --out-dir ~/Movies/running-content/YYYY-MM-DD-slug
 ```
 
-产出：
+产出（**B 站要两张比例，不要只出一张再裁**）：
 
 ```text
-cover-1920x1080.jpg   # 视频号 / B 站
-cover-1080x1440.jpg   # 小红书 3:4
-cover-frame.jpg       # 未叠字的抽帧
+cover-1920x1080.jpg          # 16:9  B 站个人空间 / 视频号（亦可 cover-16x9-1920x1080.jpg）
+cover-4x3-1920x1440.jpg      # 4:3   B 站首页推荐（可另存 cover-4x3-1440x1080.jpg 轻量）
+cover-1080x1440.jpg          # 3:4   小红书（亦可 cover-3x4-1080x1440.jpg）
+cover.jpg                    # 定稿别名，默认指向 16:9
+cover-frame.jpg              # 未叠字的抽帧（抽帧叠字流程）
 ```
 
-`assets.md` 制作状态 `cover: done`。
+创意图 / 抠图封面：每个比例**单独排版**（人物+大字位置按画幅重排），禁止把 16:9 天真裁成 4:3 导致削头或切字。
+
+`assets.md` 制作状态 `cover: done`，并写明 16:9 / 4:3（及如有 3:4）路径。
 
 
 ## 创意图封面（优先）
@@ -53,7 +57,7 @@ cover-frame.jpg       # 未叠字的抽帧
 2. **流程：** rembg（或等效）抠出自拍真人像素 → 人物加**很粗的白描边** → 铺有设计感的背景（赛事夜景、粗粝夜跑、霓虹极简等，背景**不要残字/乱码**）→ 前景大字（封面句关键词 + 系列名「破三实验室」）。左边文案拉开间距，别挤成一团。
 3. **大数字以 COROS/FIT 或口播核对过的数为准**（例：全马均心率写 186 不是口误的 187）。封面句随用户定稿改。
 4. **不要：** 纯文字贴原自拍；让 GenerateImage / 生图模型单独重画人脸（身份会漂，越画越不像）；背景里塞一堆装饰性乱字。
-5. 定稿拷到媒体目录 `cover.jpg`（或同时留 `cover-1920x1080.jpg`）；候选放 `cover-candidates/`。`assets.md` 写 `cover: done` 并注明选用哪版。
+5. 定稿至少交 **B 站两张**：`cover-1920x1080.jpg`（16:9 个人空间）+ `cover-4x3-1920x1440.jpg`（4:3 首页推荐）；另按需 `cover-1080x1440.jpg`（小红书 3:4）。`cover.jpg` 默认=16:9。候选放 `cover-candidates/`。各比例从抠图素材**重排合成**，不要 naive crop。`assets.md` 写 `cover: done` 并注明选用哪版与各比例路径。
 
 只换封面句、仍用旧底图时，可继续用上面的 `make_cover.py`。
 

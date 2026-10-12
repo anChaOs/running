@@ -113,7 +113,7 @@ subtitles.txt   # 给人改的稿
 2. **优先短语边界，不要只看字数。** 「太能冲了刷新了自己的PB」→ 两条：「太能冲了」/「刷新了自己的PB」。一句里两个完整谓语，宁可拆开。
 3. **代词贴下一句主语。** 「之后的表现吧我 / 昨天…」错；对的是「看一下之后的表现吧」/「我昨天在看直播的时候」。「我」起新句时，不要挂在上一句尾巴上。
 4. **语义单元别拆开。** 「精神 / 图腾吧」应并成「精神图腾吧」；双音节词组、专名、固定搭配同一条。
-5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → 同步两份外挂：`episodes/.../subtitles.srt` 和媒体目录 `YYYY-MM-DD-run-final.srt`（及同目录 `subtitles.srt`）。
+5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → 同步外挂：仓库与媒体目录的 `subtitles.srt`（上传用这个名）。制作审片阶段可另拷 `YYYY-MM-DD-run-final.srt` 方便 IINA 同名挂载；**不要**改成标题名。
 6. **冷开场 prepend（成片前加 bumper）时：**
    - 素材从 **原片** `open` / `run-*` / `close`（含 `*-raw`）截，**不要** HUD preview、不要 `*-close-stats`
    - 切入点：目标句**第一个字**起，不要带上上一句最后一个字
@@ -175,7 +175,7 @@ txt 一行一条，时间是成片轴：
      机器过门两层：① 比例——早收（出点比说完早 >0.3s）≤ 可核对条的 3%；漏盖（有正词人声却没字幕，连续 ≥0.5s）累计时长 ≤ 成片时长的 1%；挂静音（说完后还挂 >1s）≤ 可核对条的 3%。② 绝对硬门槛——严重早收（出点比说完早 >0.5s）条数必须为 0。超任一则退出码非 0（机器未过门）。**机器过门 ≠ 可以写 `subs: done`**：脚本仍逐条列出硬失败行，agent 必须给人听；只有用户确认「改好了 / 可以了」之后，才把 `assets.md` 写成 `subs: done`。对不上 / 噪声大的条不进比例分母，单独列出要人听。提醒：晚进 >0.3s、短于 1s、超过 7 字/秒、单字条、词组拆开、重叠、`\N`、括号注释。漏盖若是路人说话或删掉的磕巴，人听过确认后在回复里说明。
    - 对完扫一遍：单行；用词跟口播，没有被改写成另一种说法；没有括号注释。
    - 规则不变：字出在嘴动时；**宁可早出，不能早收**；气口后的短人声（「那」「嗯」）不要钉成下一句入点；句间停顿留白。
-   - 对着成片 `YYYY-MM-DD-run-final.mp4` 抽听，本地预览用 IINA，成片旁边放同名 sidecar SRT
+   - 对着成片 `YYYY-MM-DD-run-final.mp4` 抽听，本地预览用 IINA；媒体目录放 `subtitles.srt`，制作阶段可另放同名 `YYYY-MM-DD-run-final.srt` 方便自动挂
    - 不要为对齐改字。只改 sidecar，不用重拼成片。preview 时长变了（重渲 HUD），对着新成片重抽 wav、重跑这一步。
    - 改完 txt 时间后跑 `txt_to_subs.py` 回写 SRT
 3. 外挂拷到成片旁边，方便 IINA 自动挂：
@@ -212,15 +212,15 @@ iina --mpv-geometry=320x180-8+8 \
   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
 ```
 
-小窗贴右上角。同名 `YYYY-MM-DD-run-final.srt` 会自动挂。
+小窗贴右上角。制作阶段若有同名 `YYYY-MM-DD-run-final.srt` 会自动挂；成片已按标题改名后，用 `subtitles.srt`（`--sub-file=` 或上传时手挂）。
 
-**先不要给发布流程。** 用户说「没问题了 / 可以发了」再给：从 `plan.md` 抄标题、封面句、简介。把生产成片 `YYYY-MM-DD-run-final.mp4` **原地改名**为标题原文（同目录同名 `.srt` 一并改名）。**保留标题全部标点**，包括 `|`、`？`、空格等；**不要**把 `|` 换成 `-`，也不要另留一份 `run-final` 副本。上传成片 → 换封面 → 挂 SRT（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。不要替用户上传。`assets.md` 记 `upload: ready`；`episode.md` 的 `status` 仍为 `edited`，真正发完、两边链接齐了才改 `published`。
+**先不要给发布流程。** 用户说「没问题了 / 可以发了」再给：从 `plan.md` 抄标题、封面句、简介。把生产成片 `YYYY-MM-DD-run-final.mp4` **原地改名**为标题原文 + `.mp4`。**只改成片名，不要改 SRT 文件名**；上传外挂始终用 `subtitles.srt`。**保留标题全部标点**，包括 `|`、`？`、空格等；**不要**把 `|` 换成 `-`，也不要另留一份 `run-final` 副本。上传成片 → 换封面 → 挂 `subtitles.srt`（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。不要替用户上传。`assets.md` 记 `upload: ready`；`episode.md` 的 `status` 仍为 `edited`，真正发完、两边链接齐了才改 `published`。
 
 | 用途 | 文件 |
 | --- | --- |
 | 成片（上传用 = 生产成片） | 媒体目录里以标题命名的 `.mp4`（由 `YYYY-MM-DD-run-final.mp4` 原地改名） |
-| 封面 | `cover-1920x1080.jpg` / `cover-1080x1440.jpg` / `cover.jpg` |
-| 外挂 | 与成片同名的 `.srt`（另可保留 `subtitles.srt`） |
+| 封面 | `cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg` |
+| 外挂 | **`subtitles.srt`**（不要改成标题名；制作阶段可选保留 `YYYY-MM-DD-run-final.srt`） |
 
 发布后记链接，`status` 改为 `published`。还要 60–90 秒短视频才提 `/p3-jianying`。
 
@@ -238,6 +238,6 @@ iina --mpv-geometry=320x180-8+8 \
 | `cover-frame.jpg` | 封面抽帧原图（若有） |
 | `hud-renders/` | HUD preview / 透明层中间件；可再跑 `p3-hud` 生成 |
 
-不要删：`open` / `run-*` / `close`（含 `*-raw`）、FIT、`*-stats-*.jpg`、`weather-hourly.json`、以标题命名的成片 `.mp4` 与同名 `.srt`（发布前由 `run-final` 原地改名而来）、`*-run-final-pre-*.mp4` 等备份、`cover-1920x1080.jpg` / `cover-1080x1440.jpg` / `cover.jpg`、仓库 `episodes/` 里的字幕源稿、跑鞋账本。
+不要删：`open` / `run-*` / `close`（含 `*-raw`）、FIT、`*-stats-*.jpg`、`weather-hourly.json`、以标题命名的成片 `.mp4`（发布前由 `run-final` 原地改名而来）、`subtitles.srt`（及可选的 `YYYY-MM-DD-run-final.srt`）、`*-run-final-pre-*.mp4` 等备份、`cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg`、仓库 `episodes/` 里的字幕源稿、跑鞋账本。
 
 清完把实际删掉的路径报给用户。这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。
