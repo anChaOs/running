@@ -1,13 +1,13 @@
 ---
 name: p3-hud
-description: 给 run-* 渲染透明 HUD 和原片同档 preview，preview 出完做句间粗剪，同时从原片 run-* 做封面。需要已命名 mp4、FIT、跑鞋 -sn/-sk。用户说 HUD、叠加数据、hud-preview、overlay、封面一起做时用。不要给 open/close 加 HUD，不要剪原片 run-*。天气用上海城市场点，不要发 FIT GPS。封面不要用 HUD preview。
+description: 给 run-* 渲染透明 HUD 和原片同档 preview，preview 出完做句间粗剪。需要已命名 mp4、FIT、跑鞋 -sn/-sk。用户说 HUD、叠加数据、hud-preview、overlay 时用。封面走 p3-cover，可并行。不要给 open/close 加 HUD，不要剪原片 run-*。天气用上海城市场点，不要发 FIT GPS。
 ---
 
-# HUD + 封面
+# HUD
 
-同一阶段、互不影响，**并行**：HUD 吃 `run-*` + FIT；封面吃原片 `run-*`（任意一段，用户点哪段就用哪段）。不要等 HUD 渲完再抽封面。
+HUD 吃 `run-*` + FIT。封面走 `p3-cover`（自拍抠图合成），和 HUD 互不依赖，可**并行**做，不要等 HUD 渲完再做封面。
 
-细节见 `tools/hud/README.md`。换封面句、重做封面走 `p3-cover`，不要为换几个字重渲 HUD。
+细节见 `tools/hud/README.md`。不要为换封面句重渲 HUD。
 
 ## 前置
 
@@ -95,32 +95,15 @@ preview 出完后，对 **preview** 做句间粗剪（原片 `run-*` 不剪，HU
 
 ## 封面（并行）
 
-片源：任一原片 `YYYY-MM-DD-run-*.mp4`（不只 `run-a`，也不要 HUD preview）。抽帧：**清晰是硬条件。** 近处树叶、树皮、路沿要能看出纹理。同时避开行人特写、过曝、低头看表。先抽 2–3 个清楚的候选给用户看；用户点哪段就用哪段。
-
-```bash
-.venv/bin/python tools/assemble/make_cover.py \
-  --src ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-XXX.mp4 \
-  --title "封面句" \
-  --sub "破三实验室" \
-  --ss 40 \
-  --out-dir ~/Movies/running-content/YYYY-MM-DD-slug
-```
-
-产出：
-
-```text
-cover-1920x1080.jpg
-cover-1080x1440.jpg
-cover-frame.jpg
-```
+封面不在本 skill 做，走 `p3-cover`：拍摄单 → 自拍抠图 → 粗描边 → 设计底 → 三比例手排。不要用 HUD preview 当封面底图。
 
 ## 完成
 
-`assets.md`：`hud: done`（记下 `-sn` / `-sk`），`cover: done` 或 `cover: waiting-review`（等人选帧）。`episode.md` 改为 `hud`。
+`assets.md`：`hud: done`（记下 `-sn` / `-sk`）。`episode.md` 改为 `hud`。
 
 ## 完成后
 
-两件都写好后立刻推荐拼接。不要再推荐 `/p3-cover`，除非封面被否、要重抽。
+HUD 写好后立刻推荐拼接；封面若还没做，提醒并行走 `/p3-cover`。
 
 > 下一步用 `/p3-assemble`，可以直接发：
 >

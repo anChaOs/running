@@ -42,7 +42,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `templates/` | Markdown 写作模板 |
 | `tools/ingest/` | 手机导出收进素材目录 |
 | `tools/hud/` | HUD 时间探测与批量渲染 |
-| `tools/assemble/` | 全长成片拼接、封面 |
+| `tools/assemble/` | 全长成片拼接 |
 | `tools/subs/` | 字幕初稿、强制对齐、质检门、txt 收成外挂 SRT |
 | `.claude/skills/` | 按需加载；主题库 `p3-library`，选题 `p3-topic`，成片入口 `p3-episode`，归档 `p3-archive` |
 

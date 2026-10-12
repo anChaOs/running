@@ -10,9 +10,9 @@
 | `p3-scaffold` | 建期 | 日期、slug | `episodes/YYYY-MM-DD-slug/` |
 | `p3-ingest` | 收素材、命名、校正 mtime | `VID_*.mp4`、FIT | `open/run-*/close`、`assets.md` |
 | `p3-shoes` | 算 HUD `-sk` | 鞋名 + 开跑前/跑完后/生涯总里程 | `training/logs/shoes.md` 更新 |
-| `p3-hud` | 同档 preview（出完 VAD 句间粗剪）+ 透明层中间件，并行出封面 | 已命名 run + FIT + `-sk` | `hud-renders/` + `cover-*.jpg` |
+| `p3-hud` | 同档 preview（出完 VAD 句间粗剪）+ 透明层中间件 | 已命名 run + FIT + `-sk` | `hud-renders/` |
 | `p3-subs` | 词级转写 + 忠于原句 SRT（只纠错、删显著卡顿；外挂）；改字后强制对齐，质检门按比例过门；发布完毕记链接后清临时文件 | 成片音频 | `subtitles.srt` / `.txt`；发布后删 `asr/` `qc/` 封面候选、`hud-renders/` 与上传用成片副本 |
-| `p3-cover` | 只换封面 / 重抽 | `run-*` + 封面句 | `cover-*.jpg` |
+| `p3-cover` | 封面：拍摄单 → 自拍抠图 → 粗描边 → 设计底 → 三比例手排（与 HUD 并行） | 手持自拍 + 封面句 | `cover-*.jpg` |
 | `p3-assemble` | 叠化拼接（默认不烧字幕）+ 立刻抽帧核对 | HUD preview | `*-run-final.mp4` + `qc/*.jpg` |
 | `p3-qc` | 只再核对 / 重抽 | 成片 | `qc/*.jpg`；有校准字幕才 `edited` |
 | `p3-jianying` | 60–90 秒发布剪辑 | 原片 + HUD alpha | 剪映工程 / 发布版 |

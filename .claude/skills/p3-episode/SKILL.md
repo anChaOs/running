@@ -28,7 +28,8 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
   p3-shoes          → -sn / -sk（跑完后累计 km）
 
 run-* + FIT + -sk
-  p3-hud       → hud-renders/*-hud-preview.mp4 + cover-*.jpg（封面并行，用原片 run-*）
+  p3-hud       → hud-renders/*-hud-preview.mp4
+  p3-cover     → cover-*.jpg（与 HUD 并行，自拍抠图合成）
 
 hud-preview + open/close
   p3-assemble   → YYYY-MM-DD-run-final.mp4 + 抽帧核对
@@ -37,7 +38,7 @@ hud-preview + open/close
   p3-subs  → asr/* + 忠于原句 subtitles.srt / .txt（校正不改写；外挂；status=edited）
 
 换封面句
-  p3-cover       → 只重出 cover-*.jpg，不重渲 HUD
+  p3-cover       → 重出 cover-*.jpg，不重渲 HUD
 
 再核对
   p3-qc         → 只再抽一轮；默认已在 assemble 里做过
@@ -51,10 +52,10 @@ hud-preview + open/close
 | --- | --- | --- |
 | 只收素材 | 原始视频 | `p3-ingest`（缺目录则先 `p3-scaffold`） |
 | 只记鞋 | 鞋名 + 里程口径 | `p3-shoes` |
-| 只做 HUD | 已命名 `run-*` + FIT + `-sk` | `p3-shoes`（若还没有 `-sk`）→ `p3-hud`（顺带封面） |
+| 只做 HUD | 已命名 `run-*` + FIT + `-sk` | `p3-shoes`（若还没有 `-sk`）→ `p3-hud` |
 | 只拼接 | HUD preview | `p3-assemble`（默认不烧字幕；拼完立刻核对） |
 | 只做字幕 | 成片 `run-final` | `p3-subs` |
-| 只换封面 | `run-*` + 标题 | `p3-cover` |
+| 只换封面 | 自拍 + 封面句 | `p3-cover` |
 | 再核对 | 成片 | `p3-qc` |
 | 剪映短片 | HUD overlay | `p3-jianying` |
 | 归档 / 腾空间 | 满 7 天的本地媒体目录 | `p3-archive` |
@@ -73,7 +74,7 @@ hud-preview + open/close
 5. **跑鞋名**。
 6. **里程口径**：开跑前 / 跑完后 / 现在的生涯总里程。生涯总里程要减去本场 km 才是开跑前。本场 km 用 FIT。
 7. **天气**：默认上海城市场点 `--weather-city shanghai`。明确不要则 `--no-weather`。
-8. **封面句**：默认 `episode.md` / `talk.md` 标题，系列名「破三实验室」。跟 HUD 一起做，除非用户只要换封面。
+8. **封面句**：默认 `episode.md` / `talk.md` 标题，系列名「破三实验室」。封面走 `p3-cover`，与 HUD 并行。
 9. **今天停在哪**：ingest / hud / assemble / subs / full。
 
 ## 完成后 / 引导下一步
@@ -85,7 +86,7 @@ hud-preview + open/close
 | 没有 `episodes/` 目录 | `/p3-scaffold 日期 YYYY-MM-DD slug <slug>` |
 | 没有 `open` / `run-*` | `/p3-ingest 原始文件在 <路径>` |
 | 没有这一场 `-sk` | `/p3-shoes 鞋是 <HUD 名>，这是开跑前/跑完后 <数字> 公里` |
-| 没有 HUD preview | `/p3-hud`（封面一并做） |
+| 没有 HUD preview | `/p3-hud`（封面并行走 `/p3-cover`） |
 | 没有成片 | `/p3-assemble`（拼完立刻核对） |
 | 没有字幕稿 | `/p3-subs`（对着成片转写） |
 | 只要换封面 | `/p3-cover 封面句「<封面句>」` |
