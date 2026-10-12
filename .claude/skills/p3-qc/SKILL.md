@@ -9,7 +9,7 @@ description: 只再核对一次成片。默认成片流程里抽帧核对已在 
 
 ## 前置
 
-`YYYY-MM-DD-run-final.mp4`（默认无烧字幕）。时间轴见 `p3-assemble`。外挂在 `episodes/YYYY-MM-DD-slug/subtitles.srt`。
+制作期成片：`YYYY-MM-DD-run-final.mp4`（默认无烧字幕）。若已 upload-ready 改名，成片是标题原文 + `.mp4`；外挂仍是 `subtitles.srt`（不要找与成片同名的 `.srt`）。时间轴见 `p3-assemble`。外挂源稿在 `episodes/YYYY-MM-DD-slug/subtitles.srt`。
 
 ## 不要做的事
 
@@ -29,6 +29,7 @@ description: 只再核对一次成片。默认成片流程里抽帧核对已在 
 
 ```bash
 mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug/qc
+# 制作期用 run-final；改名后换成标题名 .mp4
 ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
   -frames:v 1 ~/Movies/running-content/YYYY-MM-DD-slug/qc/<label>.jpg
 ```
@@ -36,11 +37,15 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 ## 字幕（外挂，叠上看）
 
 ```bash
+# 制作期：
 iina --mpv-geometry=320x180-8+8 \
   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
+# 改名后（外挂固定 subtitles.srt，不要找与标题同名的 .srt）：
+# iina --mpv-geometry=320x180-8+8 --mpv-sub-file=.../subtitles.srt \
+#   ~/Movies/running-content/YYYY-MM-DD-slug/<标题>.mp4
 ```
 
-成片旁边的 `YYYY-MM-DD-run-final.srt` 会自动挂上。不要推荐 ffplay。抽查：open 第一句、第一段 run 开头、各 run 接缝、close 第一句。看字是否跟嘴、两条会不会重叠、是不是单行。出点跟说完：气口后的短人声不要当成下一句的整句，正词开口时条子不能已经没了。入点略早可以，早收不行。
+制作期成片旁边的 `YYYY-MM-DD-run-final.srt` 会自动挂上；改名后显式挂 `subtitles.srt`。不要推荐 ffplay。抽查：open 第一句、第一段 run 开头、各 run 接缝、close 第一句。看字是否跟嘴、两条会不会重叠、是不是单行。出点跟说完：气口后的短人声不要当成下一句的整句，正词开口时条子不能已经没了。入点略早可以，早收不行。
 
 SRT 贴底栏，可能压 HUD。公开前用私密/不公开稿在网页播放器开 CC 看一眼。
 

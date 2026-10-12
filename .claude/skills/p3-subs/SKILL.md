@@ -54,6 +54,12 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播（词级
 
 专名表：`episode.md` 里写一行 `专名：Personal Agent、HUD、……`（本期口播会说到的产品名、人名、英文术语）。它只当识别提示纠拼写，不能拿来改用词。
 
+## 成片路径（制作期 vs 改名后）
+
+- **制作期**：成片固定为 `YYYY-MM-DD-run-final.mp4`；工作字幕 `subtitles.txt` / `subtitles.srt`；对口型 wav 跟成片名。制作阶段可另拷 `YYYY-MM-DD-run-final.srt` 方便 IINA 同名挂载。
+- **upload-ready 改名后**：只把成片原地改名为标题原文 + `.mp4`（如 `芝加哥马拉松 | 结果如何？.mp4`）。**外挂始终叫 `subtitles.srt`**，不要改成与标题同名的 `.srt`。
+- 改名后若再对齐 / 审片：视频用标题名 `.mp4`，字幕显式 `--sub-file=subtitles.srt`（或 IINA 手动挂）。不要让工具去找「和成片名同名的 `.srt`」。
+
 ## 不要做的事
 
 - 不要用 `talk.md` / `script.md` 估时间，也不要用它们改口播用词
@@ -114,11 +120,7 @@ subtitles.txt   # 给人改的稿
 3. **代词贴下一句主语。** 「之后的表现吧我 / 昨天…」错；对的是「看一下之后的表现吧」/「我昨天在看直播的时候」。「我」起新句时，不要挂在上一句尾巴上。
 4. **语义单元别拆开。** 「精神 / 图腾吧」应并成「精神图腾吧」；双音节词组、专名、固定搭配同一条。
 5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → 同步外挂：仓库与媒体目录的 `subtitles.srt`（上传用这个名）。制作审片阶段可另拷 `YYYY-MM-DD-run-final.srt` 方便 IINA 同名挂载；**不要**改成标题名。
-6. **冷开场 prepend（成片前加 bumper）时：**
-   - 素材从 **原片** `open` / `run-*` / `close`（含 `*-raw`）截，**不要** HUD preview、不要 `*-close-stats`
-   - 切入点：目标句**第一个字**起，不要带上上一句最后一个字
-   - 默认**硬切**（jump cut），不要叠化；白闪/冲击/抖动只做预览给人选，定稿前确认
-   - prepend 进成片后：从**新成片**重抽 wav，字幕整体平移（body +offset）或重跑对齐；冷开场几条文首补上
+6. **冷开场 prepend（成片前加 bumper）时：** 截取/硬切/备份等以 `p3-assemble`「冷开场」为准。字幕侧只记：prepend 后 body 全部 +offset（或从新成片重抽 wav 再 `force_align`），文首补上冷开场几条；同步仓库与媒体 `subtitles.srt`。
 
 txt 一行一条，时间是成片轴：
 
@@ -212,7 +214,7 @@ iina --mpv-geometry=320x180-8+8 \
   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
 ```
 
-小窗贴右上角。制作阶段若有同名 `YYYY-MM-DD-run-final.srt` 会自动挂；成片已按标题改名后，用 `subtitles.srt`（`--sub-file=` 或上传时手挂）。
+小窗贴右上角。制作阶段若有同名 `YYYY-MM-DD-run-final.srt` 会自动挂；成片已按标题改名后，视频是标题名 `.mp4`，字幕仍用 `subtitles.srt`（`iina --mpv-sub-file=.../subtitles.srt` 或上传时手挂）。不要去找与标题同名的 `.srt`。
 
 **先不要给发布流程。** 用户说「没问题了 / 可以发了」再给：从 `plan.md` 抄标题、封面句、简介。把生产成片 `YYYY-MM-DD-run-final.mp4` **原地改名**为标题原文 + `.mp4`。**只改成片名，不要改 SRT 文件名**；上传外挂始终用 `subtitles.srt`。**保留标题全部标点**，包括 `|`、`？`、空格等；**不要**把 `|` 换成 `-`，也不要另留一份 `run-final` 副本。上传成片 → 换封面 → 挂 `subtitles.srt`（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。不要替用户上传。`assets.md` 记 `upload: ready`；`episode.md` 的 `status` 仍为 `edited`，真正发完、两边链接齐了才改 `published`。
 
