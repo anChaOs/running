@@ -48,7 +48,7 @@
 ## 制作状态
 
 - ingest: done
-- hud: pending
+- hud: done
 - subs: pending
 - cover: pending
 - assemble: pending
