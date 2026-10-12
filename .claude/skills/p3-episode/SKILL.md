@@ -16,7 +16,7 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
 - 不要把 FIT GPS 发给 Open-Meteo
 - 不要用生涯总里程直接当 HUD `-sk`
 - 不要覆盖已有 `open/run-*/close`、HUD、成片，除非用户明确要重做
-- 不要在成片流程里自行搬盘或删原片；归档走 `p3-archive`。发布完毕且两边链接都齐时，清临时文件走 `p3-subs`（只删 asr/qc/封面候选/`hud-renders`，不动原片与已按标题原地改名的成片、也不动 `subtitles.srt`）
+- 不要在成片流程里自行搬盘或删原片；归档走 `p3-archive`。发布完毕且两边链接都齐时，清临时文件走 `p3-subs`「发布后清临时文件」（真源；先确认再进废纸篓）
 - 发布前**只把成片** `YYYY-MM-DD-run-final.mp4` 原地改成标题名；**字幕文件名不要改**，上传外挂用 `subtitles.srt`
 
 ## 产物图
@@ -103,5 +103,5 @@ hud-preview + open/close
 
 ## 3. 状态
 
-`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；字幕对口型完成后 `edited`；发布后记链接（B 站 + YouTube）后 `published`，并按 `p3-subs` 清该期媒体目录临时文件。
+`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；字幕对口型完成后 `edited`；发布后记链接（B 站 + YouTube）后 `published`，并按 `p3-subs`「发布后清临时文件」清该期媒体目录（先列保留/删除清单与体积 → 用户确认 → 进废纸篓，禁止 `rm`）。
 `assets.md`：assemble 画面核对通过后 `assemble: done`、`qc: done`；此时 `episode.md` 仍是 `hud`。
