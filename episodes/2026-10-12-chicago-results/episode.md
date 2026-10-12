@@ -22,3 +22,7 @@ media: ~/Movies/running-content/2026-10-12-chicago-results/
 - `plan.md`：拍摄 / 发布计划
 - `talk.md`：边跑边说提纲
 - `assets.md`：素材索引（模板 `templates/assets.md`）
+
+上传成片（生产成片原地改名，`status` 仍为 `edited`）：
+`~/Movies/running-content/2026-10-12-chicago-results/芝加哥马拉松 | 结果如何？.mp4`
+同名外挂：`芝加哥马拉松 | 结果如何？.srt`

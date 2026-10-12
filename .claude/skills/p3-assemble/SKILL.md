@@ -149,6 +149,17 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 
 详细切口与对口型约束见 `p3-subs`「切条易错」第 6 条。
 
+## 发布前改名（upload-ready）
+
+用户说可以发了、要准备上传时（通常在 `p3-subs` 定稿之后）：
+
+1. 把媒体目录里的生产成片 `YYYY-MM-DD-run-final.mp4` **原地改名**为 `plan.md` / `episode.md` 标题原文 + `.mp4`；同名 sidecar `.srt` 一并改名。
+2. **文件名保留标题全部标点**，包括 `|`、`？`、空格等。**不要**把 `|` 换成 `-`，也不要另复制一份副本。
+3. 备份文件（如 `*-run-final-pre-coldopen.mp4`、`*-run-final-pre-trimfix.mp4`）**保留原名**，不要跟着改。
+4. `assets.md`：`assemble` 注明新文件名；加 `upload: ready`。`episode.md` 的 `status` 仍为 `edited`，发完两边链接齐了才 `published`。
+
+详细发布清单与清临时文件见 `p3-subs`。
+
 ## 完成后
 
 画面声音核对通过。不要再推荐 `/p3-qc`，除非核对失败。不要给发布文案。

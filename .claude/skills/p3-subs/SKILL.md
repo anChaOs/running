@@ -214,13 +214,13 @@ iina --mpv-geometry=320x180-8+8 \
 
 小窗贴右上角。同名 `YYYY-MM-DD-run-final.srt` 会自动挂。
 
-**先不要给发布流程。** 用户说「没问题了 / 可以发了」再给：从 `plan.md` 抄标题、封面句、简介。成片再复制一份，文件名用标题原文，只有 `/` 换成 `-`，其余标点不动。生产文件 `YYYY-MM-DD-run-final.mp4` 不要改名。上传成片 → 换封面 → 挂 SRT（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。不要替用户上传。
+**先不要给发布流程。** 用户说「没问题了 / 可以发了」再给：从 `plan.md` 抄标题、封面句、简介。把生产成片 `YYYY-MM-DD-run-final.mp4` **原地改名**为标题原文（同目录同名 `.srt` 一并改名）。**保留标题全部标点**，包括 `|`、`？`、空格等；**不要**把 `|` 换成 `-`，也不要另留一份 `run-final` 副本。上传成片 → 换封面 → 挂 SRT（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。不要替用户上传。`assets.md` 记 `upload: ready`；`episode.md` 的 `status` 仍为 `edited`，真正发完、两边链接齐了才改 `published`。
 
 | 用途 | 文件 |
 | --- | --- |
-| 成片（上传用） | 媒体目录里以标题命名的 `.mp4` |
-| 封面 | `cover-1920x1080.jpg` / `cover-1080x1440.jpg` |
-| 外挂 | `subtitles.srt` |
+| 成片（上传用 = 生产成片） | 媒体目录里以标题命名的 `.mp4`（由 `YYYY-MM-DD-run-final.mp4` 原地改名） |
+| 封面 | `cover-1920x1080.jpg` / `cover-1080x1440.jpg` / `cover.jpg` |
+| 外挂 | 与成片同名的 `.srt`（另可保留 `subtitles.srt`） |
 
 发布后记链接，`status` 改为 `published`。还要 60–90 秒短视频才提 `/p3-jianying`。
 
@@ -237,8 +237,7 @@ iina --mpv-geometry=320x180-8+8 \
 | `cover-candidates/` | 封面候选帧 |
 | `cover-frame.jpg` | 封面抽帧原图（若有） |
 | `hud-renders/` | HUD preview / 透明层中间件；可再跑 `p3-hud` 生成 |
-| 以 `plan.md` 标题命名的上传用 `.mp4` | 发布时复制出去的那份；不是 `YYYY-MM-DD-run-final.mp4` |
 
-不要删：`open` / `run-*` / `close`（含 `*-raw`）、FIT、`*-stats-*.jpg`、`weather-hourly.json`、`YYYY-MM-DD-run-final.mp4`（及旁边的 `.srt`）、`cover-1920x1080.jpg` / `cover-1080x1440.jpg`、仓库 `episodes/` 里的字幕源稿、跑鞋账本。
+不要删：`open` / `run-*` / `close`（含 `*-raw`）、FIT、`*-stats-*.jpg`、`weather-hourly.json`、以标题命名的成片 `.mp4` 与同名 `.srt`（发布前由 `run-final` 原地改名而来）、`*-run-final-pre-*.mp4` 等备份、`cover-1920x1080.jpg` / `cover-1080x1440.jpg` / `cover.jpg`、仓库 `episodes/` 里的字幕源稿、跑鞋账本。
 
 清完把实际删掉的路径报给用户。这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。

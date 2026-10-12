@@ -32,7 +32,8 @@
   - 句1 `run-c` **17.02–22.10**「或者说是拍摄车的前脸 / 有点像小米彭程」（原 16.00，含上一句末字）
   - 句2 `close` **76.98–81.90**「那句话怎么说的来着 / 后来者总有机会」（原 76.50）
   - bumper：`cold-open/bumper-hardcut-raw.mp4`（offset **10.024s**）
-  - 备份：`2026-10-12-run-final-pre-coldopen.mp4`
+  - 备份：`2026-10-12-run-final-pre-coldopen.mp4`（及 `2026-10-12-run-final-pre-trimfix.mp4`）保留原名
+  - 发布前成片已原地改名：`芝加哥马拉松 | 结果如何？.mp4`（同名 `.srt`）
   - 字幕：body 全部 +10.024s，文首加冷开场 4 条
 
 ## 时间顺序依据
@@ -58,6 +59,7 @@
 - hud: done
 - subs: done
 - cover: done (v4b → cover.jpg；句：真的假的 心率186？)
-- assemble: done (`2026-10-12-run-final.mp4`；已 prepend 硬切冷开场 raw)
+- assemble: done（生产成片已原地改名 `芝加哥马拉松 | 结果如何？.mp4`；已 prepend 硬切冷开场 raw；备份 `2026-10-12-run-final-pre-coldopen.mp4` / `2026-10-12-run-final-pre-trimfix.mp4` 保留原名）
 - cold-open: done (硬切；原片 run-c + close，无 HUD/stats；句首起切；offset 10.024s)
 - qc: done (抽帧：HUD 进出正确、无烧字幕、鞋名惊碳Fly 可见、接缝叠化正常)
+- upload: ready（`芝加哥马拉松 | 结果如何？.mp4` + 同名 `.srt`；标题标点含 `|` 原样保留；无 `run-final` 副本）

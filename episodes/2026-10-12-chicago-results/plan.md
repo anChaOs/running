@@ -30,3 +30,11 @@
 - LetsRun 成绩：https://www.letsrun.com/news/2026/10/2026-chicago-marathon-results-amos-kipruto-20109-and-hawi-feysa-21333-win/
 - Marathon Handbook 鞋：https://marathonhandbook.com/the-shoes-that-won-the-2026-chicago-marathon/
 - WWD 鞋（女冠写 Evo 1，与 Handbook 不一致）：https://wwd.com/footwear-news/sneaker-news/chicago-marathon-winners-adidas-shoes-details-1239342091/
+
+## 发布准备
+
+- 成片（生产成片原地改名，保留 `|`）：`~/Movies/running-content/2026-10-12-chicago-results/芝加哥马拉松 | 结果如何？.mp4`
+- 外挂同名：`芝加哥马拉松 | 结果如何？.srt`（另有 `subtitles.srt`）
+- 封面：`cover.jpg`
+- `assets.md`：`upload: ready`；`episode.md` `status: edited`（未发，发完两边链接齐再改 `published`）
+
