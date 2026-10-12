@@ -2,7 +2,7 @@
 date: 2026-10-12
 slug: chicago-results
 title: 芝加哥马拉松 | 结果如何？
-status: hud
+status: edited
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-12-chicago-results/
 ---
@@ -13,7 +13,7 @@ media: ~/Movies/running-content/2026-10-12-chicago-results/
 
 当天训练：轻松跑约 60–70 分钟（地点待补）。
 
-封面句：真的假的 心率187？
+封面句：真的假的 心率186？
 
 专名：阿莫斯·基普鲁托、Amos Kipruto、基普里莫、Jacob Kiplimo、哈维·费萨、Hawi Feysa、塔德塞·比基拉、Tadese Bikila、Tadese Takele、Clayton Young、Vincent Mauri、Vinny Mauri、赤崎晓、大迫杰、Sharon Lokedi、Brigid Kosgei、Conner Mantz、Adidas Adizero Adios Pro Evo 3、Nike Apex、Under Armour Velociti Elite、芝加哥马拉松、World Athletics、LetsRun、Marathon Handbook
 

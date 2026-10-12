@@ -22,6 +22,7 @@ HUD 和封面走 `p3-hud`（并行），字幕走 `p3-subs`。只换封面走 `p
 - 不要降码
 - 用户没明确说「烧进去」时，不要烧字幕
 - 成片写好后不要只丢路径；接着抽帧核对
+- 冷开场不要从 HUD preview / close-stats 截；不要默叠化（默认硬切）
 
 ## 前置
 
@@ -133,6 +134,20 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 | 主轨没有 HUD | 拼了原片而不是 `*-hud-preview.mp4` |
 | 平台字幕压 HUD | SRT 没有位置信息，属预期；公开前在网页播放器开 CC |
 | 口播刺耳 / 风盖过人声 | 峰值顶到 0 dB 削波，或没先降风噪就推音量；限制器 ceiling −1 dB 后重听 |
+
+
+## 冷开场（可选，字幕定稿后）
+
+用户指定「从 run-c / close 各抽一句接到 open 前」时再做。不是默认流程。
+
+1. **只从原片截**：`YYYY-MM-DD-run-*.mp4` / `open` / `close`（或 `*-raw`）。不要 HUD preview，不要 `*-close-stats`。
+2. **切入点**按字幕轴找目标句，从该句**第一个字**起切到句末；不要带上上一句最后一个字。
+3. **转场默认硬切**（jump cut）。白闪 / 声音冲击 / 画面抖动可另做几秒预览给人选，定稿用哪版听用户的。
+4. **prepend** 到已有 `YYYY-MM-DD-run-final.mp4` 前；记下 bumper 时长 offset。备份旧成片（如 `*-pre-coldopen.mp4`）。
+5. **字幕**：body 全部 +offset，文首补上冷开场几条；或从新成片重抽 wav 再 `force_align`。同步 episode 与媒体 sidecar。
+6. `assets.md` 记：`cold-open: done`、两句来源与秒数、offset。
+
+详细切口与对口型约束见 `p3-subs`「切条易错」第 6 条。
 
 ## 完成后
 

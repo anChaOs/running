@@ -13,13 +13,18 @@
 
 ## 封面句
 
-> 真的假的 心率187？
+> 真的假的 心率186？
 
 ## 简介
 
-等字幕完成并校准后再写。不要按本口播卡写。
+个人视频制作来自：https://github.com/anChaOs/running
 
-## 参考
+轻松跑边唠昨晚芝加哥马拉松。冠军不是赛前最热的基普里莫——基普鲁托以 2:01:09 反超夺冠；美国本土冠军 Clayton Young 带伤完赛，首马 Vincent（Vinny）中后程掉速仍跑进 2:06；日本赤崎晓高温下刷新 PB。另提乔爷墨尔本夺冠、会长巴黎 2:07。开场提到韦洁婷海淀马达标健将、全马均心率 186——自己上马想冲 180 以上？估计不行。
+
+## 选题调研（不进简介）
+
+口播未点名出处，发布简介不列「参考」。选题时用过的链接留档：
+
 
 - World Athletics 报道：https://worldathletics.org/competitions/world-athletics-label-road-races/news/feysa-kipruto-2026-chicago-marathon
 - LetsRun 成绩：https://www.letsrun.com/news/2026/10/2026-chicago-marathon-results-amos-kipruto-20109-and-hawi-feysa-21333-win/
