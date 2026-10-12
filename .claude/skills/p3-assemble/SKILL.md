@@ -1,6 +1,6 @@
 ---
 name: p3-assemble
-description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。成片音频峰值限制 ≤ −1 dB（先降风噪再推人声）。字幕默认外挂，不要烧进成片。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
+description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。拼完必须测峰值；超 −1 dB 再补 limiter/降风噪。字幕默认外挂，不要烧进成片。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
 ---
 
 # 拼接 + 核对
@@ -22,6 +22,7 @@ HUD 和封面走 `p3-hud`（并行），字幕走 `p3-subs`。只换封面走 `p
 - 不要降码
 - 用户没明确说「烧进去」时，不要烧字幕
 - 成片写好后不要只丢路径；接着抽帧核对
+- 冷开场不要从 HUD preview / close-stats 截；不要默叠化（默认硬切）
 
 ## 前置
 
@@ -65,12 +66,12 @@ cp episodes/YYYY-MM-DD-slug/subtitles.srt \
 - 统一 60 fps、`settb=1/60`（open/close 和 preview 时间基不同，不统一 xfade 会失败）
 - 视频 HEVC videotoolbox，码率对齐 preview；音频 AAC 192k
 
-## 音频（成片必做）
+## 音频（拼完必测）
 
-这不是改 HUD 代码，是成片导出时的听感底线：
+`assemble_episode.py` **不**内置 limiter / 降风噪。听感底线靠拼完实测，超标再补：
 
-- **峰值限制 ≤ −1 dB**（ceiling −1 或 −1.5 dB）。实测口播顶到 0 dB 会削波，刺耳。
-- 先降 POV 跑段风噪，再推人声；不要整轨盲目加大。
+- **拼完测峰值**（例：`ffmpeg -i …-run-final.mp4 -af volumedetect -f null -` 看 `max_volume`）。目标峰值 ≤ −1 dB；顶到 0 dB 会削波、刺耳。
+- 超 −1 dB：再补 limiter（ceiling −1 / −1.5 dB）或先降 POV 风噪再推人声；不要整轨盲目加大。脚本未落地前，用 ffmpeg 另导出一版覆盖成片即可。
 - 录的时候尽量加风棉/死猫；开场自拍口播清楚，切到 POV 后音量别突然炸。
 - 拼完用 IINA 听一遍开场、第一段 run、风声最大处；削波或风盖过人声就不算过。
 
@@ -107,6 +108,7 @@ cp episodes/YYYY-MM-DD-slug/subtitles.srt \
 
 ```bash
 mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug/qc
+# 制作期用 run-final；若已 upload-ready 改名，把输入换成标题名 .mp4
 ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
   -frames:v 1 ~/Movies/running-content/YYYY-MM-DD-slug/qc/<label>.jpg
 ```
@@ -118,7 +120,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 - 跑鞋名和 `-sk` 与 `training/logs/shoes.md` 一致
 - 天气是「数字°C / 数字°C」，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
-- 音频峰值 ≤ −1 dB，无明显削波；POV 风噪不盖过人声
+- 已用 volumedetect（或等效）测过峰值；≤ −1 dB、无明显削波；POV 风噪不盖过人声
 
 通过后：`assets.md` 的 `assemble: done`、`qc: done`。`episode.md` 仍是 `hud`。字幕核对在 `p3-subs`。
 
@@ -132,7 +134,35 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 | xfade 报 timebase mismatch | 没做 `fps=60,settb=1/60`，concat 后没再 settb |
 | 主轨没有 HUD | 拼了原片而不是 `*-hud-preview.mp4` |
 | 平台字幕压 HUD | SRT 没有位置信息，属预期；公开前在网页播放器开 CC |
-| 口播刺耳 / 风盖过人声 | 峰值顶到 0 dB 削波，或没先降风噪就推音量；限制器 ceiling −1 dB 后重听 |
+| 口播刺耳 / 风盖过人声 | 峰值顶到 0 dB 削波，或没先降风噪就推音量；测峰值后补 limiter（ceiling −1 dB）再重听 |
+
+
+## 冷开场（可选，字幕定稿后）
+
+用户指定「从 run-c / close 各抽一句接到 open 前」时再做。不是默认流程。
+
+1. **只从原片截**：`YYYY-MM-DD-run-*.mp4` / `open` / `close`（或 `*-raw`）。不要 HUD preview，不要 `*-close-stats`。
+2. **切入点**按字幕轴找目标句，从该句**第一个字**起切到句末；不要带上上一句最后一个字。
+3. **转场默认硬切**（jump cut）。白闪 / 声音冲击 / 画面抖动可另做几秒预览给人选，定稿用哪版听用户的。
+4. **prepend** 到已有 `YYYY-MM-DD-run-final.mp4` 前；记下 bumper 时长 offset。备份旧成片（如 `*-pre-coldopen.mp4`）。
+5. **字幕**：body 全部 +offset，文首补上冷开场几条；或从新成片重抽 wav 再 `force_align`。同步 episode 与媒体 sidecar。
+6. `assets.md` 记：`cold-open: done`、两句来源与秒数、offset。
+
+详细切口与对口型约束见 `p3-subs`「切条易错」第 6 条。
+
+## 发布前改名（upload-ready）
+
+用户说可以发了、要准备上传时（通常在 `p3-subs` 定稿之后）：
+
+**路径约定：** 制作期工具与抽帧一律用 `YYYY-MM-DD-run-final.mp4`；改名后成片=标题名 `.mp4`，外挂仍=`subtitles.srt`。改名后再 QC / 对口型时，视频走标题名，字幕显式 `--sub-file=subtitles.srt`，不要找与成片同名的 `.srt`。
+
+1. **只改成片名**：把媒体目录里的生产成片 `YYYY-MM-DD-run-final.mp4` **原地改名**为 `plan.md` / `episode.md` 标题原文 + `.mp4`。
+2. **不要改字幕文件名。** 上传外挂始终用 `subtitles.srt`（仓库 `episodes/.../subtitles.srt` 与媒体目录同名拷贝）。**不要**把 SRT 改成标题名。制作阶段若曾拷过 `YYYY-MM-DD-run-final.srt`（给 IINA 同名挂载用），可保留，但发布上传优先 `subtitles.srt`。
+3. **文件名保留标题全部标点**，包括 `|`、`？`、空格等。**不要**把 `|` 换成 `-`，也不要另复制一份成片副本。
+4. 备份文件（如 `*-run-final-pre-coldopen.mp4`、`*-run-final-pre-trimfix.mp4`）**保留原名**，不要跟着改。
+5. `assets.md`：`assemble` 注明新成片文件名；加 `upload: ready`（成片=标题名 `.mp4`，外挂=`subtitles.srt`）。`episode.md` 的 `status` 仍为 `edited`，发完两边链接齐了才 `published`。
+
+详细发布清单与清临时文件见 `p3-subs`。
 
 ## 完成后
 

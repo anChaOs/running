@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""从跑中画面抽一帧，做成横屏封面和 3:4 竖版封面。"""
+"""从跑中画面抽一帧，做成 16:9 / 4:3 / 3:4 封面。"""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ def draw_bottom_text(img: Image.Image, title: str, sub: str) -> Image.Image:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Make 16:9 and 3:4 covers from a run clip.")
+    parser = argparse.ArgumentParser(description="Make 16:9, 4:3, and 3:4 covers from a run clip.")
     parser.add_argument("--src", required=True, help="Source mp4, usually run-a")
     parser.add_argument("--title", required=True)
     parser.add_argument("--sub", default="破三实验室")
@@ -86,14 +86,30 @@ def main() -> int:
     src_img = Image.open(raw).convert("RGB")
     if src_img.size != (1920, 1080):
         src_img = src_img.resize((1920, 1080), Image.Resampling.LANCZOS)
-    land = draw_bottom_text(src_img, args.title, args.sub)
-    land.save(out_dir / "cover-1920x1080.jpg", quality=95, subsampling=0)
 
+    # 16:9 — B 站个人空间 / 视频号
+    land = draw_bottom_text(src_img, args.title, args.sub)
+    land_path = out_dir / "cover-1920x1080.jpg"
+    land.save(land_path, quality=95, subsampling=0)
+    cover_alias = out_dir / "cover.jpg"
+    land.save(cover_alias, quality=95, subsampling=0)
+
+    # 4:3 — B 站首页推荐（规范 1920×1440；从 16:9 中心裁 1440×1080 再放大）
+    four_three = src_img.crop((240, 0, 1680, 1080)).resize((1920, 1440), Image.Resampling.LANCZOS)
+    four_three = draw_bottom_text(four_three, args.title, args.sub)
+    four_path = out_dir / "cover-4x3-1920x1440.jpg"
+    four_three.save(four_path, quality=95, subsampling=0)
+
+    # 3:4 — 小红书
     crop = src_img.crop((200, 0, 1010, 1080)).resize((1080, 1440), Image.Resampling.LANCZOS)
     portrait = draw_bottom_text(crop, args.title, args.sub)
-    portrait.save(out_dir / "cover-1080x1440.jpg", quality=95, subsampling=0)
-    print(f"Wrote {out_dir / 'cover-1920x1080.jpg'}")
-    print(f"Wrote {out_dir / 'cover-1080x1440.jpg'}")
+    port_path = out_dir / "cover-1080x1440.jpg"
+    portrait.save(port_path, quality=95, subsampling=0)
+
+    print(f"Wrote {land_path}")
+    print(f"Wrote {four_path}")
+    print(f"Wrote {port_path}")
+    print(f"Wrote {cover_alias} (alias → 16:9)")
     return 0
 
 
