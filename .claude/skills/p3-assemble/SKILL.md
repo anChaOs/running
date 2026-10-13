@@ -1,6 +1,6 @@
 ---
 name: p3-assemble
-description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。拼完必须测峰值；超 −1 dB 再补 limiter/降风噪。字幕默认外挂，不要烧进成片。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
+description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。混音后默认 dynaudnorm+loudnorm 到约 −16 LUFS（峰值 ≤ −1.5 dBTP）；拼完仍测 LUFS/峰值。字幕默认外挂，不要烧进成片。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
 ---
 
 # 拼接 + 核对
@@ -65,15 +65,42 @@ cp episodes/YYYY-MM-DD-slug/subtitles.srt \
 - `最后一段 run → close` 叠化 0.2 秒，close 无 HUD
 - 统一 60 fps、`settb=1/60`（open/close 和 preview 时间基不同，不统一 xfade 会失败）
 - 视频 HEVC videotoolbox，码率对齐 preview；音频 AAC 192k
+- **混音后默认响度链**（concat + whoosh → leveling → loudnorm）；`--no-loudness-fix` 可关
 
-## 音频（拼完必测）
+## 音频（默认响度链 + 拼完必测）
 
-`assemble_episode.py` **不**内置 limiter / 降风噪。听感底线靠拼完实测，超标再补：
+**为什么在 assemble，不在 hud / subs：** HUD 只叠画面；字幕是外挂轴。人声+环境+whoosh 的最终听感只在成片混音这一次定型，所以 leveling / loudnorm 放在 `assemble_episode.py` 的 post-mix（whoosh 叠完、AAC 编码前）。
 
-- **拼完测峰值**（例：`ffmpeg -i …-run-final.mp4 -af volumedetect -f null -` 看 `max_volume`）。目标峰值 ≤ −1 dB；顶到 0 dB 会削波、刺耳。
-- 超 −1 dB：再补 limiter（ceiling −1 / −1.5 dB）或先降 POV 风噪再推人声；不要整轨盲目加大。脚本未落地前，用 ffmpeg 另导出一版覆盖成片即可。
-- 录的时候尽量加风棉/死猫；开场自拍口播清楚，切到 POV 后音量别突然炸。
-- 拼完用 IINA 听一遍开场、第一段 run、风声最大处；削波或风盖过人声就不算过。
+对比黑影儿TV 等参考片：整轨 flat gain（旧记忆「至少 ×1.5 / ≈+3.5 dB」）不够——峰值先顶满，轻句仍小，麦克风偶发掉音也补不回。默认改为 **dynaudnorm 拉平起伏 → compressor → loudnorm 对齐整体响度**。
+
+脚本默认开启（`--no-loudness-fix` 关掉）。滤镜字符串（**起点参数**，POV 实拍未逐条精调）：
+
+```text
+highpass=f=90,afftdn=nf=-25,dynaudnorm=f=250:g=15:p=0.9:m=8,acompressor=threshold=-20dB:ratio=3:attack=10:release=150:makeup=2,loudnorm=I=-16:TP=-1.5:LRA=7
+```
+
+顺序：
+
+1. concat / acrossfade 拼主音轨
+2. 叠 whoosh（音效单独 volume，不先猛推整轨）
+3. 上述响度链 → 目标约 **I=-16 LUFS**，**TP=-1.5 dBTP**（loudnorm 卡住真峰值）
+4. AAC 192k 写出
+
+拼完仍要测（单 pass loudnorm 与实片听感可能有偏差；严重麦掉音如 −13 dB 处可能需手工局部增益）：
+
+```bash
+# 响度（看 I / TP / LRA）
+ffmpeg -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
+  -af loudnorm=I=-16:TP=-1.5:LRA=7:print_format=summary -f null -
+
+# 峰值兜底
+ffmpeg -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
+  -af volumedetect -f null -
+```
+
+目标：**LUFS ≈ −16**（与常见跑步口播参考接近）、**峰值 ≤ −1.5 dB**（勿顶到 0 dB 削波）。超标再查是否误关了响度链、或个别句要局部补增益——不要整轨再盲目 ×1.5。
+
+录的时候尽量加风棉/死猫；开场自拍口播清楚，切到 POV 后别炸。拼完用 IINA 听开场、第一段 run、风声最大处与已知掉音处。
 
 只有用户明确要求硬字幕时才加 `--ass episodes/.../subtitles.ass`。
 
@@ -85,7 +112,7 @@ cp episodes/YYYY-MM-DD-slug/subtitles.srt \
   --preview-joins
 ```
 
-写出 `qc/join-a-b.mp4`、`qc/join-b-c.mp4`。要回硬切加 `--run-transition cut`。`--wind 0.08` 调刮过时长，`--whoosh-volume 0.85` 调风声，`--no-whoosh` 不要音效。
+写出 `qc/join-a-b.mp4`、`qc/join-b-c.mp4`（接缝小样**不**跑响度链，只听 whoosh/刮过）。要回硬切加 `--run-transition cut`。`--wind 0.08` 调刮过时长，`--whoosh-volume 0.85` 调风声，`--no-whoosh` 不要音效。全片不要响度链时加 `--no-loudness-fix`。
 
 ## 成片时间轴
 
@@ -120,7 +147,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 - 跑鞋名和 `-sk` 与 `training/logs/shoes.md` 一致
 - 天气是「数字°C / 数字°C」，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
-- 已用 volumedetect（或等效）测过峰值；≤ −1 dB、无明显削波；POV 风噪不盖过人声
+- 已测 LUFS ≈ −16、峰值 ≤ −1.5 dB（loudnorm summary / volumedetect）；无明显削波；POV 风噪不盖过人声；未误加 `--no-loudness-fix`
 
 通过后：`assets.md` 的 `assemble: done`、`qc: done`。`episode.md` 仍是 `hud`。字幕核对在 `p3-subs`。
 
@@ -134,7 +161,8 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 | xfade 报 timebase mismatch | 没做 `fps=60,settb=1/60`，concat 后没再 settb |
 | 主轨没有 HUD | 拼了原片而不是 `*-hud-preview.mp4` |
 | 平台字幕压 HUD | SRT 没有位置信息，属预期；公开前在网页播放器开 CC |
-| 口播刺耳 / 风盖过人声 | 峰值顶到 0 dB 削波，或没先降风噪就推音量；测峰值后补 limiter（ceiling −1 dB）再重听 |
+| 口播刺耳 / 风盖过人声 | 峰值顶到 0 dB 削波，或 flat gain 猛推；确认默认响度链开着，再测 I/TP；仍炸再查局部掉音/风噪 |
+| 整体偏 quieter 参考片 | 误加了 `--no-loudness-fix`，或单句麦掉音需局部增益（整轨再 ×1.5 不够且易削波） |
 
 
 ## 冷开场（可选，字幕定稿后）
