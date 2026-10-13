@@ -46,7 +46,7 @@ cover.jpg                    # 定稿别名，默认指向 16:9
 cover-candidates/            # 仅在主推/备选需要并排时用
 ```
 
-`assets.md` 制作状态写 `cover: done`（等人挑时 `cover: waiting-review`），并注明选用哪版与各比例路径。
+`assets.md` 制作状态写 `cover: done`（等人确认主推成图时可用 `cover: waiting-review`），并注明选用哪版与各比例路径。
 
 ## 不要做的事
 
