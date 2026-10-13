@@ -1,13 +1,16 @@
 ---
 date: 2026-10-13
 slug: threshold-test
-title: 我的乳酸阈配速到底是多少？
-status: planned
+title: 高驰体能测试 | 乳酸阈配速多少？
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-13-threshold-test/
+youtube: https://youtu.be/gSJVibcJlYI
+bilibili: https://www.bilibili.com/video/BV1sdWF6ME8a
+bilibili_bvid: BV1sdWF6ME8a
 ---
 
-# 2026-10-13 我的乳酸阈配速到底是多少？
+# 2026-10-13 高驰体能测试 | 乳酸阈配速多少？
 
 一句话：手表说现在阈值 4:21；真正掉的时候它没跟上，直到我重测才认账。今天跑高驰跑步能力测试，边测边看今天测出什么。只讲自己的曲线和经历；往破 3 只说尽量、争取，不承诺。
 
@@ -19,5 +22,13 @@ media: ~/Movies/running-content/2026-10-13-threshold-test/
 
 ## 文件
 
+- `plan.md`：拍摄 / 发布计划
 - `talk.md`：边跑边说提纲
 - `assets.md`：素材索引（模板 `templates/assets.md`）
+
+## 发布
+
+- YouTube：https://youtu.be/gSJVibcJlYI
+- Bilibili：BV1sdWF6ME8a（https://www.bilibili.com/video/BV1sdWF6ME8a）
+- 成片：`~/Movies/running-content/2026-10-13-threshold-test/高驰体能测试 | 乳酸阈配速多少？.mp4`
+- 外挂：`subtitles.srt`（不改成标题名）

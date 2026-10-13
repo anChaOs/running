@@ -1,0 +1,29 @@
+# 2026-10-13 发布计划
+
+## 标题
+
+发这个：
+
+> 高驰体能测试 | 乳酸阈配速多少？
+
+## 封面句
+
+> 乳酸阈值掉到 4:21？
+
+## 简介
+
+个人视频制作来自：https://github.com/anChaOs/running
+
+跑一堂高驰跑步能力测试，边测边说。测前手表给的乳酸阈配速是 4:21，觉得可能偏夏天的数据。热身时聊了这一年的曲线：1 月嘉定迎新跑半马后从 4:10 更新到 4:01；春节和 3 月旅游停了小 1 个月、还有伤病，7 月重测掉到 4:15–4:18，夏天又掉到 4:21。测完更新为 4:16，提高了 5 秒，乳酸阈心率 185、最大心率 208 没变。破三至少要 4:15 的配速，离破三还远；这次上马争取跑到 3:10，继续努力。
+
+## 发布准备
+
+- 成片（生产成片原地改名）：`~/Movies/running-content/2026-10-13-threshold-test/高驰体能测试 | 乳酸阈配速多少？.mp4`
+- 外挂：`subtitles.srt`（不改成标题名）
+- 封面：`cover.jpg`（另有 16:9 / 4:3 / 3:4）
+- 已发布：`episode.md` `status: published`；`assets.md` `upload: done`
+
+## 已发布链接
+
+- YouTube：https://youtu.be/gSJVibcJlYI
+- Bilibili：BV1sdWF6ME8a（https://www.bilibili.com/video/BV1sdWF6ME8a）
