@@ -4,8 +4,9 @@
 
 状态：`seed` → `scoped` → `wiki` → `ready` → `used`。旁路：`parked` / `dropped`。
 
-种类：`running` 主线；`life` 自身经历；`news` 社会热点；`ai`；`finance`。
+种类：破三实验室 / 聊金融 / 聊科技 / 聊装备 / 聊跑步知识。
 
 | slug | 一句话 | 种类 | 体量 | 状态 |
 |------|--------|------|------|------|
-| [berlin-marathon](berlin-marathon.md) | 柏林马拉松｜中国出征（2026-09-23） | running | large | used |
+| [berlin-marathon](berlin-marathon.md) | 柏林马拉松｜中国出征（2026-09-23） | 破三实验室 | large | used |
+| [body-weight](body-weight.md) | 半马 PB 时约 65kg，现约 68.5kg（+3.5kg）；单独一期聊体重 | 破三实验室 | small | seed |
