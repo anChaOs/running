@@ -76,7 +76,7 @@ cp episodes/YYYY-MM-DD-slug/subtitles.srt \
 脚本默认开启（`--no-loudness-fix` 关掉）。滤镜字符串（**起点参数**，POV 实拍未逐条精调）：
 
 ```text
-highpass=f=90,afftdn=nf=-25,dynaudnorm=f=250:g=15:p=0.9:m=8,acompressor=threshold=-20dB:ratio=3:attack=10:release=150:makeup=2,loudnorm=I=-16:TP=-1.5:LRA=7
+highpass=f=90,afftdn=nf=-25,dynaudnorm=f=250:g=15:p=0.9:m=8,acompressor=threshold=-20dB:ratio=3:attack=10:release=150:makeup=2,loudnorm=I=-16:TP=-1.5:LRA=7,aformat=sample_rates=48000:channel_layouts=stereo
 ```
 
 顺序：

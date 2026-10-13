@@ -37,7 +37,8 @@ LOUDNESS_AF = (
     "afftdn=nf=-25,"
     "dynaudnorm=f=250:g=15:p=0.9:m=8,"
     "acompressor=threshold=-20dB:ratio=3:attack=10:release=150:makeup=2,"
-    "loudnorm=I=-16:TP=-1.5:LRA=7"
+    "loudnorm=I=-16:TP=-1.5:LRA=7,"
+    "aformat=sample_rates=48000:channel_layouts=stereo"
 )
 
 
