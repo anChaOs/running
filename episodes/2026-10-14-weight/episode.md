@@ -2,9 +2,12 @@
 date: 2026-10-14
 slug: weight
 title: 体重 | 减肥能帮我破三吗？
-status: planned
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-14-weight/
+youtube: https://youtu.be/Ms-rZwFUyaQ
+bilibili: https://www.bilibili.com/video/BV1Kypy6hEui
+bilibili_bvid: BV1Kypy6hEui
 ---
 
 # 2026-10-14 体重 | 减肥能帮我破三吗？
@@ -20,3 +23,12 @@ media: ~/Movies/running-content/2026-10-14-weight/
 ## 文件
 
 - `talk.md`：边跑边说提纲
+- `plan.md`：发布计划与简介
+- `assets.md`：素材索引
+
+## 发布
+
+- YouTube：https://youtu.be/Ms-rZwFUyaQ
+- Bilibili：BV1Kypy6hEui（https://www.bilibili.com/video/BV1Kypy6hEui）
+- 成片：`~/Movies/running-content/2026-10-14-weight/体重 | 减肥能帮我破三吗？.mp4`
+- 外挂：`subtitles.srt`（不改成标题名）
