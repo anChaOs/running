@@ -8,26 +8,47 @@
 
 ### 视频素材
 
-（待 ingest）
+- `VID_20261015_054614.mp4` -> `2026-10-15-open.mp4`（粗剪后；原片 `2026-10-15-open-raw.mp4`）
+- `VID_20261015_061504.mp4` -> `2026-10-15-run-a.mp4`
+- `VID_20261015_065300.mp4` -> `2026-10-15-run-b.mp4`
+- `VID_20261015_070113.mp4` -> `2026-10-15-run-c.mp4`
+- `VID_20261015_072439.mp4` + `VID_20261015_072527.mp4` -> `2026-10-15-close.mp4`（先 ffmpeg concat demuxer `-c copy` 拼成一段，再句间粗剪；拼接未剪原片 `2026-10-15-close-raw.mp4`；分镜源 `2026-10-15-close-part1-raw.mp4` / `2026-10-15-close-part2-raw.mp4`）
+
+### 高驰截图（assemble 全进成片）
+
+叙事顺序（非文件名时间序）：
+
+- `Screenshot_…07-31-17…` -> `2026-10-15-stats-01.jpg`（带地图的完成页）
+- `Screenshot_…07-31-30…` -> `2026-10-15-stats-02.jpg`（各公里分段）
+- `Screenshot_…07-31-02…` -> `2026-10-15-stats-03.jpg`（能力图；LT 已更新到 4:10）
 
 ### 跑步数据
 
-（待 FIT）
+- COROS MCP `labelId=481041874751095188` -> `2026-10-15-run-data.fit`
+
+### 封面原图
+
+- `1792020720563.jpg`（6528×4896 自拍；留给 p3-cover，勿当 stats）
 
 ## 时间顺序依据
 
-（待素材）
+- 05:46:14: `open`（mtime 结束约 05:48:26）
+- 06:15:04: `run-a`（mtime 06:16:48）
+- 06:53:00: `run-b`（mtime 06:53:27）
+- 07:01:13: `run-c`（mtime 07:02:01）
+- close：两段 VID 07:24:39 + 07:25:27；拼接件 mtime 对齐 part2 结束 `07:27:57`（`close-raw`）；粗剪工作文件 mtime 为剪完时刻
 
 ## 素材关联
 
 - 开场：`2026-10-15-open.mp4`
 - 跑中 A：`2026-10-15-run-a.mp4`
 - 跑中 B：`2026-10-15-run-b.mp4`
+- 跑中 C：`2026-10-15-run-c.mp4`
 - 收尾：`2026-10-15-close.mp4`
 - FIT：`2026-10-15-run-data.fit`
+- 截图：`2026-10-15-stats-01.jpg` / `02` / `03`
 
-
-## close 叠片动画
+## close 叠片动画（assemble 必用）
 
 目录：`~/Movies/running-content/2026-10-15-threshold-50min-410/overlays/`（左半屏；透明用 `.mov`，预览用 `-darkbg.mp4`）
 
@@ -35,13 +56,21 @@
 |---|---|
 | `lt-01-produce` | 快供能靠糖 → 糖酵解 → 丙酮酸 → 乳酸（非「这时才开始有」） |
 | `lt-02-reuse` | 产生乳酸的肌肉 → 丙酮酸 → 线粒体氧化；血液 → 心脏/慢肌 |
-| `lt-03-threshold` | 生成≈清除稳态 vs 生成>清除堆积≈过乳酸阈；手表 4:16 |
+| `lt-03-threshold` | 生成≈清除稳态 vs 生成>清除堆积≈过乳酸阈；手表原 4:16 |
 
 详见 overlays/`README-overlays.md`。
 
+**assemble 提醒**：close 叠三张 LT 动画 + 三张 stats（含能力图 4:10），不要只留 overlays 目录不用。
+
+## 本场要点（给 HUD / 口播核对）
+
+- 全程约 18.16 km / 1:28:16
+- 主段约 50′ 均配 **4:08**（心率约 182）
+- 手表乳酸阈更新到 **4:10**（全马预测约 3:10:28）
+
 ## 制作状态
 
-- ingest: pending
+- ingest: done
 - hud: pending
 - subs: pending
 - cover: pending
