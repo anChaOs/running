@@ -2,7 +2,7 @@
 """成片音频 → 字幕初稿（单行短条）。给人改字用，时间只是草稿。
 
 faster-whisper large-v3-turbo 词级时间（专名表当提示，只纠拼写）。
-切条顺序：先在标点和词间停顿（落在词组边界上）切，再按长度切；孤字并到邻条；再确定性合并「数字+单位/概数尾巴」和少量固定搭配。
+切条顺序：停顿第一优先级——≥1.2s 必断，≥0.5s 自然断；超长非切不可时在整条里找最长停顿切（只在词组边界，停顿相近才看标点）；≤2 字短条并到停顿更短的一侧；再确定性合并「数字+单位/概数尾巴」和少量固定搭配。
 繁体统一转简体。不删字、不改写；校正交给人和 p3-subs 的规则。
 
 产物：
@@ -25,7 +25,9 @@ MAX_CHARS = 16      # 一行上限；宁可稍过也不拆词
 HARD_CHARS = 20
 MAX_DUR = 4.5
 MIN_DUR = 1.0
-PAUSE = 0.30        # 词间停顿超过这个算候选切口
+NATURAL = 0.50      # 词间停顿 ≥ 这个且前面已够 MIN_SIDE 字：直接断（停顿第一优先级）
+MIN_SIDE = 4        # 超长切分时两边尽量各留的字数
+TIE = 0.10          # 停顿相差这么多以内才算「差不多」，用标点/挂词打平
 STRONG = re.compile(r"[。！？!?…]$")
 WEAK = re.compile(r"[，,、；;：:]$")
 HANG_END = ("的", "一个", "一些", "了", "就", "比较", "和", "跟", "在", "把", "被", "给", "对", "很", "非常", "是")
@@ -102,16 +104,14 @@ def nchars(ws) -> int:
 
 
 def score_cut(ws, k) -> float:
-    """在 ws[k] 之后切的得分：越高越像词组边界。"""
+    """在 ws[k] 之后切的「文字」得分（标点 / 挂词 / 句首词）。停顿另算，这里只用于停顿相近时打平。"""
     w = clean_word(ws[k].w)
     nxt = clean_word(ws[k + 1].w) if k + 1 < len(ws) else ""
-    pause = (ws[k + 1].s - ws[k].e) if k + 1 < len(ws) else 1.0
     s = 0.0
     if STRONG.search(w):
         s += 3
     elif WEAK.search(w):
         s += 2
-    s += min(pause, 1.0) * 3
     bare = sc.norm(w)
     if bare.endswith(HANG_END) or sc.norm(nxt).startswith(HANG_HEAD):
         s -= 4
@@ -125,44 +125,92 @@ def score_cut(ws, k) -> float:
     return s
 
 
+def gap_after(ws, k) -> float:
+    return (ws[k + 1].s - ws[k].e) if k + 1 < len(ws) else 1.0
+
+
+def _forbidden(ws, k) -> bool:
+    """硬约束：数字+单位不拆；英文专名（连续英文词）不拆。"""
+    a, b = sc.norm(clean_word(ws[k].w)), sc.norm(clean_word(ws[k + 1].w))
+    if re.search(r"\d$", a) and UNIT_TAIL_HEAD.match(b):
+        return True
+    if re.search(r"[A-Za-z]$", a) and re.match(r"^[A-Za-z]", b):
+        return True
+    return False
+
+
+def best_cut(buf):
+    """停顿第一优先级：在整个 buf 里找最长停顿切（只在词组边界）。
+    左侧尽量留 MIN_SIDE 字；停顿相差 TIE 以内才看标点/挂词/句首词打平。"""
+    ks = [k for k in range(len(buf) - 1) if not _forbidden(buf, k)]
+    if not ks:
+        return None
+    total = nchars(buf)
+    # 右侧会继续接后面的词，所以只要求左侧够字；右侧短也没关系（最后由 merge_short 兜底）
+    roomy = [k for k in ks if nchars(buf[: k + 1]) >= MIN_SIDE]
+    pool = roomy or [k for k in ks if nchars(buf[: k + 1]) >= 2 and total - nchars(buf[: k + 1]) >= 2] or ks
+    top = max(gap_after(buf, k) for k in pool)
+    tied = [k for k in pool if gap_after(buf, k) >= top - TIE]
+    # 打平：文字得分高者；再平则停顿更大者；再平取靠中间（两边更均衡）
+    return max(tied, key=lambda k: (score_cut(buf, k), gap_after(buf, k), -abs(total / 2 - nchars(buf[: k + 1]))))
+
+
 def split_words(words) -> list[list]:
     cues: list[list] = []
     buf: list = []
-    for i, w in enumerate(words):
-        if buf and (w.s - buf[-1].e) > 1.2:   # 长停顿一定断
-            cues.append(buf)
-            buf = []
+    for w in words:
+        if buf:
+            gap = w.s - buf[-1].e
+            # 长停顿一定断；自然停顿（≥NATURAL）且前面已够一句 → 也断，不等到超长
+            if gap > 1.2 or (gap >= NATURAL and nchars(buf) >= MIN_SIDE and not _forbidden(buf + [w], len(buf) - 1)):
+                cues.append(buf)
+                buf = []
         buf.append(w)
         n = nchars(buf)
-        dur = buf[-1].e - buf[0].s
-        end_here = STRONG.search(clean_word(w.w)) and n >= 6
-        if end_here:
+        if STRONG.search(clean_word(w.w)) and n >= 6:
             cues.append(buf)
             buf = []
             continue
-        if n > MAX_CHARS or dur > MAX_DUR:
-            # 在 buf 里找最好的切口（至少留 4 字）
-            best, best_s = None, -9.0
-            for k in range(len(buf) - 1):
-                if nchars(buf[: k + 1]) < 4:
-                    continue
-                sc_ = score_cut(buf, k)
-                if sc_ > best_s:
-                    best, best_s = k, sc_
-            if best is not None and (best_s > -1 or n > HARD_CHARS):
-                cues.append(buf[: best + 1])
-                buf = buf[best + 1:]
+        while buf and len(buf) > 1 and (nchars(buf) > MAX_CHARS or buf[-1].e - buf[0].s > MAX_DUR):
+            k = best_cut(buf)
+            if k is None:
+                break
+            cues.append(buf[: k + 1])
+            buf = buf[k + 1:]
     if buf:
         cues.append(buf)
-    # 孤字 / 太短：并到邻条（停顿短的那边），并后不超过 HARD_CHARS
-    merged: list[list] = []
-    for c in cues:
-        if merged and (nchars(c) <= 2 or nchars(merged[-1]) <= 2) and nchars(merged[-1]) + nchars(c) <= HARD_CHARS \
-                and c[0].s - merged[-1][-1].e < 0.6:
-            merged[-1] = merged[-1] + c
+    return merge_cut_fixes(merge_short(cues))
+
+
+def merge_short(cues: list[list]) -> list[list]:
+    """≤2 字的短条并到停顿更短的那一边（不是总并回上一条）：
+    「开表了 ⟨0.6s⟩ OK ⟨0.15s⟩ 我们」→ OK 归下一条。两边停顿都 ≥0.6s 就留着。"""
+    out = [list(c) for c in cues]
+    i = 0
+    while i < len(out):
+        c = out[i]
+        if nchars(c) > 2 or len(out) == 1:
+            i += 1
+            continue
+        gp = c[0].s - out[i - 1][-1].e if i > 0 else 9.0
+        gn = out[i + 1][0].s - c[-1].e if i + 1 < len(out) else 9.0
+        opts = []
+        if i > 0 and gp < 0.6 and nchars(out[i - 1]) + nchars(c) <= HARD_CHARS:
+            opts.append((gp, -1))
+        if i + 1 < len(out) and gn < 0.6 and nchars(out[i + 1]) + nchars(c) <= HARD_CHARS:
+            opts.append((gn, 1))
+        if not opts:
+            i += 1
+            continue
+        _, d = min(opts)
+        if d == 1:
+            out[i + 1] = c + out[i + 1]
+            del out[i]
         else:
-            merged.append(c)
-    return merge_cut_fixes(merged)
+            out[i - 1] = out[i - 1] + c
+            del out[i]
+            i -= 1
+    return out
 
 
 def _ends_with_number(text: str) -> bool:
