@@ -68,10 +68,17 @@
 - 主段约 50′ 均配 **4:08**（心率约 182）
 - 手表乳酸阈更新到 **4:10**（全马预测约 3:10:28）
 
+## HUD
+
+- `-sn` Plaid 1.5 / `-sk` 516.03（FIT 18.164 km → 开跑前 497.87）
+- 产出：`hud-renders/2026-10-15-run-{a,b,c}-hud-alpha.mov` + `*-hud-preview.mp4`（已句间粗剪；未剪备份 `*-hud-preview-raw.mp4`）
+- preview 时长（粗剪后）：run-a ≈ 91.8s / run-b ≈ 22.6s / run-c ≈ 44.6s
+- 天气：`--weather-city shanghai`（城市场点，未发 FIT GPS）
+
 ## 制作状态
 
 - ingest: done
-- hud: pending
+- hud: done（-sn Plaid 1.5 / -sk 516.03）
 - subs: pending
 - cover: pending
 - assemble: pending
