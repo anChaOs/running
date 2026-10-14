@@ -4,6 +4,9 @@
 两端 0.2s 叠化；run 与 run 默认一阵风刮过（横向拖影，约 0.08s 出 + 0.08s 入），叠风声。
 吃的是各段头尾，成片时长不变，字幕轴不用重算。
 默认不烧字幕；外挂 SRT 另外上传。
+
+混音后默认走响度链（dynaudnorm → compressor → loudnorm I=-16/TP=-1.5），
+whoosh 叠完再 leveling，避免整轨盲目抬增益把峰值顶满。--no-loudness-fix 可关。
 """
 
 from __future__ import annotations
@@ -23,6 +26,20 @@ XFADE = 0.2
 WIND_DEFAULT = 0.08
 FONT_SRC = Path("/System/Library/Fonts/Hiragino Sans GB.ttc")
 WHOOSH_PATH = Path(__file__).resolve().parent / "sfx" / "whoosh.wav"
+
+
+# 成片默认响度链（起点参数；POV 实拍未逐条精调，拼完仍测 LUFS/峰值）。
+# 顺序：高通去轰隆 → 轻降噪 → 动态拉平人声起伏 → 压缩 → EBU R128 到 −16 LUFS / −1.5 dBTP。
+# 意图约等于「整体至少再响 ~3.5 dB / 旧记忆 ×1.5」，但用 leveling+loudnorm，
+# 避免 flat gain 先把峰值顶满、轻句仍小。
+LOUDNESS_AF = (
+    "highpass=f=90,"
+    "afftdn=nf=-25,"
+    "dynaudnorm=f=250:g=15:p=0.9:m=8,"
+    "acompressor=threshold=-20dB:ratio=3:attack=10:release=150:makeup=2,"
+    "loudnorm=I=-16:TP=-1.5:LRA=7,"
+    "aformat=sample_rates=48000:channel_layouts=stereo"
+)
 
 
 def run(cmd: list[str], dry_run: bool = False) -> None:
@@ -186,11 +203,17 @@ def audio_lock_to_video(src: str, dst: str, duration: float) -> str:
     )
 
 
-def mix_whoosh(audio_label: str, whoosh_index: int, delays_ms: list[int], volume: float) -> tuple[str, str]:
+def mix_whoosh(
+    audio_label: str,
+    whoosh_index: int,
+    delays_ms: list[int],
+    volume: float,
+    out_label: str = "a",
+) -> tuple[str, str]:
     """把 whoosh 叠到主音轨。返回 (filter, output_label)。"""
     n = len(delays_ms)
     if n == 0:
-        return f"[{audio_label}]anull[a]", "a"
+        return f"[{audio_label}]anull[{out_label}]", out_label
     labels = "".join(f"[w{i}]" for i in range(n))
     parts = [f"[{whoosh_index}:a]aformat=sample_rates=48000:channel_layouts=stereo,asplit={n}{labels}"]
     mixed = f"[{audio_label}]"
@@ -201,8 +224,10 @@ def mix_whoosh(audio_label: str, whoosh_index: int, delays_ms: list[int], volume
         else:
             parts.append(f"[w{i}]volume={volume:.3f}{delayed}")
         mixed += delayed
-    parts.append(f"{mixed}amix=inputs={n + 1}:duration=first:dropout_transition=0:normalize=0[a]")
-    return ";".join(parts), "a"
+    parts.append(
+        f"{mixed}amix=inputs={n + 1}:duration=first:dropout_transition=0:normalize=0[{out_label}]"
+    )
+    return ";".join(parts), out_label
 
 
 def build_filter(
@@ -218,6 +243,7 @@ def build_filter(
     height: int,
     whoosh_index: int | None,
     whoosh_volume: float,
+    loudness_fix: bool = True,
 ) -> str:
     parts: list[str] = []
     for i in range(n_inputs):
@@ -307,10 +333,16 @@ def build_filter(
         a_pre = acur
 
     if whoosh_index is not None and whoosh_delays:
-        mix, _aout = mix_whoosh(a_pre, whoosh_index, whoosh_delays, whoosh_volume)
+        mix, _aout = mix_whoosh(a_pre, whoosh_index, whoosh_delays, whoosh_volume, out_label="am")
         parts.append(mix)
     else:
-        parts.append(f"[{a_pre}]anull[a]")
+        parts.append(f"[{a_pre}]anull[am]")
+
+    # whoosh 叠完后再 leveling+loudnorm，避免 SFX 被单独猛推，同时 TP 仍由 loudnorm 卡住。
+    if loudness_fix:
+        parts.append(f"[am]{LOUDNESS_AF}[a]")
+    else:
+        parts.append(f"[am]anull[a]")
 
     if ass is not None:
         ass_path = str(ass).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
@@ -478,6 +510,11 @@ def main() -> int:
     parser.add_argument("--no-whoosh", action="store_true")
     parser.add_argument("--whoosh-volume", type=float, default=0.85)
     parser.add_argument(
+        "--no-loudness-fix",
+        action="store_true",
+        help="Skip post-mix dynaudnorm+loudnorm (default ON: I=-16 LUFS, TP=-1.5 dBTP)",
+    )
+    parser.add_argument(
         "--preview-joins",
         action="store_true",
         help="Only render short run-run join previews into media-dir/qc/",
@@ -523,7 +560,9 @@ def main() -> int:
     print(f"Runs: {', '.join(p.name for p in runs)}")
     print(f"Close: {close_clip}")
     print("Durations:", " ".join(f"{d:.3f}s" for d in durations))
+    loudness_fix = not args.no_loudness_fix
     print(f"Run transition: {transition} wind={args.wind:.3f}s whoosh={whoosh}")
+    print(f"Loudness fix: {'ON ' + LOUDNESS_AF if loudness_fix else 'OFF'}")
 
     date_prefix = runs[0].name[:10]
     out = Path(args.out).expanduser().resolve() if args.out else media_dir / f"{date_prefix}-run-final.mp4"
@@ -557,6 +596,7 @@ def main() -> int:
         height=height,
         whoosh_index=whoosh_index,
         whoosh_volume=args.whoosh_volume,
+        loudness_fix=loudness_fix,
     )
 
     cmd = encode_cmd(ffmpeg_inputs, filt, out, bitrate)
