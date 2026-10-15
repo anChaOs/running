@@ -28,7 +28,12 @@
 
 ### 封面原图
 
-- `1792020720563.jpg`（6528×4896 自拍；留给 p3-cover，勿当 stats）
+- `1792020720563.jpg`（6528×4896 自拍；rembg 抠图源）
+- 成图（主推 **charcoal-volt**：炭黑底 + 荧光黄光斑；句「手表给的值能跑出来吗？」；咬牙咧嘴表情；粗白描边；无备选）
+  - `cover.jpg` / `cover-1920x1080.jpg` / `cover-16x9-1920x1080.jpg`（16:9）
+  - `cover-4x3-1920x1440.jpg`（4:3）
+  - `cover-1080x1440.jpg` / `cover-3x4-1080x1440.jpg`（3:4）
+  - 中间件：`cover-work/person-cutout.png`、`cover-work/person-outlined.png`
 
 ## 时间顺序依据
 
@@ -80,6 +85,6 @@
 - ingest: done
 - hud: done（-sn Plaid 1.5 / -sk 516.03）
 - subs: pending
-- cover: pending
+- cover: waiting-review（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
 - assemble: pending
 - qc: pending
