@@ -104,7 +104,7 @@ ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`。
 
 - ingest: done
 - hud: done（-sn Plaid 1.5 / -sk 516.03）
-- subs: pending
+- subs: waiting-review
 - cover: done（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
 - assemble: done（close-stats = 三 stats + 三 LT；loudness 链默认开）
 - qc: done（拼后抽帧 + LUFS）
