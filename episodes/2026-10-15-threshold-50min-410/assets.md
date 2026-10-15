@@ -77,34 +77,38 @@
 
 - `-sn` Plaid 1.5 / `-sk` 516.03（FIT 18.164 km → 开跑前 497.87）
 - 产出：`hud-renders/2026-10-15-run-{a,b,c}-hud-alpha.mov` + `*-hud-preview.mp4`（已句间粗剪；未剪备份 `*-hud-preview-raw.mp4`）
-- preview 时长（粗剪后）：run-a ≈ 91.8s / run-b ≈ 22.6s / run-c ≈ 44.6s
+- preview 时长（粗剪后）：run-a ≈ 91.8s / run-b ≈ 22.5s / run-c ≈ 44.6s
 - 天气：`--weather-city shanghai`（城市场点，未发 FIT GPS）
+- **run-b 朝向修复（2026-10-15）**：源片 HEVC 带 displaymatrix `rotation=-90`，且手机旋转元数据与画面不一致。已把坏源备份为 `2026-10-15-run-b-orient-bad.mp4`；工作文件 `2026-10-15-run-b.mp4` 为 `-noautorotate` + `transpose=2`（CCW）bake 成直立竖幅后 pillarbox 进 1920×1080，并用 `sidedata=delete:DISPLAYMATRIX` 清掉旋转旁路数据（mtime 仍对齐原结束时刻供 HUD）。随后重渲 run-b HUD（旧 HUD 旁路 `*-pre-orient.*`）。
 
 ## close 叠片时间轴（成片已用）
 
-原 `2026-10-15-close.mp4` 不动。工作文件：`2026-10-15-close-stats.mp4`（assemble 优先选用）。
+原 `2026-10-15-close.mp4` 不动。工作文件：`2026-10-15-close-stats.mp4`（assemble 优先选用）。旧版备份 `2026-10-15-close-stats-pre-lt-hold.mp4`。
 
-| 时段（close 内） | 内容 |
-|---|---|
-| 0–34.3s | stats-01 地图完成页 → stats-02 分段 → stats-03 能力图（各约 11.4s，半透明左侧） |
-| 34.3–46.3s | `overlays/lt-01-produce.mov`（12s，左半屏） |
-| 76.3–86.3s | `overlays/lt-02-reuse.mov`（10s） |
-| 105.3–118.3s | `overlays/lt-03-threshold.mov`（13s） |
-| 151s–end | 无叠片（结尾疑问） |
+close 起点（成片）≈ 287.78s（open+runs − 2×0.2s 叠化）。LT 按**成片钟**加长 hold（动画播完 freeze 末帧）：
 
-ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`。
+| 时段（close 内） | 成片约 | 内容 |
+|---|---|---|
+| 0–34.3s | ~4:48– | stats-01 → stats-02 → stats-03（各约 11.4s，半透明左侧） |
+| 34.3–62.15s | hold 至 ~5:50 | `lt-01-produce.mov`（12s 动画 + ~15.85s freeze） |
+| 76.3–102.15s | hold 至 ~6:30 | `lt-02-reuse.mov`（10s 动画 + ~15.85s freeze） |
+| 116.15–143.15s | ~6:44–~7:11 | `lt-03-threshold.mov`（13s 动画 + 14s freeze） |
+| 151s–end | | 无叠片（结尾疑问） |
+
+ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`；滤镜：`qc/close-composite-filter.txt`。
 
 ## 成片
 
-- `2026-10-15-run-final.mp4`（≈469.5s / 887M；loudness 链 ON）
-- 响度（loudnorm summary）：I ≈ **−15.9 LUFS**，TP ≈ **−0.7 dBTP**，LRA ≈ 5.2（目标 I=-16 / TP≤-1.5；峰值略热，未二次整轨抬增益）
-- QC 抽帧：`qc/final-*.jpg` + close 叠片核对帧 `qc/close-*.jpg`
+- `2026-10-15-run-final.mp4`（≈469.5s / ~889M；loudness 链 ON；orient+LT-hold 重拼）
+- 旧成片备份：`2026-10-15-run-final-pre-orientfix.mp4`
+- 响度（loudnorm summary，orient 重拼后）：I ≈ **−15.9 LUFS**，TP ≈ **−1.3 dBTP**，LRA ≈ 5.2（目标 I=-16 / TP≤-1.5）
+- QC 抽帧：`qc/final-run-b-orient.jpg`、`qc/final-lt0{1,2,3}-*.jpg` 等；run-b 源核对 `qc/run-b-orient-fix-mid.jpg`
 
 ## 制作状态
 
 - ingest: done
-- hud: done（-sn Plaid 1.5 / -sk 516.03）
+- hud: done（-sn Plaid 1.5 / -sk 516.03；run-b 朝向修复后重渲）
 - subs: waiting-review（force_align+check_subs 已跑，机器过门；硬失败 3 条漏盖 + interp #70 待人听确认后才写 done）
 - cover: done（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
-- assemble: done（close-stats = 三 stats + 三 LT；loudness 链默认开）
-- qc: done（拼后抽帧 + LUFS）
+- assemble: done（close-stats = 三 stats + 三 LT 加长 hold；loudness 链默认开；orient 重拼）
+- qc: done（拼后抽帧 + LUFS；run-b 直立 + LT hold 核对）
