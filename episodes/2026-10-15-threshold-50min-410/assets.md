@@ -85,6 +85,6 @@
 - ingest: done
 - hud: done（-sn Plaid 1.5 / -sk 516.03）
 - subs: pending
-- cover: waiting-review（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
+- cover: done（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
 - assemble: pending
 - qc: pending
