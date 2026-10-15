@@ -45,9 +45,9 @@
 - 封面：`cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg`（另有 `cover-16x9-1920x1080.jpg` / `cover-3x4-1080x1440.jpg`）
 - 品牌：破三实验室
 - 账号：B 站 mid 3687100；YouTube @anChaOs天天写bug
-- 状态：`episode.md` `status: edited`；`assets.md` `subs: done` / `upload: ready`（两边链接齐了再改 `published`）
+- 状态：`episode.md` `status: published`；`assets.md` `subs: done` / `upload: done`
 
 ## 已发布链接
 
-- YouTube：（待发）
-- Bilibili：（待发）
+- YouTube：https://youtu.be/3qLuzzgW9js
+- Bilibili：https://www.bilibili.com/video/BV14LJC6DE4Z

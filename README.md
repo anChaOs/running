@@ -32,7 +32,10 @@ AI 协作规则见 `CLAUDE.md`（`AGENT.md` 是它的软链）。
 `episodes/YYYY-MM-DD-slug/` 与本地素材目录同名。常见文件：
 
 - `episode.md`：元数据、status、媒体路径
-- `plan.md` / `talk.md` / `script.md` / `assets.md`
+- `plan.md` / `talk.md` / `assets.md`
+- `NOTES.md`：制作侧笔记（bot 用，不进成片）
+- `subtitles.srt` / `subtitles.txt`：外挂字幕（忠于原句）
+- `script.md`：可选，现在很少用
 
 status：`idea` → `planned` → `shot` → `hud` → `edited` → `published`。
 
@@ -43,7 +46,7 @@ status：`idea` → `planned` → `shot` → `hud` → `edited` → `published`�
 3. 新建 `episodes/YYYY-MM-DD-slug/`，用 `templates/episode.md`。
 4. 当天用 `talk.md` 边跑边说。
 5. 素材收进 `~/Movies/running-content/YYYY-MM-DD-slug/`，按 `open` / `run-*` / `close` 命名。
-6. 用 `tools/hud/` 给跑中段加 HUD，再进剪映。
+6. 用 `tools/hud/` 给跑中段加 HUD；全长成片再拼成片、写外挂字幕，双发 YouTube / B 站。剪映只做短视频，不是主路径。
 7. 有长期价值的写进 `knowledge/`；周期结束做 `training/reviews/`。
 
 ## HUD
@@ -54,7 +57,7 @@ status：`idea` → `planned` → `shot` → `hud` → `edited` → `published`�
 .venv/bin/python tools/hud/render_running_hud.py --media-dir ~/Movies/running-content/YYYY-MM-DD-topic
 ```
 
-说明在 `tools/hud/README.md`。自动拼接成片以后再做。
+说明在 `tools/hud/README.md`。HUD 之后拼成片、写字幕、双发；细节在 `.claude/skills/`（入口 `p3-episode`）。剪映只做短视频。
 
 ## 许可
 

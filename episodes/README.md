@@ -8,8 +8,10 @@
 |------|------|
 | `plan.md` | 单期拍摄 / 发布计划 |
 | `talk.md` | 当天边跑边说提纲 |
-| `script.md` | 完整脚本、标题、字幕 |
 | `assets.md` | 素材索引，指向仓库外大文件 |
+| `NOTES.md` | 制作侧笔记（bot 用，不进成片） |
+| `subtitles.srt` / `subtitles.txt` | 外挂字幕（忠于原句） |
+| `script.md` | 可选，现在很少用 |
 
 `episode.md` 的 `status`：`idea` → `planned` → `shot` → `hud` → `edited` → `published`。
 
