@@ -79,13 +79,13 @@
 - 产出：`hud-renders/2026-10-15-run-{a,b,c}-hud-alpha.mov` + `*-hud-preview.mp4`（已句间粗剪；未剪备份 `*-hud-preview-raw.mp4`）
 - preview 时长（粗剪后）：run-a ≈ 91.8s / run-b ≈ 22.5s / run-c ≈ 44.6s
 - 天气：`--weather-city shanghai`（城市场点，未发 FIT GPS）
-- **run-b 朝向修复（2026-10-15）**：源片 HEVC 带 displaymatrix `rotation=-90`，且手机旋转元数据与画面不一致。已把坏源备份为 `2026-10-15-run-b-orient-bad.mp4`；工作文件 `2026-10-15-run-b.mp4` 为 `-noautorotate` + `transpose=2`（CCW）bake 成直立竖幅后 pillarbox 进 1920×1080，并用 `sidedata=delete:DISPLAYMATRIX` 清掉旋转旁路数据（mtime 仍对齐原结束时刻供 HUD）。随后重渲 run-b HUD（旧 HUD 旁路 `*-pre-orient.*`）。
+- **run-b 朝向修复（2026-10-15，定稿 strip-meta）**：源片 HEVC 带错误 displaymatrix `rotation=-90`，**像素本身已是正立横屏**。坏源 `2026-10-15-run-b-orient-bad.mp4`；中间误用 `transpose=2`+pillarbox 的旁路 `2026-10-15-run-b-bad-transpose.mp4`。工作文件 `2026-10-15-run-b.mp4` = `-noautorotate -display_rotation 0` + `sidedata=delete`（**无 transpose**），mtime 对齐 06:53:27。HUD 复用 `*-hud-alpha-pre-orient.mov` 叠到定稿底，再 VAD 句间粗剪（剪 4.89–8.55→1.53s）得 `*-hud-preview.mp4` ≈22.47s；坏朝向 HUD 旁路 `*-bad-transpose.*`。
 
 ## close 叠片时间轴（成片已用）
 
 原 `2026-10-15-close.mp4` 不动。工作文件：`2026-10-15-close-stats.mp4`（assemble 优先选用）。旧版备份 `2026-10-15-close-stats-pre-lt-hold.mp4`。
 
-close 起点（成片）≈ 287.78s（open+runs − 2×0.2s 叠化）。LT 按**成片钟**加长 hold（动画播完 freeze 末帧）：
+close 起点（成片）≈ 287.72s（open+runs − 2×0.2s 叠化；run-b preview ≈22.47s）。LT 按**成片钟**加长 hold（动画播完 freeze 末帧）：
 
 | 时段（close 内） | 成片约 | 内容 |
 |---|---|---|
@@ -99,16 +99,16 @@ ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`；
 
 ## 成片
 
-- `2026-10-15-run-final.mp4`（≈469.5s / ~889M；loudness 链 ON；orient+LT-hold 重拼）
-- 旧成片备份：`2026-10-15-run-final-pre-orientfix.mp4`
-- 响度（loudnorm summary，orient 重拼后）：I ≈ **−15.9 LUFS**，TP ≈ **−1.3 dBTP**，LRA ≈ 5.2（目标 I=-16 / TP≤-1.5）
-- QC 抽帧：`qc/final-run-b-orient.jpg`、`qc/final-lt0{1,2,3}-*.jpg` 等；run-b 源核对 `qc/run-b-orient-fix-mid.jpg`
+- `2026-10-15-run-final.mp4`（≈469.4s / ~888M；loudness 链 ON；strip-meta 定稿 + LT-hold）
+- 旧成片备份：`2026-10-15-run-final-pre-orientfix.mp4`（误 transpose 版）；`2026-10-15-run-final-pre-stripfix.mp4`（strip 定稿前）
+- 响度（loudnorm summary，strip-meta 定稿）：I ≈ **−15.9 LUFS**，TP ≈ **−1.3 dBTP**，LRA ≈ 5.2（目标 I=-16 / TP≤-1.5）
+- QC 抽帧：`qc/run-b-orient-try/final-run-b-strip.jpg`、`final-lt0{1,2,3}-*-strip.jpg`（box: `/workspace/run-b-orient/`）
 
 ## 制作状态
 
 - ingest: done
-- hud: done（-sn Plaid 1.5 / -sk 516.03；run-b 朝向修复后重渲）
+- hud: done（-sn Plaid 1.5 / -sk 516.03；run-b strip-meta 定稿，复用 pre-orient alpha）
 - subs: waiting-review（force_align+check_subs 已跑，机器过门；硬失败 3 条漏盖 + interp #70 待人听确认后才写 done）
 - cover: done（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
-- assemble: done（close-stats = 三 stats + 三 LT 加长 hold；loudness 链默认开；orient 重拼）
-- qc: done（拼后抽帧 + LUFS；run-b 直立 + LT hold 核对）
+- assemble: done（close-stats = 三 stats + 三 LT 加长 hold；loudness 链默认开；strip-meta 定稿重拼）
+- qc: done（拼后抽帧 + LUFS；run-b 正立横屏 + LT hold 核对；未开播放器）
