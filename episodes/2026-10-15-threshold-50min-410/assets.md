@@ -1,0 +1,120 @@
+# 2026-10-15 threshold-50min-410 素材索引
+
+## 本地素材目录
+
+`~/Movies/running-content/2026-10-15-threshold-50min-410/`
+
+## 重命名结果
+
+### 视频素材
+
+- `VID_20261015_054614.mp4` -> `2026-10-15-open.mp4`（粗剪后；原片 `2026-10-15-open-raw.mp4`）
+- `VID_20261015_061504.mp4` -> `2026-10-15-run-a.mp4`
+- `VID_20261015_065300.mp4` -> `2026-10-15-run-b.mp4`
+- `VID_20261015_070113.mp4` -> `2026-10-15-run-c.mp4`
+- `VID_20261015_072439.mp4` + `VID_20261015_072527.mp4` -> `2026-10-15-close.mp4`（先 ffmpeg concat demuxer `-c copy` 拼成一段，再句间粗剪；拼接未剪原片 `2026-10-15-close-raw.mp4`；分镜源 `2026-10-15-close-part1-raw.mp4` / `2026-10-15-close-part2-raw.mp4`）
+
+### 高驰截图（assemble 全进成片）
+
+叙事顺序（非文件名时间序）：
+
+- `Screenshot_…07-31-17…` -> `2026-10-15-stats-01.jpg`（带地图的完成页）
+- `Screenshot_…07-31-30…` -> `2026-10-15-stats-02.jpg`（各公里分段）
+- `Screenshot_…07-31-02…` -> `2026-10-15-stats-03.jpg`（能力图；LT 已更新到 4:10）
+
+### 跑步数据
+
+- COROS MCP `labelId=481041874751095188` -> `2026-10-15-run-data.fit`
+
+### 封面原图
+
+- `1792020720563.jpg`（6528×4896 自拍；rembg 抠图源）
+- 成图（主推 **charcoal-volt**：炭黑底 + 荧光黄光斑；封面字「手表给的乳酸阈值／能跑出来吗？」+「破三实验室」；咬牙咧嘴表情；粗白描边；无备选）
+  - `cover.jpg` / `cover-1920x1080.jpg` / `cover-16x9-1920x1080.jpg`（16:9）
+  - `cover-4x3-1920x1440.jpg`（4:3）
+  - `cover-1080x1440.jpg` / `cover-3x4-1080x1440.jpg`（3:4）
+  - 中间件：`cover-work/person-cutout.png`、`cover-work/person-outlined.png`
+
+## 时间顺序依据
+
+- 05:46:14: `open`（mtime 结束约 05:48:26）
+- 06:15:04: `run-a`（mtime 06:16:48）
+- 06:53:00: `run-b`（mtime 06:53:27）
+- 07:01:13: `run-c`（mtime 07:02:01）
+- close：两段 VID 07:24:39 + 07:25:27；拼接件 mtime 对齐 part2 结束 `07:27:57`（`close-raw`）；粗剪工作文件 mtime 为剪完时刻
+
+## 素材关联
+
+- 开场：`2026-10-15-open.mp4`
+- 跑中 A：`2026-10-15-run-a.mp4`
+- 跑中 B：`2026-10-15-run-b.mp4`
+- 跑中 C：`2026-10-15-run-c.mp4`
+- 收尾：`2026-10-15-close.mp4`
+- FIT：`2026-10-15-run-data.fit`
+- 截图：`2026-10-15-stats-01.jpg` / `02` / `03`
+
+## close 叠片动画（assemble 必用）
+
+目录：`~/Movies/running-content/2026-10-15-threshold-50min-410/overlays/`（左半屏；透明用 `.mov`，预览用 `-darkbg.mp4`）
+
+| 文件 | 对应 close 口播 |
+|---|---|
+| `lt-01-produce` | 快供能靠糖 → 糖酵解 → 丙酮酸 → 乳酸（非「这时才开始有」） |
+| `lt-02-reuse` | 产生乳酸的肌肉 → 丙酮酸 → 线粒体氧化；血液 → 心脏/慢肌 |
+| `lt-03-threshold` | 生成≈清除稳态 vs 生成>清除堆积≈过乳酸阈；手表原 4:16 |
+
+详见 overlays/`README-overlays.md`。
+
+**assemble 提醒**：close 叠三张 LT 动画 + 三张 stats（含能力图 4:10），不要只留 overlays 目录不用。
+
+## 本场要点（给 HUD / 口播核对）
+
+- 全程约 18.16 km / 1:28:16
+- 主段约 50′ 均配 **4:08**（心率约 182）
+- 手表乳酸阈更新到 **4:10**（全马预测约 3:10:28）
+
+## HUD
+
+- `-sn` Plaid 1.5 / `-sk` 516.03（FIT 18.164 km → 开跑前 497.87）
+- 产出：`hud-renders/2026-10-15-run-{a,b,c}-hud-alpha.mov` + `*-hud-preview.mp4`（已句间粗剪；未剪备份 `*-hud-preview-raw.mp4`）
+- preview 时长（粗剪后）：run-a ≈ 91.8s / run-b ≈ 22.5s / run-c ≈ 44.6s
+- 天气：`--weather-city shanghai`（城市场点，未发 FIT GPS）
+- **run-b 朝向修复（2026-10-15，定稿 strip-meta）**：源片 HEVC 带错误 displaymatrix `rotation=-90`，**像素本身已是正立横屏**。坏源 `2026-10-15-run-b-orient-bad.mp4`；中间误用 `transpose=2`+pillarbox 的旁路 `2026-10-15-run-b-bad-transpose.mp4`。工作文件 `2026-10-15-run-b.mp4` = `-noautorotate -display_rotation 0` + `sidedata=delete`（**无 transpose**），mtime 对齐 06:53:27。HUD 复用 `*-hud-alpha-pre-orient.mov` 叠到定稿底，再 VAD 句间粗剪（剪 4.89–8.55→1.53s）得 `*-hud-preview.mp4` ≈22.47s；坏朝向 HUD 旁路 `*-bad-transpose.*`。
+
+## close 叠片时间轴（成片已用）
+
+原 `2026-10-15-close.mp4` 不动。工作文件：`2026-10-15-close-stats.mp4`（assemble 优先选用）。旧版备份 `2026-10-15-close-stats-pre-lt-hold.mp4`。
+
+close 起点（成片）≈ 287.72s（open+runs − 2×0.2s 叠化；run-b preview ≈22.47s）。LT 按**成片钟**加长 hold（动画播完 freeze 末帧）：
+
+| 时段（close 内） | 成片约 | 内容 |
+|---|---|---|
+| 0–34.3s | ~4:48– | stats-01 → stats-02 → stats-03（各约 11.4s，半透明左侧） |
+| 34.3–62.15s | hold 至 ~5:50 | `lt-01-produce.mov`（12s 动画 + ~15.85s freeze） |
+| 76.3–102.15s | hold 至 ~6:30 | `lt-02-reuse.mov`（10s 动画 + ~15.85s freeze） |
+| 116.15–143.15s | ~6:44–~7:11 | `lt-03-threshold.mov`（13s 动画 + 14s freeze） |
+| 151s–end | | 无叠片（结尾疑问） |
+
+ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`；滤镜：`qc/close-composite-filter.txt`。
+
+## 成片
+
+- `乳酸阈值 | 手表给的值能跑出来吗？.mp4`（由 `2026-10-15-run-final.mp4` 原地改名；≈469.4s / ~888M；loudness 链 ON；strip-meta 定稿 + LT-hold）
+- 旧成片备份：`2026-10-15-run-final-pre-orientfix.mp4`（误 transpose 版）；`2026-10-15-run-final-pre-stripfix.mp4`（strip 定稿前）
+- 外挂：`subtitles.srt`（上传用此名；制作期旁挂 `2026-10-15-run-final.srt` 可留）
+- 响度（loudnorm summary，strip-meta 定稿）：I ≈ **−15.9 LUFS**，TP ≈ **−1.3 dBTP**，LRA ≈ 5.2（目标 I=-16 / TP≤-1.5）
+- QC 抽帧：`qc/run-b-orient-try/final-run-b-strip.jpg`、`final-lt0{1,2,3}-*-strip.jpg`（box: `/workspace/run-b-orient/`）
+
+## 制作状态
+
+- ingest: done
+- hud: done（-sn Plaid 1.5 / -sk 516.03；run-b strip-meta 定稿，复用 pre-orient alpha）
+- subs: done（用户确认成片可发；外挂 `subtitles.srt`）
+- cover: done（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
+- assemble: done（close-stats = 三 stats + 三 LT 加长 hold；loudness 链默认开；strip-meta 定稿重拼）
+- qc: done（拼后抽帧 + LUFS；run-b 正立横屏 + LT hold 核对）
+- upload: done（成片「乳酸阈值 | 手表给的值能跑出来吗？.mp4」；外挂 subtitles.srt）
+- published:
+  - YouTube：https://youtu.be/3qLuzzgW9js
+  - Bilibili：BV14LJC6DE4Z（https://www.bilibili.com/video/BV14LJC6DE4Z）
+- post-publish cleanup: done（~5.9G → 废纸篓；媒体目录余 ~2.3G；保留原片/成片/字幕/封面/FIT/overlays/stats/自拍/NOTES）
