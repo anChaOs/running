@@ -117,4 +117,4 @@ ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`；
 - published:
   - YouTube：https://youtu.be/3qLuzzgW9js
   - Bilibili：BV14LJC6DE4Z（https://www.bilibili.com/video/BV14LJC6DE4Z）
-- post-publish cleanup: 待用户确认后进废纸篓（清单见发布后对话）
+- post-publish cleanup: done（~5.9G → 废纸篓；媒体目录余 ~2.3G；保留原片/成片/字幕/封面/FIT/overlays/stats/自拍/NOTES）
