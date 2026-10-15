@@ -80,11 +80,31 @@
 - preview 时长（粗剪后）：run-a ≈ 91.8s / run-b ≈ 22.6s / run-c ≈ 44.6s
 - 天气：`--weather-city shanghai`（城市场点，未发 FIT GPS）
 
+## close 叠片时间轴（成片已用）
+
+原 `2026-10-15-close.mp4` 不动。工作文件：`2026-10-15-close-stats.mp4`（assemble 优先选用）。
+
+| 时段（close 内） | 内容 |
+|---|---|
+| 0–34.3s | stats-01 地图完成页 → stats-02 分段 → stats-03 能力图（各约 11.4s，半透明左侧） |
+| 34.3–46.3s | `overlays/lt-01-produce.mov`（12s，左半屏） |
+| 76.3–86.3s | `overlays/lt-02-reuse.mov`（10s） |
+| 105.3–118.3s | `overlays/lt-03-threshold.mov`（13s） |
+| 151s–end | 无叠片（结尾疑问） |
+
+ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`。
+
+## 成片
+
+- `2026-10-15-run-final.mp4`（≈469.5s / 887M；loudness 链 ON）
+- 响度（loudnorm summary）：I ≈ **−15.9 LUFS**，TP ≈ **−0.7 dBTP**，LRA ≈ 5.2（目标 I=-16 / TP≤-1.5；峰值略热，未二次整轨抬增益）
+- QC 抽帧：`qc/final-*.jpg` + close 叠片核对帧 `qc/close-*.jpg`
+
 ## 制作状态
 
 - ingest: done
 - hud: done（-sn Plaid 1.5 / -sk 516.03）
 - subs: pending
 - cover: done（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
-- assemble: pending
-- qc: pending
+- assemble: done（close-stats = 三 stats + 三 LT；loudness 链默认开）
+- qc: done（拼后抽帧 + LUFS）
