@@ -113,4 +113,8 @@ ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`；
 - cover: done（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
 - assemble: done（close-stats = 三 stats + 三 LT 加长 hold；loudness 链默认开；strip-meta 定稿重拼）
 - qc: done（拼后抽帧 + LUFS；run-b 正立横屏 + LT hold 核对）
-- upload: ready（成片已改标题名；两边链接齐了再改 published）
+- upload: done（成片「乳酸阈值 | 手表给的值能跑出来吗？.mp4」；外挂 subtitles.srt）
+- published:
+  - YouTube：https://youtu.be/3qLuzzgW9js
+  - Bilibili：BV14LJC6DE4Z（https://www.bilibili.com/video/BV14LJC6DE4Z）
+- post-publish cleanup: 待用户确认后进废纸篓（清单见发布后对话）
