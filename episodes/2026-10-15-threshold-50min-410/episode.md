@@ -2,7 +2,7 @@
 date: 2026-10-15
 slug: threshold-50min-410
 title: 乳酸阈值 | 手表给的值能跑出来吗？
-status: hud
+status: edited
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-15-threshold-50min-410/
 ---
@@ -21,3 +21,4 @@ media: ~/Movies/running-content/2026-10-15-threshold-50min-410/
 
 - `talk.md`：边跑边说提纲
 - `assets.md`：素材索引（模板 `templates/assets.md`）
+- `plan.md`：发布计划与简介

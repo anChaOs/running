@@ -99,8 +99,9 @@ ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`；
 
 ## 成片
 
-- `2026-10-15-run-final.mp4`（≈469.4s / ~888M；loudness 链 ON；strip-meta 定稿 + LT-hold）
+- `乳酸阈值 | 手表给的值能跑出来吗？.mp4`（由 `2026-10-15-run-final.mp4` 原地改名；≈469.4s / ~888M；loudness 链 ON；strip-meta 定稿 + LT-hold）
 - 旧成片备份：`2026-10-15-run-final-pre-orientfix.mp4`（误 transpose 版）；`2026-10-15-run-final-pre-stripfix.mp4`（strip 定稿前）
+- 外挂：`subtitles.srt`（上传用此名；制作期旁挂 `2026-10-15-run-final.srt` 可留）
 - 响度（loudnorm summary，strip-meta 定稿）：I ≈ **−15.9 LUFS**，TP ≈ **−1.3 dBTP**，LRA ≈ 5.2（目标 I=-16 / TP≤-1.5）
 - QC 抽帧：`qc/run-b-orient-try/final-run-b-strip.jpg`、`final-lt0{1,2,3}-*-strip.jpg`（box: `/workspace/run-b-orient/`）
 
@@ -108,7 +109,8 @@ ASR 对齐稿：`qc/close-asr.txt`；cue 摘要：`qc/close-overlay-cues.txt`；
 
 - ingest: done
 - hud: done（-sn Plaid 1.5 / -sk 516.03；run-b strip-meta 定稿，复用 pre-orient alpha）
-- subs: waiting-review（force_align+check_subs 已跑，机器过门；硬失败 3 条漏盖 + interp #70 待人听确认后才写 done）
+- subs: done（用户确认成片可发；外挂 `subtitles.srt`）
 - cover: done（主推 charcoal-volt；16:9/4:3/3:4 已落媒体目录）
 - assemble: done（close-stats = 三 stats + 三 LT 加长 hold；loudness 链默认开；strip-meta 定稿重拼）
-- qc: done（拼后抽帧 + LUFS；run-b 正立横屏 + LT hold 核对；未开播放器）
+- qc: done（拼后抽帧 + LUFS；run-b 正立横屏 + LT hold 核对）
+- upload: ready（成片已改标题名；两边链接齐了再改 published）
