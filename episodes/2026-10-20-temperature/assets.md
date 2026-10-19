@@ -1,8 +1,8 @@
-# 2026-10-16 素材索引
+# 2026-10-20 素材索引
 
 ## 本地素材目录
 
-`~/Movies/running-content/2026-10-16-temperature/`
+`~/Movies/running-content/2026-10-20-temperature/`
 
 ## 重命名结果
 
@@ -20,11 +20,11 @@
 
 ## 素材关联
 
-- 开场：`2026-10-16-open.mp4`
-- 跑中 A：`2026-10-16-run-a.mp4`
-- 跑中 B：`2026-10-16-run-b.mp4`
-- 收尾：`2026-10-16-close.mp4`
-- FIT：`2026-10-16-run-data.fit`
+- 开场：`2026-10-20-open.mp4`
+- 跑中 A：`2026-10-20-run-a.mp4`
+- 跑中 B：`2026-10-20-run-b.mp4`
+- 收尾：`2026-10-20-close.mp4`
+- FIT：`2026-10-20-run-data.fit`
 
 ## 制作状态
 

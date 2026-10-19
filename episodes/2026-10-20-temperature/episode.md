@@ -1,13 +1,13 @@
 ---
-date: 2026-10-16
+date: 2026-10-20
 slug: temperature
 title: 温度 | 上马凉快能更接近破三吗？
 status: planned
 series: 破三实验室
-media: ~/Movies/running-content/2026-10-16-temperature/
+media: ~/Movies/running-content/2026-10-20-temperature/
 ---
 
-# 2026-10-16 温度 | 上马凉快能更接近破三吗？
+# 2026-10-20 温度 | 上马凉快能更接近破三吗？
 
 一句话：上马偏凉快少交热税，更接近破三的方向成立；底座仍是训练。
 
