@@ -48,7 +48,7 @@
 
 - ingest: done
 - hud: pending
-- shoes: pending
+- shoes: done（C202 7 / -sk 374.56；本场 FIT 13.644）
 - cover: pending（自拍已就位）
 - assemble: pending
 - subs: pending
