@@ -2,7 +2,7 @@
 date: 2026-10-22
 slug: temperature
 title: 温度 | 上马凉快能更接近破三吗？
-status: shot
+status: hud
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-22-temperature/
 ---

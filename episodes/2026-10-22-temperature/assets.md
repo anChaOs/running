@@ -44,12 +44,22 @@
 - stats：`2026-10-22-stats-01.jpg`
 - 封面自拍：`1792625182926.jpg`
 
+### 封面成图（主推 cool-mist）
+
+- 句：「凉快就能更接近破三？」+「破三实验室」
+- 流程：自拍 `1792625182926.jpg` → onnx/u2net 抠图 → 粗白描边 → 冰蓝冷雾创意底 → 三比例手排（人偏右 / 竖版偏下）
+- 中间件：`cover-work/person-cutout.png`、`cover-work/person-outlined.png`、`cover-work/bg-cool-mist.jpg`
+- 根目录：
+  - `cover.jpg` / `cover-1920x1080.jpg` / `cover-16x9-1920x1080.jpg` — **16:9**
+  - `cover-4x3-1920x1440.jpg` — **4:3**
+  - `cover-1080x1440.jpg` / `cover-3x4-1080x1440.jpg` — **3:4**
+
 ## 制作状态
 
 - ingest: done
-- hud: pending
+- hud: done（-sn "C202 7" / -sk 374.56；preview 已句间粗剪）
 - shoes: done（C202 7 / -sk 374.56；本场 FIT 13.644）
-- cover: pending（自拍已就位）
-- assemble: pending
+- cover: waiting-review（主推 cool-mist；16:9/4:3/3:4 已出；句：凉快就能更接近破三？）
+- assemble: done（2026-10-22-run-final.mp4；时长 1073.3s≈17:53；响度链默认 ON；close-stats 已叠）
 - subs: pending
-- qc: pending
+- qc: done（抽帧 open/接缝/HUD/close-stats；I≈-15.9 LUFS，max_volume=-1.0 dB）
