@@ -61,5 +61,6 @@
 - shoes: done（C202 7 / -sk 374.56；本场 FIT 13.644）
 - cover: done（选用 A cool-mist；16:9/4:3/3:4；句：凉快就能更接近破三？）
 - assemble: done（2026-10-22-run-final.mp4；时长 1073.3s≈17:53；响度链默认 ON；close-stats 已叠）
-- subs: waiting-review（初稿已自检切条；未 force_align）
+- subs: done
+- upload: ready
 - qc: done（抽帧 open/接缝/HUD/close-stats；I≈-15.9 LUFS，max_volume=-1.0 dB）
