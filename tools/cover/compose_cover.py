@@ -46,6 +46,34 @@ THUMB_W = 320            # 手机信息流小图宽度，自检用
 THUMB_MIN_PX = 22        # 小图上封面句字高至少这么多像素
 
 
+U2NET_PATHS = [Path.home() / ".u2net/u2net.onnx",
+               Path.home() / "Movies/running-content/.models/u2net.onnx"]
+
+
+def u2net_cutout(im: Image.Image) -> Image.Image | None:
+    """没装 rembg 时的兜底：onnxruntime + rembg 缓存里的 u2net.onnx（10-22 那期就是这么手抠的）。"""
+    model = next((p for p in U2NET_PATHS if p.is_file()), None)
+    if model is None:
+        return None
+    try:
+        import numpy as np  # type: ignore
+        import onnxruntime as ort  # type: ignore
+    except ImportError:
+        return None
+    print(f"[cover] u2net 抠图中（{model}）…", file=sys.stderr)
+    rgb = im.convert("RGB")
+    x = np.asarray(rgb.resize((320, 320), Image.LANCZOS), dtype=np.float32) / 255.0
+    x = (x - np.array([0.485, 0.456, 0.406])) / np.array([0.229, 0.224, 0.225])
+    x = x.transpose(2, 0, 1)[None].astype(np.float32)
+    sess = ort.InferenceSession(str(model), providers=["CPUExecutionProvider"])
+    pred = sess.run(None, {sess.get_inputs()[0].name: x})[0][0, 0]
+    pred = (pred - pred.min()) / max(float(pred.max() - pred.min()), 1e-6)
+    mask = Image.fromarray((pred * 255).astype("uint8")).resize(rgb.size, Image.LANCZOS)
+    out = rgb.copy()
+    out.putalpha(mask)
+    return out
+
+
 def load_person(path: Path) -> Image.Image:
     im = Image.open(path)
     if im.mode == "RGBA" and im.getextrema()[3][0] < 250:
@@ -53,7 +81,10 @@ def load_person(path: Path) -> Image.Image:
     try:
         from rembg import remove  # type: ignore
     except ImportError:
-        sys.exit(f"{path} 没有透明通道。先抠图（rembg / u2net）存成 RGBA PNG，或 pip install rembg 后重跑。")
+        cut = u2net_cutout(im)
+        if cut is None:
+            sys.exit(f"{path} 没有透明通道，本机也没有 rembg 或 onnxruntime+u2net.onnx。先抠图存成 RGBA PNG 再跑。")
+        return cut
     print("[cover] rembg 抠图中…", file=sys.stderr)
     return remove(im.convert("RGB"))
 
@@ -214,7 +245,7 @@ def compose(bg, person_ol, lines, series, font_path, W, H, layout, side, title_c
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--person", required=True, help="已抠好的 RGBA PNG（或原自拍，需本机 rembg）")
+    ap.add_argument("--person", required=True, help="已抠好的 RGBA PNG（或原自拍：本机 rembg，没有就用 onnxruntime + ~/.u2net/u2net.onnx）")
     ap.add_argument("--bg", required=True, help="创意底图（AI／设计；不要 HUD preview）")
     ap.add_argument("--title", required=True, help="封面句；| 手动断行")
     ap.add_argument("--series", default="破三实验室")
