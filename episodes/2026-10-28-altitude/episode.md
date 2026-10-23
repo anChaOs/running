@@ -1,13 +1,13 @@
 ---
-date: 2026-10-23
+date: 2026-10-28
 slug: altitude
 title: 高原 | 高住低训到底是什么？
 status: planned
 series: 破三实验室
-media: ~/Movies/running-content/2026-10-23-altitude/
+media: ~/Movies/running-content/2026-10-28-altitude/
 ---
 
-# 2026-10-23 高原 | 高住低训到底是什么？
+# 2026-10-28 高原 | 高住低训到底是什么？
 
 一句话：借吴向东离开体制、践行高住低练的热点，科普高原训练的几种练法和人造低氧；不扯破三。
 
