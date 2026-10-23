@@ -33,6 +33,18 @@ description: 做封面、换封面句、重做封面时用。封面用真人抠�
 3. **创意底：** 铺 AI／设计感背景（赛事夜景、粗粝夜跑、霓虹极简等）。遵循「简单、颜色够跳、手机小图可读」；主体放上去要融合自然；背景**不要残字 / 乱码**，也不要和前景大字抢视线
 4. **大字（优先醒目）：** 前景大字 = 封面句关键词 + 系列名「破三实验室」。封面句字号要冲、占画面左半明显面积；拉开行距，别挤成一团。若小图上读不清，一律放大重排，不要靠「设计感」缩小字
 5. **三比例手排：** 16:9 / 4:3 / 3:4 各自重排人物和大字位置，**不要把 16:9 naive crop 成 4:3 / 3:4**（会削头、切字）
+**脚本（第 2、4、5 步固定下来，不要每期手搓）：** 抠好人像存 `cover-work/person-cutout.png`（RGBA；本机装了 `rembg` 时可直接传原自拍），创意底存 `cover-work/bg.jpg`，然后：
+
+```bash
+.venv/bin/python tools/cover/compose_cover.py \
+  --person ~/Movies/running-content/YYYY-MM-DD-slug/cover-work/person-cutout.png \
+  --bg ~/Movies/running-content/YYYY-MM-DD-slug/cover-work/bg.jpg \
+  --title "<封面句，可用 | 手动断行>" \
+  --out-dir ~/Movies/running-content/YYYY-MM-DD-slug
+```
+
+脚本做粗白描边（`cover-work/person-outlined.png`）、三比例各自重排（横版人在右、字在左半；竖版字在上、人在下；`--side left` 反过来）、封面句白字深描边加阴影、系列名黄色约为封面句四成。**字号有硬下限**（横版 ≥ 画高 11%，竖版 ≥ 7.5%），放不下就报错，让你减字或用 `|` 多断一行，不会自动缩成中号字。断行只落在词边界（jieba）。每个比例打印「320px 小图字高」，有 `偏小` 就退出码 2，不要接受。只写文件，不打开图片查看器；要人看就把路径发给用户。要出备选用 `--prefix cover-candidates/b-`。
+
 6. 先按最优判断出**一版**成图（难得才附一版备选）；需要对比时再放进 `cover-candidates/`，不要默认甩多版让人选
 
 ## 产出
