@@ -44,17 +44,18 @@ HUD 走 `p3-hud`，封面走 `p3-cover`（二者并行），字幕走 `p3-subs`�
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
   --dry-run
 
-.venv/bin/python tools/assemble/assemble_episode.py \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
+# 正式拼一律后台跑，日志进媒体目录；不要前台阻塞等 ffmpeg
+nohup .venv/bin/python tools/assemble/assemble_episode.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  > ~/Movies/running-content/YYYY-MM-DD-slug/assemble.log 2>&1 &
+# 等待期间去做封面 / 鞋账本；结束后看 assemble.log 末尾再核对
 ```
 
-已有 SRT 时拷到成片旁边：
+已有字幕时（重拼后）脚本不会拷 SRT，跑一次同步：
 
 ```bash
-cp episodes/YYYY-MM-DD-slug/subtitles.srt \
-   ~/Movies/running-content/YYYY-MM-DD-slug/
-cp episodes/YYYY-MM-DD-slug/subtitles.srt \
-   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.srt
+.venv/bin/python tools/subs/txt_to_subs.py \
+  --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto
 ```
 
 脚本会：

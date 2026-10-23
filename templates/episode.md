@@ -19,5 +19,4 @@ media: ~/Movies/running-content/YYYY-MM-DD-topic/
 
 - `plan.md`：拍摄 / 发布计划
 - `talk.md`：边跑边说提纲
-- `script.md`：完整脚本
 - `assets.md`：素材索引（模板 `templates/assets.md`）
