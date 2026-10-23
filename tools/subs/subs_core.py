@@ -162,7 +162,7 @@ def episode_terms(near: Path) -> str | None:
     if not ep.is_file():
         return None
     m = TERMS_LINE.search(ep.read_text(encoding="utf-8"))
-    if not m:
+    if not m or m.group(1).startswith(("（", "(")):  # 模板占位「专名：（…）」没填
         return None
     terms = [t.strip() for t in re.split(r"[、,，;；]", m.group(1)) if t.strip()]
     return "、".join(terms) or None

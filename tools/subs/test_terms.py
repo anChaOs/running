@@ -41,6 +41,8 @@ def test_episode_terms():
         assert sc.resolve_prompt(None, p / "subtitles.txt") == "高驰、COROS、乳酸阈"
         assert sc.resolve_prompt("", p / "subtitles.txt") is None
         assert sc.resolve_prompt("A", p / "subtitles.txt") == "A"
+        (p / "episode.md").write_text("专名：（口播会说到的产品名、人名）\n", encoding="utf-8")
+        assert sc.episode_terms(p) is None
         (p / "episode.md").write_text("无专名\n", encoding="utf-8")
         assert sc.episode_terms(p) is None
 

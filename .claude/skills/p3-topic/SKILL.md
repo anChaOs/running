@@ -212,7 +212,7 @@ description: 边跑边说选题对谈。用户说选题、想拍什么、没主�
 | 还没拍摄日 | `/p3-library` 写入 `topics/`，不要写 `talk.md` |
 | 调研里有长期价值的知识 / 历史 | ingest 进 `knowledge/wiki/`（来源放 `raw/`），和主题卡分开 |
 
-`episode.md` 的 `status` 用 `idea` 或 `planned`。已经在选题里建过期、只改 `talk.md` 时，也要确认素材目录在；没有就补建。
+`episode.md` 的 `status` 用 `idea` 或 `planned`。同时把口播里会说到的产品名、人名、英文缩写填进 `episode.md` 的 `专名：` 行（顿号分隔，如 `专名：COROS、Vaporfly、乳酸阈`）。p3-subs 转写会自动读这一行当识别提示并统一英文拼写，不填就没有提示。已经在选题里建过期、只改 `talk.md` 时，也要确认素材目录在；没有就补建。
 
 ## 完成后
 
