@@ -75,7 +75,7 @@ cover-candidates/            # 仅在主推/备选需要并排时用
 
 用户只是要换封面句：停在这里，不用重拼成片。
 
-还缺成片：
+还缺成片：先看 `assets.md` 的 `hud:`。还没 `done`（HUD 还在渲）就停在这里等 HUD，不要提前拼；`hud: done` 再推：
 
 > `/p3-assemble`
 

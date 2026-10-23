@@ -89,7 +89,7 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播（词级
 
 产物：`asr/*.words.json`（词级缓存，对时和质检共用）、`asr/*.draft.srt`（原始初稿，不要覆盖）、`subtitles.txt`。txt 已存在时脚本拒绝覆盖，防止冲掉人改的字。
 
-初稿切条：只在 jieba 分词的词边界上断，连着的英文词（Personal Agent）不拆。先在标点和词间停顿（≥0.3s）处断，停顿后面接「的 / 了」或前面停在「的 / 一个」上的不算切口；再按约 16 字、4.5 秒的上限在词边界切；1～2 字的孤条并到邻条。
+初稿切条：只在 jieba 分词的词边界上断，连着的英文词（Personal Agent）不拆。先在词间停顿处断（≥1.2s 必断，≥0.5s 自然断，和 `draft_subs.py` 一致），再看标点，停顿后面接「的 / 了」或前面停在「的 / 一个」上的不算切口；再按约 16 字、4.5 秒的上限在词边界切；1～2 字的孤条并到邻条。
 
 ## 写 SRT / txt
 
@@ -203,7 +203,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 **用户说改好了**
 
-回写 SRT、对口型、拷到成片旁边，简介写入 `plan.md`。IINA 审片（不要推荐 ffplay）：
+回写 SRT、对口型、拷到成片旁边，简介写入 `plan.md`。IINA 审片（不要推荐 ffplay）。**不要自己执行这条命令**：发给用户，用户同意或自己开：
 
 ```bash
 iina --mpv-geometry=320x180-8+8 \
