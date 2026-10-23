@@ -278,7 +278,7 @@ def main() -> int:
 
     t0 = time.time()
     txt = Path(args.txt).expanduser()
-    wav = Path(args.audio).expanduser()
+    wav = sc.ensure_wav(Path(args.audio).expanduser())
     out = Path(args.out).expanduser() if args.out else txt
     model_dir = Path(args.model_dir).expanduser()
     cache = Path(args.words_cache).expanduser() if args.words_cache else sc.default_cache(wav)
@@ -287,6 +287,7 @@ def main() -> int:
     audio = sc.load_audio(wav)
     dur = len(audio) / sc.SR
     vad = sc.vad_segments(audio)
+    args.prompt = sc.resolve_prompt(args.prompt, Path(args.txt).expanduser())
     words = sc.cached_words(wav, model_dir, cache, args.prompt)
     spans = sc.align_chars([c.text for c in cues], sc.words_to_chars(words))
     for sp in spans:

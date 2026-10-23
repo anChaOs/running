@@ -147,6 +147,84 @@ def norm(text: str) -> str:
     return PUNCT.sub("", to_simplified(text)).lower()
 
 
+# ---------- 专名表 / 音频 ----------
+
+TERMS_LINE = re.compile(r"^\s*[-*]?\s*专名[：:]\s*(.+?)\s*$", re.M)
+
+
+def episode_terms(near: Path) -> str | None:
+    """从 near（subtitles.txt 或 episode 目录）同目录的 episode.md 读「专名：」一行。
+
+    三个脚本不传 --prompt 时都用它，保证同一份提示 → 同一个词级缓存 key，不会因为手抄差一个顿号而整条重转。
+    """
+    d = near if near.is_dir() else near.parent
+    ep = d / "episode.md"
+    if not ep.is_file():
+        return None
+    m = TERMS_LINE.search(ep.read_text(encoding="utf-8"))
+    if not m:
+        return None
+    terms = [t.strip() for t in re.split(r"[、,，;；]", m.group(1)) if t.strip()]
+    return "、".join(terms) or None
+
+
+def resolve_prompt(arg: str | None, near: Path) -> str | None:
+    if arg is not None:
+        return arg or None  # --prompt "" 显式不用提示
+    p = episode_terms(near)
+    if p:
+        print(f"[asr] 专名表取自 episode.md：{p}", file=sys.stderr)
+    return p
+
+
+def _term_pattern(term: str) -> re.Pattern | None:
+    """只给含英文字母的专名建模式：大小写不敏感、字符间允许空格/连字符，前后不能贴着英文字母数字。"""
+    if not re.search(r"[A-Za-z]", term):
+        return None
+    chars = [c for c in term if not c.isspace() and c not in "-_·"]
+    if len(chars) < 2:
+        return None
+    body = r"[\s\-_·]?".join(re.escape(c) for c in chars)
+    return re.compile(rf"(?<![A-Za-z0-9]){body}(?![A-Za-z0-9])", re.I)
+
+
+def fix_terms(text: str, prompt: str | None) -> tuple[str, list[tuple[str, str]]]:
+    """按专名表统一英文专名的大小写和空格（coros→COROS、personal agent→Personal Agent）。
+
+    只动拼写形态，不改用词；中文专名不做模糊替换（同音字仍按 SKILL 人工扫）。返回 (新文本, [(原, 改)])。
+    """
+    if not prompt:
+        return text, []
+    fixes: list[tuple[str, str]] = []
+    terms = sorted({t.strip() for t in re.split(r"[、,，;；]", prompt) if t.strip()}, key=len, reverse=True)
+    for term in terms:
+        pat = _term_pattern(term)
+        if not pat:
+            continue
+
+        def sub(m, term=term):
+            if m.group(0) != term:
+                fixes.append((m.group(0), term))
+            return term
+        text = pat.sub(sub, text)
+    return text, fixes
+
+
+def ensure_wav(src: Path) -> Path:
+    """传成片 mp4 时自动抽 16k 单声道 wav 到同目录 asr/<stem>.wav（已有且更新就复用）。"""
+    if src.suffix.lower() == ".wav":
+        return src
+    wav = src.parent / "asr" / (src.stem + ".wav")
+    if wav.is_file() and wav.stat().st_mtime >= src.stat().st_mtime:
+        return wav
+    import subprocess
+    wav.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[asr] 抽音频 {src.name} → asr/{wav.name}", file=sys.stderr)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-vn", "-ac", "1", "-ar", str(SR), str(wav)],
+                   check=True)
+    return wav
+
+
 # ---------- 模型 ----------
 
 def ensure_model(model_dir: Path) -> Path:

@@ -251,26 +251,30 @@ def merge_cut_fixes(groups: list[list]) -> list[list]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--audio", required=True, help="asr/YYYY-MM-DD-run-final.wav（16k 单声道）")
+    ap.add_argument("--audio", required=True, help="asr/YYYY-MM-DD-run-final.wav（16k 单声道）；也可直接给成片 .mp4，自动抽到 asr/")
     ap.add_argument("--txt", required=True, help="episodes/YYYY-MM-DD-slug/subtitles.txt")
-    ap.add_argument("--prompt", help="专名表，来自 episode.md「专名」一行；只用来纠拼写")
+    ap.add_argument("--prompt", help="专名表；不传就读 --txt 同目录 episode.md 的「专名：」一行；--prompt \"\" 不用提示")
     ap.add_argument("--model-dir", default=str(sc.DEFAULT_MODEL_DIR))
     ap.add_argument("--words-cache")
     ap.add_argument("--force", action="store_true", help="txt 已存在也覆盖（默认拒绝，防止冲掉人手改的字）")
     args = ap.parse_args()
 
-    wav = Path(args.audio).expanduser()
     txt = Path(args.txt).expanduser()
     if txt.exists() and not args.force:
         raise SystemExit(f"{txt} 已存在。人手改过的字不要被初稿冲掉；确实要重来加 --force。")
+    wav = sc.ensure_wav(Path(args.audio).expanduser())
+    prompt = sc.resolve_prompt(args.prompt, txt)
     cache = Path(args.words_cache).expanduser() if args.words_cache else sc.default_cache(wav)
-    words = sc.cached_words(wav, Path(args.model_dir).expanduser(), cache, args.prompt)
+    words = sc.cached_words(wav, Path(args.model_dir).expanduser(), cache, prompt)
     groups = split_words(to_tokens(words))
     cues = []
+    term_fixes: list[tuple[str, str]] = []
     for g in groups:
         t = text_of(g)
         if not t:
             continue
+        t, fx = sc.fix_terms(t, prompt)
+        term_fixes += fx
         a, b = g[0].s, g[-1].e
         if b - a < MIN_DUR:
             b = a + MIN_DUR
@@ -284,6 +288,10 @@ def main() -> int:
     draft = wav.with_suffix(".draft.srt")
     sc.write_srt(draft, cues)
     print(f"cues={len(cues)}\n写入 {txt}\n原始初稿 {draft}（不要覆盖）")
+    if term_fixes:
+        from collections import Counter
+        print("专名拼写统一（按 episode.md 专名表，只改大小写/空格）：" +
+              "；".join(f"{a}→{b}×{n}" for (a, b), n in Counter(term_fixes).most_common()))
     return 0
 
 

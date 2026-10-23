@@ -33,7 +33,8 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播（词级
 
 1. **换一种表达。** 不要把口语改成更顺、更短、更书面的说法。不要用 `talk.md` / `script.md` 重写。
 2. **压缩语句信息。** 指代、限定、程度、口头禅只要是说出来的，都要留。包括但不限于：「这点」「一些」「什么」「完全」「其实」「倒是」「大概」「左右」「足够的」。
-3. **加括号注释。** 字幕里不要出现（私服）（词语）(使用) 这类没说出口的补充。要解释写进简介，字幕只放嘴里说的。
+3. **自己加括号注释。** agent 不要往字幕里加没说出口的（…）补充；要解释写进简介。
+   **但用户手改时加的括号是屏幕注释，必须原样保留**（如「去打魔兽世界（私服）」「行（忘记说啥了）」）：回写 SRT、重切条、force_align、同步外挂时都不许删、不许改成别的符号。`check_subs.py` 报「括号」时先看是不是用户写的；是就保留，回复里说明「括号为用户注释，已保留」。
 
 不确定是不是错字，就保留原句。缺一句宁可空着等人手补，也不要为了通顺而改写。
 
@@ -53,7 +54,7 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播（词级
 
 依赖（一次）：`.venv/bin/pip install -r tools/subs/requirements.txt`。Apple Silicon 上 pip 直接装，CPU 跑。模型首次运行自动从 ModelScope 拉到 `~/Movies/running-content/.models/faster-whisper-large-v3-turbo/`（约 1.6 GB），不连 Hugging Face。Silero VAD 随 faster-whisper 包自带，不用另下。30 分钟成片在 8 核 CPU 上实测：整条转写约 4 分钟（结果缓存到 `asr/*.words.json`，三个脚本共用；换了 `--prompt` 或成片会重转），对齐时的短窗重听再约 5～9 分钟，质检复用缓存几秒钟。
 
-专名表：`episode.md` 里写一行 `专名：Personal Agent、HUD、……`（本期口播会说到的产品名、人名、英文术语）。它只当识别提示纠拼写，不能拿来改用词。
+专名表：`episode.md` 里写一行 `专名：Personal Agent、HUD、……`（本期口播会说到的产品名、人名、英文术语）。它只当识别提示纠拼写，不能拿来改用词。`p3-topic` 建期时就该写好（口播卡里的人名、品牌、术语），转写时脚本自动读，不用再手抄。
 
 ## 成片路径（制作期 vs 改名后）
 
@@ -76,17 +77,15 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播（词级
 
 ## 转写 + 初稿
 
-对成片抽 16 kHz 单声道，放媒体目录 `asr/`，文件名跟成片走：
+`--audio` 直接给成片 mp4 即可：脚本自动抽 16 kHz 单声道到媒体目录 `asr/YYYY-MM-DD-run-final.wav`（已有且比成片新就复用）。三个脚本（draft / force_align / check）不传 `--prompt` 时都自动读 `--txt` 同目录 `episode.md` 的「专名：」一行，**同一份提示 → 同一个词级缓存**，后两步不会因为手抄专名差一个字而整条重转（约 4 分钟）。所以**先把专名表写进 `episode.md` 再转写**；临时不要提示用 `--prompt ""`。
 
 ```bash
-ffmpeg -y -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
-  -vn -ac 1 -ar 16000 ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav
-
 .venv/bin/python tools/subs/draft_subs.py \
-  --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav \
-  --txt episodes/YYYY-MM-DD-slug/subtitles.txt \
-  --prompt "<episode.md 专名表>"
+  --audio ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
+  --txt episodes/YYYY-MM-DD-slug/subtitles.txt
 ```
+
+转写后脚本按专名表**只统一英文专名的大小写和空格**（coros→COROS、personal agent→Personal Agent、vo2 max→VO2max），并打印「专名拼写统一」清单；中文专名不做模糊替换，同音字仍按上面「同音字扫描」人工过。
 
 产物：`asr/*.words.json`（词级缓存，对时和质检共用）、`asr/*.draft.srt`（原始初稿，不要覆盖）、`subtitles.txt`。txt 已存在时脚本拒绝覆盖，防止冲掉人改的字。
 
@@ -135,7 +134,12 @@ txt 一行一条，时间是成片轴：
 
 自检切条做完、写完 SRT/txt 之后 **立刻停**。不要对口型、不要烧字幕、不要写简介。第一稿时间只是识别的词级时间，不是口型。
 
-把 txt 路径发给用户：
+把 txt 路径发给用户；用户在 Mac 上要看稿时用文本编辑打开（不要开播放器）：
+
+```bash
+open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
+```
+
 
 - 切条已按「切条易错」自检过。这一轮用户**抽听核对、改错字**即可；优先改 `subtitles.txt`，时间不要动。保持单行、别写太长。
 
@@ -160,8 +164,7 @@ txt 一行一条，时间是成片轴：
      ```bash
      .venv/bin/python tools/subs/force_align.py \
        --txt episodes/YYYY-MM-DD-slug/subtitles.txt \
-       --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav \
-       --prompt "<同一份专名表>"
+       --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav
      ```
 
      做法：定稿文字按字对到词级识别上，只用连续对上的字当锚点；对不上的几条在前后锚点之间切短窗、用这几条原文当提示重听；还对不上，短窗（≤10s）内按人声时长比例分，标 `interp`；窗更长就保留原时间，标 `unanchored`。最后用 Silero VAD 咬点：入点贴开口、略早 0.1s（气口后的短人声「嗯」「那」不吸附）；出点盖住说完再挂约 0.2s，只往后延不往前缩；**出点盖住说完优先于不重叠**——冲突时推迟下一条入点，绝不砍上一条出点造成早收；共享人声岛按词级边界切开；句间留白约 0.22s；最短约 1 秒。
@@ -171,8 +174,7 @@ txt 一行一条，时间是成片轴：
      ```bash
      .venv/bin/python tools/subs/check_subs.py \
        --subs episodes/YYYY-MM-DD-slug/subtitles.txt \
-       --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav \
-       --prompt "<同一份专名表>"
+       --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav
      ```
 
      机器过门两层：① 比例——早收（出点比说完早 >0.3s）≤ 可核对条的 3%；漏盖（有正词人声却没字幕，连续 ≥0.5s）累计时长 ≤ 成片时长的 1%；挂静音（说完后还挂 >1s）≤ 可核对条的 3%。② 绝对硬门槛——严重早收（出点比说完早 >0.5s）条数必须为 0。超任一则退出码非 0（机器未过门）。**机器过门 ≠ 可以写 `subs: done`**：脚本仍逐条列出硬失败行，agent 必须给人听；只有用户确认「改好了 / 可以了」之后，才把 `assets.md` 写成 `subs: done`。对不上 / 噪声大的条不进比例分母，单独列出要人听。提醒：晚进 >0.3s、短于 1s、超过 7 字/秒、单字条、词组拆开、重叠、`\N`、括号注释。漏盖若是路人说话或删掉的磕巴，人听过确认后在回复里说明。
