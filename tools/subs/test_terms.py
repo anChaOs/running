@@ -60,6 +60,14 @@ def test_ensure_wav_from_mp4():
         assert sc.ensure_wav(mp4) == wav  # 第二次复用
 
 
+def test_cap_prompt():
+    long = "、".join(f"专名{i:02d}" for i in range(60))
+    out = sc.cap_prompt(long)
+    assert len(out) <= sc.PROMPT_MAX_CHARS and out.startswith("专名00") and not out.endswith("、")
+    assert sc.cap_prompt("COROS、Vaporfly") == "COROS、Vaporfly"
+    print("ok test_cap_prompt")
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

@@ -177,6 +177,23 @@ def resolve_prompt(arg: str | None, near: Path) -> str | None:
     return p
 
 
+PROMPT_MAX_CHARS = 120  # whisper 提示预算约 224 token，超了从前面截掉；按顿号整词截，前面的词留住
+
+
+def cap_prompt(prompt: str | None, limit: int = PROMPT_MAX_CHARS) -> str | None:
+    """长专名表只喂前面一段给识别；拼写统一 fix_terms 仍用全表。"""
+    if not prompt or len(prompt) <= limit:
+        return prompt
+    out = ""
+    for t in prompt.split("、"):
+        nxt = f"{out}、{t}" if out else t
+        if len(nxt) > limit:
+            break
+        out = nxt
+    print(f"[asr] 专名表 {len(prompt)} 字，识别提示只取前 {len(out)} 字（拼写统一仍用全表）", file=sys.stderr)
+    return out or prompt[:limit]
+
+
 def _term_pattern(term: str) -> re.Pattern | None:
     """只给含英文字母的专名建模式：大小写不敏感、字符间允许空格/连字符，前后不能贴着英文字母数字。"""
     if not re.search(r"[A-Za-z]", term):
@@ -308,7 +325,7 @@ def transcribe_words(model, audio, *, prompt: str | None = None, offset: float =
         vad_filter=vad_filter,
         vad_parameters={"min_silence_duration_ms": 700, "speech_pad_ms": 300} if vad_filter else None,
         condition_on_previous_text=False,
-        initial_prompt=prompt,
+        initial_prompt=cap_prompt(prompt),
     )
     out: list[Word] = []
     for s in segs:
