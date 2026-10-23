@@ -153,10 +153,10 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
    ```bash
    .venv/bin/python tools/subs/txt_to_subs.py \
-     --txt episodes/YYYY-MM-DD-slug/subtitles.txt
+     --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto
    ```
 
-   覆盖同目录 `subtitles.srt`
+   覆盖同目录 `subtitles.srt`；`--media-dir auto` 顺手拷到媒体目录 `subtitles.srt`，成片还叫 `run-final.mp4` 时再拷一份同名 `.srt`（改名后不拷，外挂始终是 `subtitles.srt`）
 2. **对口型**（只改时间；口播用词不改）：
    - 对齐前先按「写 SRT / txt」的切口规则扫一遍，词组被拆成两条的先并回去。这是修切条，不是改嘴里说的字。
    - 强制对齐（定稿文字为准，脚本不改字）：
@@ -182,15 +182,8 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
    - 规则不变：字出在嘴动时；**宁可早出，不能早收**；气口后的短人声（「那」「嗯」）不要钉成下一句入点；句间停顿留白。
    - 对着成片 `YYYY-MM-DD-run-final.mp4` 抽听，本地预览用 IINA；媒体目录放 `subtitles.srt`，制作阶段可另放同名 `YYYY-MM-DD-run-final.srt` 方便自动挂
    - 不要为对齐改字。只改 sidecar，不用重拼成片。preview 时长变了（重渲 HUD），对着新成片重抽 wav、重跑这一步。
-   - 改完 txt 时间后跑 `txt_to_subs.py` 回写 SRT
-3. 外挂拷到成片旁边，方便 IINA 自动挂：
-
-```bash
-cp episodes/YYYY-MM-DD-slug/subtitles.srt \
-   ~/Movies/running-content/YYYY-MM-DD-slug/
-cp episodes/YYYY-MM-DD-slug/subtitles.srt \
-   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.srt
-```
+   - 改完 txt 时间后跑 `txt_to_subs.py --media-dir auto` 回写 SRT 并同步媒体目录
+3. 外挂拷到成片旁边（IINA 自动挂）：最后一次 `txt_to_subs.py ... --media-dir auto` 已经拷好，不用再手动 `cp`。
 
 `check_subs.py` 机器过门之后，把硬失败行和 `interp` / `unanchored` 条列给人听；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。比例过门本身不够，agent 不得自行写 `subs: done`。
 

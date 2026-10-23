@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 from pathlib import Path
 
 
@@ -49,6 +50,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Convert subtitles.txt into SRT for Bilibili and YouTube.")
     parser.add_argument("--txt", required=True, help="episodes/.../subtitles.txt")
     parser.add_argument("--srt", help="Output SRT. Default: next to txt")
+    parser.add_argument("--media-dir", help="同时拷到媒体目录：subtitles.srt（上传用）+ 成片还叫 run-final 时另拷同名 .srt（IINA 自动挂）。"
+                        "传 auto = ~/Movies/running-content/<期名>")
     args = parser.parse_args()
 
     txt = Path(args.txt).expanduser().resolve()
@@ -59,6 +62,19 @@ def main() -> int:
     write_srt(srt_path, cues)
     print(f"cues={len(cues)}")
     print(f"Wrote {srt_path}")
+    if args.media_dir:
+        media = (Path.home() / "Movies/running-content" / txt.parent.name if args.media_dir == "auto"
+                 else Path(args.media_dir).expanduser().resolve())
+        if not media.is_dir():
+            raise SystemExit(f"media dir not found: {media}")
+        targets = [media / "subtitles.srt"]
+        date = txt.parent.name[:10]
+        if (media / f"{date}-run-final.mp4").is_file():
+            targets.append(media / f"{date}-run-final.srt")
+        for t in targets:
+            if t.resolve() != srt_path:
+                shutil.copyfile(srt_path, t)
+                print(f"Copied {t}")
     return 0
 
 
