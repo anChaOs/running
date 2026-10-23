@@ -47,7 +47,7 @@ def front(path: Path) -> dict[str, str]:
 
 
 def done(v: str | None) -> bool:
-    return bool(v) and v.split()[0].rstrip("（(,，;；") in ("done", "ready")
+    return bool(v) and re.match(r"(done|ready)(?![A-Za-z-])", v) is not None
 
 
 def main() -> int:
