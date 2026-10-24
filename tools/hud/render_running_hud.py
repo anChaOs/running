@@ -76,7 +76,8 @@ def discover_clips(media_dir: Path) -> list[Path]:
     clips = sorted(p for p in media_dir.glob("*-run-*.mp4") if not any(k in p.name for k in CLIP_SKIP))
     if clips:
         return clips
-    return sorted(path for path in media_dir.glob("*.mp4") if not path.name.endswith(("-open.mp4", "-close.mp4")))
+    return sorted(path for path in media_dir.glob("*.mp4")
+                  if not path.name.endswith(("-open.mp4", "-close.mp4")) and not any(k in path.name for k in CLIP_SKIP))
 
 
 def resolve_total_distance_meters(fit_path: Path) -> int | None:

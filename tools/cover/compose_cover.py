@@ -216,7 +216,7 @@ def compose(bg, person_ol, lines, series, font_path, W, H, layout, side, title_c
             p = person_ol.resize((pw, int(person_ol.height * pw / person_ol.width)), Image.LANCZOS)
         px = W - p.width - margin // 2 if side == "right" else margin // 2
         img.alpha_composite(p, (px, H - p.height))
-        tx0 = margin if side == "right" else p.width + margin
+        tx0 = margin if side == "right" else px + p.width + margin // 2
         tx1 = px - margin // 2 if side == "right" else W - margin
         box_w, box_h = tx1 - tx0, int(H * 0.72)
     else:
@@ -227,7 +227,8 @@ def compose(bg, person_ol, lines, series, font_path, W, H, layout, side, title_c
             p = person_ol.resize((pw, int(person_ol.height * pw / person_ol.width)), Image.LANCZOS)
         img.alpha_composite(p, ((W - p.width) // 2, H - p.height))
         tx0, box_w, box_h = margin, W - 2 * margin, int(H * 0.30)
-    min_px = int(H * TITLE_MIN_FRAC[layout])
+    # 两条下限取大：画高比例，和 320px 小图字高门（16:9 下后者更严），免得排出来再被自检打回
+    min_px = max(int(H * TITLE_MIN_FRAC[layout]), -(-THUMB_MIN_PX * W // THUMB_W))
     size = fit_title(lines, font_path, box_w, box_h, min_px, int(H * 0.30))
     if size is None:
         raise SystemExit(

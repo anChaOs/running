@@ -76,7 +76,7 @@ def main() -> int:
     st = read_kv(ep / "assets.md")
     has = lambda p: p.exists()  # noqa: E731
     clips = sorted(media.glob(f"{date}-run-*.mp4")) if media.is_dir() else []
-    clips = [c for c in clips if "final" not in c.name and "-hud" not in c.name]
+    clips = [c for c in clips if not any(k in c.name for k in ("run-final", "orient", "transpose", "-raw", "pre-", "-bad", "-hud"))]
     fit = list(media.glob("*.fit")) if media.is_dir() else []
     previews = list((media / "hud-renders").glob("*-hud-preview.mp4")) if media.is_dir() else []
     covers = {n: has(media / n) for n in ("cover-1920x1080.jpg", "cover-4x3-1920x1440.jpg", "cover-1080x1440.jpg")}
