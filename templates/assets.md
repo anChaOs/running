@@ -28,8 +28,10 @@
 ## 制作状态
 
 - ingest: pending
+- shoes: pending
 - hud: pending
-- subs: pending
 - cover: pending
 - assemble: pending
 - qc: pending
+- subs: pending
+- upload: pending

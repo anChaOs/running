@@ -240,20 +240,17 @@ def write_assets_md(
         lines.append(f"- `{row['role']}`：`{row['dest']}`")
     for _, dest_name_ in fits:
         lines.append(f"- FIT：`{dest_name_}`")
-    lines.extend(
-        [
-            "",
-            "## 制作状态",
-            "",
-            "- ingest: done",
-            "- hud: pending",
-            "- subs: pending",
-            "- cover: pending",
-            "- assemble: pending",
-            "- qc: pending",
-            "",
-        ]
-    )
+    old = dest.read_text(encoding="utf-8") if dest.is_file() else ""
+    if "## 制作状态" in old:
+        # 重跑 ingest 只更新素材部分；制作状态和之后人写的记录原样保留，只把 ingest 置 done
+        tail = "## 制作状态" + old.split("## 制作状态", 1)[1]
+        tail = re.sub(r"^- ingest:.*$", "- ingest: done", tail, count=1, flags=re.M)
+        if "- ingest:" not in tail:
+            tail = tail.replace("## 制作状态\n", "## 制作状态\n\n- ingest: done", 1)
+        lines.extend(["", tail.rstrip("\n"), ""])
+    else:
+        lines.extend(["", "## 制作状态", "", "- ingest: done"]
+                     + [f"- {k}: pending" for k in ("shoes", "hud", "cover", "assemble", "qc", "subs", "upload")] + [""])
     dest.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -364,7 +361,7 @@ def main() -> int:
         else:
             trim_script = Path(__file__).resolve().parent / "trim_talk_pauses.py"
             print("open/close pause trim")
-            subprocess.run(
+            rc = subprocess.run(
                 [
                     sys.executable,
                     str(trim_script),
@@ -373,7 +370,10 @@ def main() -> int:
                     "--apply",
                 ],
                 check=False,
-            )
+            ).returncode
+            if rc:
+                print(f"open/close 粗剪失败（exit {rc}）：素材已收，但粗剪没做。修好后单独跑 trim_talk_pauses.py --apply，或用 --skip-pause-trim。", file=sys.stderr)
+                return rc
     return 0
 
 

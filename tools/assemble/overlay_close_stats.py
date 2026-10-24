@@ -220,11 +220,12 @@ def overlay_filter(
         parts.append(
             f"{''.join(piece_labels)}concat=n={len(playlist)}:v=1:a=0,fps=60,settb=1/60[slide]"
         )
-    parts.append(f"[slide]null[st]")
+    d = f"{close_dur:.6f}"
+    # slide 轨比 close 短时 shortest=1 会把 close 截短（10-14 截成 131s）：末帧定住垫到 close 时长
+    parts.append(f"[slide]tpad=stop_mode=clone:stop_duration={d},trim=duration={d},setpts=PTS-STARTPTS[st]")
     parts.append(
         f"[0:v][st]overlay=x={OVERLAY_X}:y=(H-h)/2:shortest=1,format=yuv420p[v]"
     )
-    d = f"{close_dur:.6f}"
     parts.append(
         f"[0:a]aformat=sample_rates=48000:channel_layouts=stereo,"
         f"aresample=async=1:first_pts=0,"

@@ -46,7 +46,11 @@ hud-preview + open/close
 
 ## 1. 先盘点，再问目标
 
-在仓库和 `~/Movies/running-content/` 里找该日已有文件。对照 `episodes/*/assets.md` 的「制作状态」。
+在仓库和 `~/Movies/running-content/` 里找该日已有文件。对照 `episodes/*/assets.md` 的「制作状态」。先跑一次盘点脚本（只读，不开播放器），它会列出已有/缺失并给下一步提示词：
+
+```bash
+python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
+```
 
 | 目标 | 最低前置 | 加载 |
 | --- | --- | --- |

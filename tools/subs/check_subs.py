@@ -65,7 +65,7 @@ def main() -> int:
     args = ap.parse_args()
 
     subs = Path(args.subs).expanduser()
-    wav = Path(args.audio).expanduser()
+    wav = sc.ensure_wav(Path(args.audio).expanduser())
     model_dir = Path(args.model_dir).expanduser()
     cache = Path(args.words_cache).expanduser() if args.words_cache else sc.default_cache(wav)
 
@@ -73,6 +73,7 @@ def main() -> int:
     audio = sc.load_audio(wav)
     dur = len(audio) / sc.SR
     vad = sc.vad_segments(audio)
+    args.prompt = sc.resolve_prompt(args.prompt, Path(args.subs).expanduser())
     words = sc.cached_words(wav, model_dir, cache, args.prompt)
     asr = sc.words_to_chars(words)
     spans = sc.align_chars([c.text.replace("\\N", "") for c in cues], asr)
@@ -110,7 +111,7 @@ def main() -> int:
         if "\\N" in c.text or "\n" in c.text:
             add(warn, "多行", c, i)
         if BRACKETS.search(c.text):
-            add(warn, "括号注释", c, i, BRACKETS.search(c.text).group(0))
+            add(warn, "括号（用户注释就保留，agent 加的才删）", c, i, BRACKETS.search(c.text).group(0))
         if d < 1.0:
             add(warn, "短于1s", c, i, f"{d:.2f}s")
         if d > 0 and n / d > MAX_CPS:
