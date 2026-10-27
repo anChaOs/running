@@ -1,6 +1,6 @@
 ---
 name: p3-qc
-description: 只再核对一次成片。默认成片流程里抽帧核对已在 p3-assemble 里拼完立刻做。用户说再核对、抽帧、QC、审片、接缝不对时用。画面声音通过且已有校准字幕才把 episode status 改为 edited。
+description: 只再核对一次成片。默认成片流程里抽帧核对已在 p3-assemble 里拼完立刻做。用户说再核对、抽帧、QC、审片、接缝不对时用。只写 `qc: done`；episode status 的 `edited` 由 p3-subs 在用户确认字幕后写。
 ---
 
 # 成片核对（补做 / 重做）
@@ -36,6 +36,8 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 
 ## 字幕（外挂，叠上看）
 
+下面的 IINA 命令发给用户，**用户同意才执行**，agent 不要自己打开播放器。
+
 ```bash
 # 制作期：
 iina --mpv-geometry=320x180-8+8 \
@@ -62,7 +64,7 @@ SRT 贴底栏，可能压 HUD。公开前用私密/不公开稿在网页播放�
 - 天气是「数字°C / 数字°C」，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
 
-画面声音通过后：`assets.md` 制作状态 `qc: done`。已有校准字幕才把 `episode.md` 改为 `edited`。
+画面声音通过后：`assets.md` 制作状态 `qc: done`。`episode.md` 的 `edited` 只由 `p3-subs` 在用户确认字幕后写，这里不改。
 
 失败则指出该重跑哪个 skill：鞋错 → `p3-hud`；字幕错 → 改 txt/SRT，**不用重拼**；接缝错 → 查 open/close 是否被当成 run。
 

@@ -119,7 +119,9 @@ def discover(media_dir: Path) -> tuple[Path | None, list[Path], Path | None]:
         p for p in media_dir.glob("*-close.mp4") if "stats" not in p.name
     )
     hud = media_dir / "hud-renders"
-    previews = sorted(p for p in hud.glob("*-run-*-hud-preview.mp4") if p.name.endswith("-hud-preview.mp4"))
+    previews = sorted(p for p in hud.glob("*-run-*-hud-preview.mp4")
+                      if p.name.endswith("-hud-preview.mp4")
+                      and not any(k in p.name for k in ("run-final", "orient", "transpose", "-raw", "-bad")))
     if not previews:
         raise SystemExit(f"No HUD previews in {hud}. Render HUD with --preview first.")
     close = stats_closes[0] if stats_closes else (closes[0] if closes else None)

@@ -68,11 +68,16 @@ def run(cmd: list[str], dry_run: bool = False) -> None:
     subprocess.run(cmd, check=True)
 
 
+CLIP_SKIP = ("run-final", "orient", "transpose", "-raw", "pre-", "-bad", "-hud")
+
+
 def discover_clips(media_dir: Path) -> list[Path]:
-    clips = sorted(media_dir.glob("*-run-*.mp4"))
+    # 只要 run-a / run-b 这类原段；成片 run-final、朝向备份、raw 不能再叠一层 HUD
+    clips = sorted(p for p in media_dir.glob("*-run-*.mp4") if not any(k in p.name for k in CLIP_SKIP))
     if clips:
         return clips
-    return sorted(path for path in media_dir.glob("*.mp4") if not path.name.endswith(("-open.mp4", "-close.mp4")))
+    return sorted(path for path in media_dir.glob("*.mp4")
+                  if not path.name.endswith(("-open.mp4", "-close.mp4")) and not any(k in path.name for k in CLIP_SKIP))
 
 
 def resolve_total_distance_meters(fit_path: Path) -> int | None:
@@ -378,10 +383,10 @@ def main() -> int:
         print(f"Weather hours: {len(payload.get('hours') or [])} from {weather_path}")
     else:
         _fit_lat, _fit_lon, tmin, tmax = resolve_fit_geo_time(fit)
-        if args.weather_city:
-            lat, lon = WEATHER_CITIES[args.weather_city]
-        else:
-            lat, lon = _fit_lat, _fit_lon
+        if not args.weather_city:
+            # 不把 FIT GPS 发给 Open-Meteo（CLAUDE.md / p3-hud 硬规则）；忘了 flag 就停，不偷偷用坐标
+            raise SystemExit("天气需要 --weather-city shanghai（或 --weather-json / --no-weather）；不会用 FIT 经纬度查天气。")
+        lat, lon = WEATHER_CITIES[args.weather_city]
         if lat is not None and lon is not None and tmin is not None and tmax is not None:
             try:
                 if args.dry_run:
