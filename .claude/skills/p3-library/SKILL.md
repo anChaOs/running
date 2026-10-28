@@ -5,9 +5,9 @@ description: 备选主题库。用户灵光一闪扔来一个主题、先记下�
 
 # 主题库
 
-把还没拍摄日的主题收进 `topics/`。五种内容类型都收：破三实验室 / 聊金融 / 聊科技 / 聊装备 / 聊跑步知识。
+把还没拍摄日的主题收进 `topics/`。五种都收：破三实验室 / 聊金融 / 聊科技 / 聊装备 / 聊跑步知识。
 
-和 `/p3-topic` 的分工：这里是库存；`p3-topic` 是「今天要拍、写成口播」。不要在这里写 `talk.md` 或 `episodes/`。
+这里是库存。`p3-topic` 才是「今天要拍、写成口播」。不要在这里写 `talk.md` 或 `episodes/`。
 
 ## 不要做的事
 
@@ -43,17 +43,13 @@ description: 备选主题库。用户灵光一闪扔来一个主题、先记下�
 | 要进 wiki | 按 `knowledge/CLAUDE.md` ingest。卡上只写 `wiki:` 指针。 | `wiki` |
 | 可以拍了 | 标 `ready`。等有拍摄日再 `/p3-topic`。 | `ready` |
 
-种类：破三实验室 / 聊金融 / 聊科技 / 聊装备 / 聊跑步知识。
-
-日记、过期热点、纯自身碎记默认不进 wiki；能沉淀的概念再 ingest。
+种类用开篇那五种。日记、过期热点、纯自身碎记默认不进 wiki；能沉淀的概念再 ingest。
 
 ## 状态
 
 `seed` → `scoped` → `wiki` → `ready` → `used`
 
-旁路：`parked`（暂缓）、`dropped`（不做）。
-
-已拍：`used`，在卡上写 `episodes: [YYYY-MM-DD-slug]`。
+旁路：`parked`（暂缓）、`dropped`（不做）。已拍标 `used`，卡上写 `episodes: [YYYY-MM-DD-slug]`。
 
 ## 落盘
 
