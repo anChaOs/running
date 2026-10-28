@@ -9,4 +9,5 @@
 | slug | 一句话 | 种类 | 体量 | 状态 |
 |------|--------|------|------|------|
 | [berlin-marathon](berlin-marathon.md) | 柏林马拉松｜中国出征（2026-09-23） | 破三实验室 | large | used |
+| [vo2max](vo2max.md) | VO₂max｜最大摄氧量到底是什么？ | 聊跑步知识 | large | scoped |
 | [body-weight](body-weight.md) | 半马 PB 时约 65kg，现约 68.5kg（+3.5kg）；单独一期聊体重 | 破三实验室 | small | seed |
