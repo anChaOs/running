@@ -36,7 +36,8 @@
 
 - ingest: done
 - hud: done（-sn "C202 7" -sk 389.71；preview 已句间粗剪）
-- subs: waiting-review（221 条；用户改字+补漏 3 条后 force_align 再跑、check 机器过门；硬失败漏盖 1 / interp 6 / unanchored 1；SRT 已同步；等人确认后再写 done）
+- subs: done（221 条；用户确认可发片；force_align + check 已过）
 - cover: done（主推 16:9 cover-1920x1080.jpg；另有 4:3 / 3:4；句「高住低训|到底|是什么？」）
-- assemble: done（2026-10-28-run-final.mp4；I=-16.1 LUFS / TP=-1.3 dBTP；时长 960.7s）
+- assemble: done（已改名「高原 | 高住低训到底是什么？.mp4」；I=-16.1 LUFS / TP=-1.3 dBTP；时长 960.7s）
 - qc: done（抽帧 open/接缝/HUD/close；鞋 C202 7、°C 正常）
+- upload: ready（成片已按标题改名；外挂 subtitles.srt）
