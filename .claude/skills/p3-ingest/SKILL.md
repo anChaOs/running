@@ -43,10 +43,11 @@ MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间�
 
 核对角色：
 
-- 第一段通常 `open`（跑前），最后一段 `close`（跑后），中间 `run-a`、`run-b`…
+- 第一段通常 `open`（跑前），最后一段 `close`（跑后，多段见下），中间 `run-a`、`run-b`…
 - 只有跑中：`--no-open --no-close`
 - 空镜标成 `broll-01`，不要混进 `run-*`（HUD 会扫全部 `*-run-*.mp4`）
-- FIT 已由高驰 MCP 写成 `YYYY-MM-DD-run-data.fit`。目录里还有别的 FIT 时，只留和跑步时间重叠的那一个
+- FIT 已由高驰 MCP 写成 `YYYY-MM-DD-run-data.fit`。源目录里有多个 FIT 时，脚本**按时间重叠自动挑**：读每个 FIT 的 record 起止（`.venv` 有 fitdecode；读不到就用文件名时间、往后估 3 小时），和每段视频的时间窗（`VID_` 名是开始；否则 mtime 当结束往前推时长）算重叠秒数，打印候选表。只有一场明显重叠最多才选它；两场都重叠（次多 ≥ 最多的一半）或都不重叠时**直接停下列候选**，看过后用 `--fit <文件名>` 指定，不要猜
+- **close 有好几段**（跑完说两三条）：FIT 结束后才开拍的尾部片段自动都算 close，命名 `close-1`、`close-2`…，`--apply` 时拼成一条 `YYYY-MM-DD-close.mp4`（参数一致 `-c copy` 无损；不一致才重编码），mtime 取最后一段。没有 FIT 起止时默认只有最后一段是 close，用 `--close-clips N` 指定；自动数错了也用它（`--close-clips 1` 回到单段）。`close-N` 分段留着别删，粗剪和 assemble 只吃拼好的 `close`
 - 高驰截图（`Screenshot_*` / `*coros*` / `截图*`）改名为 `YYYY-MM-DD-stats-01.jpg`。拼成片时叠到 close 左侧
 
 `VID_` 文件名是开始时间。脚本若发现 `mtime` 和「开始 + 时长」相差超过 5 分钟，会把 `mtime` 改成结束时间。这是 HUD `--video-end-time-mode file-modified` 的前提。把将要改写的 mtime 打给用户看一眼。

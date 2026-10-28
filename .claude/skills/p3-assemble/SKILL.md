@@ -66,7 +66,9 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 - `最后一段 run → close` 叠化 0.2 秒，close 无 HUD
 - 统一 60 fps、`settb=1/60`（open/close 和 preview 时间基不同，不统一 xfade 会失败）
 - 视频 HEVC videotoolbox，码率对齐 preview；音频 AAC 192k
-- **混音后默认响度链**（concat + whoosh → leveling → loudnorm）；`--no-loudness-fix` 可关
+- **混音后默认响度链**（concat + whoosh → leveling → loudnorm），**默认两遍**；`--no-loudness-fix` 可关
+- 有 `overlays.json` 时按成片时间轴叠动画/小视频，可停住到指定时间（见下「叠加层」）
+- 写完自动实测成片 I / TP / LRA 打到日志末尾
 
 ## 音频（默认响度链 + 拼完必测）
 
@@ -87,7 +89,9 @@ highpass=f=90,afftdn=nf=-25,dynaudnorm=f=250:g=15:p=0.9:m=8,acompressor=threshol
 3. 上述响度链 → 目标约 **I=-16 LUFS**，**TP=-1.5 dBTP**（loudnorm 卡住真峰值）
 4. AAC 192k 写出
 
-拼完仍要测（单 pass loudnorm 与实片听感可能有偏差；严重麦掉音如 −13 dB 处可能需手工局部增益）：
+**两遍 loudnorm（默认）：** 第一遍只解码音频，跑同一条链（前四个滤镜完全一样，loudnorm 加 `print_format=json`）测出 `measured_I/TP/LRA/thresh/offset`；第二遍把最后的 loudnorm 换成带测量值 + `linear=true` 的版本再编码。线性增益不会像单遍那样边走边推，句间起伏更自然，I 更贴近 −16。日志里有 `Loudnorm pass 1`（链内 loudnorm 之前的 I / 峰值 TP）和 `Loudnorm pass 2` 的完整滤镜；loudnorm 判断线性做不到（LRA/峰值卡住）会自己退回动态，日志 summary 的 `Normalization Type` 能看到。测量失败（报错、全静音 `-inf`）自动退回单遍 `LOUDNESS_AF`，日志有 `⚠ Loudnorm 测量失败`。想强制单遍加 `--single-pass-loudnorm`。
+
+拼完日志末尾有 `成片实测: I=… TP=…`（AAC 编码后真峰值可能比 −1.5 高零点几，−1.0 以内算过）。还要人工复核时（严重麦掉音如 −13 dB 处可能需手工局部增益）：
 
 ```bash
 # 响度（看 I / TP / LRA）
@@ -102,6 +106,28 @@ ffmpeg -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
 目标：**LUFS ≈ −16**（与常见跑步口播参考接近）、**峰值 ≤ −1.5 dB**（勿顶到 0 dB 削波）。超标再查是否误关了响度链、或个别句要局部补增益——不要整轨再盲目 ×1.5。
 
 录的时候尽量加风棉/死猫；开场自拍口播清楚，切到 POV 后别炸。拼完用 IINA 听开场、第一段 run、风声最大处与已知掉音处。
+
+## 叠加层（动画 / 小视频，按时间停住）
+
+每期一个 `overlays.json`，放媒体目录（优先）或 `episodes/YYYY-MM-DD-slug/`；`--overlays <路径>` 指定，`--no-overlays` 关。叠在成片画面上（转场之后、字幕之前），dry-run 会打出每层换算后的起止：
+
+```json
+{
+  "overlays": [
+    {"file": "lt-01.mov", "start": "5:20", "hold_until": "5:50"},
+    {"file": "lt-02.mov", "start": "6:00", "hold_until": "6:30"},
+    {"file": "lt-03.mov", "start": "6:44", "hold_until": "7:11", "fade_out": 0.3},
+    {"file": "badge.png", "anchor": "close", "start": 2, "hold_until": 8, "x": "W-w-40", "y": 40, "width": 360}
+  ]
+}
+```
+
+- 上面 start 是示意，按实际填。`start` / `hold_until`：`m:ss`、`h:mm:ss` 或秒数。默认 `anchor: final`（成片时间轴，和抽帧/字幕同一根轴）；`anchor: close` 从 close 在成片里的起点算
+- 动画放完后**停在最后一帧**到 `hold_until` 再撤（`tpad` clone）；`hold_until` 早于动画结束就提前截掉；不写 `hold_until` 就放完一遍。图片必须写 `hold_until`
+- `file` 相对媒体目录。带透明的动画用 ProRes 4444 `.mov` 或 PNG；全画幅透明动画 `x/y` 不写（默认 0,0）
+- 可选：`x` / `y`（ffmpeg overlay 表达式，如 `W-w-40`）、`width`（等比缩放）、`fade_in` / `fade_out`（秒）、`opacity`（0–1）
+- 超出成片的 `hold_until` 会截到片尾并警告；`start` 超出直接报错
+- 10-15 那期手工做过同样的事（lt-01 停到约 5:50、lt-02 到约 6:30、lt-03 约 6:44 起停到约 7:11），以后写进 `overlays.json` 让 assemble 一次拼完，不要拼完再二次压。核对时在每层起点、停住中段、撤掉后各抽一帧
 
 只有用户明确要求硬字幕时才加 `--ass episodes/.../subtitles.ass`。
 

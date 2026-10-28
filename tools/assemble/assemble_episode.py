@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import random
 import shutil
 import subprocess
@@ -40,6 +41,204 @@ LOUDNESS_AF = (
     "loudnorm=I=-16:TP=-1.5:LRA=7,"
     "aformat=sample_rates=48000:channel_layouts=stereo"
 )
+
+
+# 两遍 loudnorm：第一遍用同一条链（loudnorm 带 print_format=json）只测量，第二遍把测量值喂回去 + linear=true。
+# 前面四个滤镜和单遍完全一样，只换最后的 loudnorm；测量失败就回到单遍 LOUDNESS_AF。
+LOUDNORM_TARGET = "loudnorm=I=-16:TP=-1.5:LRA=7"
+LOUDNESS_PRE, _LOUDNESS_POST = LOUDNESS_AF.split(LOUDNORM_TARGET + ",")
+assert _LOUDNESS_POST == "aformat=sample_rates=48000:channel_layouts=stereo"
+LOUDNESS_MEASURE_AF = f"{LOUDNESS_PRE}{LOUDNORM_TARGET}:print_format=json"
+
+
+def loudness_af_two_pass(m: dict) -> str:
+    return (
+        f"{LOUDNESS_PRE}{LOUDNORM_TARGET}:measured_I={m['input_i']}:measured_TP={m['input_tp']}"
+        f":measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}"
+        f":linear=true:print_format=summary,{_LOUDNESS_POST}"
+    )
+
+
+def parse_loudnorm_json(stderr: str) -> dict | None:
+    """从 ffmpeg stderr 里抠 loudnorm 打印的最后一个 JSON 块。"""
+    end = stderr.rfind("}")
+    start = stderr.rfind("{", 0, end)
+    if start < 0 or end < 0:
+        return None
+    try:
+        m = json.loads(stderr[start : end + 1])
+    except json.JSONDecodeError:
+        return None
+    keys = ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")
+    if not all(k in m for k in keys):
+        return None
+    try:
+        vals = [float(m[k]) for k in keys]
+    except (TypeError, ValueError):
+        return None
+    if not all(math.isfinite(v) for v in vals):  # 全静音时 input_i=-inf
+        return None
+    return m
+
+
+def measure_loudness(inputs: list[list[str]], audio_filter: str) -> dict | None:
+    cmd = ["ffmpeg", "-hide_banner", "-nostats"]
+    for spec in inputs:
+        cmd.extend(spec)
+    cmd.extend(["-filter_complex", audio_filter, "-map", "[a]", "-f", "null", "-"])
+    print("$ (loudnorm pass 1, audio only)", " ".join(cmd))
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    if proc.returncode != 0:
+        print(proc.stderr[-2000:])
+        return None
+    return parse_loudnorm_json(proc.stderr)
+
+
+def measure_output(path: Path) -> dict | None:
+    """成片实测 I / TP / LRA（只解码音频）。"""
+    proc = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-vn",
+         "-af", f"{LOUDNORM_TARGET}:print_format=json", "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    return parse_loudnorm_json(proc.stderr) if proc.returncode == 0 else None
+
+
+# ---------- 叠加层（下三分之一动画 / 小视频，按成片时间轴摆，可停住到指定时间） ----------
+
+IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
+
+
+def parse_time(v: object) -> float:
+    """'5:50' / '1:05:50' / '350.5' / 350 → 秒。"""
+    if isinstance(v, (int, float)):
+        return float(v)
+    parts = str(v).strip().split(":")
+    if not 1 <= len(parts) <= 3:
+        raise ValueError(f"bad time: {v!r}")
+    sec = 0.0
+    for part in parts:
+        sec = sec * 60 + float(part)
+    return sec
+
+
+def find_overlays_file(media_dir: Path, explicit: str | None) -> Path | None:
+    if explicit:
+        p = Path(explicit).expanduser().resolve()
+        if not p.is_file():
+            raise SystemExit(f"overlays file not found: {p}")
+        return p
+    repo = Path(__file__).resolve().parents[2]
+    for cand in (media_dir / "overlays.json", repo / "episodes" / media_dir.name / "overlays.json"):
+        if cand.is_file():
+            return cand
+    return None
+
+
+def load_overlays(cfg_path: Path, media_dir: Path) -> list[dict]:
+    """读 overlays.json；只做静态校验，成片时间轴上的换算放到 resolve_overlays。"""
+    data = json.loads(cfg_path.read_text(encoding="utf-8"))
+    items = data.get("overlays", data) if isinstance(data, dict) else data
+    out: list[dict] = []
+    for n, raw in enumerate(items, start=1):
+        if "file" not in raw or "start" not in raw:
+            raise SystemExit(f"{cfg_path}: overlay #{n} 要有 file 和 start")
+        f = Path(raw["file"]).expanduser()
+        if not f.is_absolute():
+            f = (media_dir / f) if (media_dir / f).exists() else (cfg_path.parent / f)
+        if not f.is_file():
+            raise SystemExit(f"{cfg_path}: overlay #{n} 文件不存在：{f}")
+        anchor = raw.get("anchor", "final")
+        if anchor not in ("final", "close"):
+            raise SystemExit(f"{cfg_path}: overlay #{n} anchor 只能是 final / close")
+        is_image = f.suffix.lower() in IMAGE_EXT
+        start = parse_time(raw["start"])
+        until = parse_time(raw["hold_until"]) if raw.get("hold_until") is not None else None
+        if until is None and is_image:
+            raise SystemExit(f"{cfg_path}: overlay #{n} 是图片，要给 hold_until")
+        if until is not None and until <= start:
+            raise SystemExit(f"{cfg_path}: overlay #{n} hold_until 要晚于 start")
+        out.append({
+            "n": n, "file": f, "anchor": anchor, "start": start, "until": until, "is_image": is_image,
+            "src_dur": None if is_image else probe_duration(f),
+            "x": str(raw.get("x", 0)), "y": str(raw.get("y", 0)),
+            "width": raw.get("width"), "opacity": float(raw.get("opacity", 1.0)),
+            "fade_in": float(raw.get("fade_in", 0)), "fade_out": float(raw.get("fade_out", 0)),
+        })
+    return out
+
+
+def resolve_overlays(overlays: list[dict], close_start: float | None, total: float) -> list[dict]:
+    """anchor=close 的换到成片时间轴；补齐 until（视频不给就放完一遍）；超出成片的截掉。"""
+    res: list[dict] = []
+    for ov in overlays:
+        base = 0.0
+        if ov["anchor"] == "close":
+            if close_start is None:
+                raise SystemExit(f"overlay #{ov['n']} anchor=close，但这次没有 close")
+            base = close_start
+        start = base + ov["start"]
+        until = base + ov["until"] if ov["until"] is not None else start + ov["src_dur"]
+        if start >= total:
+            raise SystemExit(f"overlay #{ov['n']} 开始 {start:.2f}s 超出成片 {total:.2f}s")
+        if until > total:
+            print(f"  ⚠ overlay #{ov['n']} hold_until {until:.2f}s 超出成片，截到 {total:.2f}s")
+            until = total
+        span = until - start
+        hold = 0.0 if ov["is_image"] else max(0.0, span - ov["src_dur"])
+        res.append({**ov, "t0": start, "t1": until, "span": span, "hold": hold})
+    return res
+
+
+def overlay_input_spec(ov: dict) -> list[str]:
+    if ov["is_image"]:
+        return ["-loop", "1", "-framerate", "60", "-t", f"{ov['span']:.6f}", "-i", str(ov["file"])]
+    return ["-i", str(ov["file"])]
+
+
+def overlay_chain(index: int, ov: dict, k: int, vin: str, vout: str) -> str:
+    """把第 index 路输入放到 t0..t1：放完原片后用最后一帧停住（tpad clone），到 t1 撤掉。"""
+    f = [f"[{index}:v]fps=60,format=yuva420p"]
+    if ov["width"]:
+        f.append(f"scale={int(ov['width'])}:-2")
+    if ov["hold"] > 0:
+        f.append(f"tpad=stop_mode=clone:stop_duration={ov['hold']:.6f}")
+    f.append(f"trim=duration={ov['span']:.6f}")
+    if ov["fade_in"] > 0:
+        f.append(f"fade=t=in:st=0:d={ov['fade_in']:.3f}:alpha=1")
+    if ov["fade_out"] > 0:
+        f.append(f"fade=t=out:st={max(0.0, ov['span'] - ov['fade_out']):.6f}:d={ov['fade_out']:.3f}:alpha=1")
+    if ov["opacity"] < 1:
+        f.append(f"colorchannelmixer=aa={ov['opacity']:.3f}")
+    f.append(f"setpts=PTS-STARTPTS+{ov['t0']:.6f}/TB")
+    src = ",".join(f) + f"[ol{k}]"
+    return (
+        f"{src};[{vin}][ol{k}]overlay=x={ov['x']}:y={ov['y']}:eof_action=pass:format=auto"
+        f":enable='between(t,{ov['t0']:.6f},{ov['t1']:.6f})'[{vout}]"
+    )
+
+
+def timeline(durations: list[float], has_open: bool, has_close: bool) -> tuple[float | None, float]:
+    """(close 在成片里的起点, 成片总长)。和 build_filter 的 xfade/concat 偏移同口径。"""
+    n = len(durations)
+    runs = durations[(1 if has_open else 0) : (n - 1 if has_close else n)]
+    acc = (durations[0] - XFADE if has_open else 0.0) + sum(runs)
+    if not has_close:
+        return None, acc
+    close_start = max(0.0, acc - XFADE)
+    return close_start, close_start + durations[-1]
+
+
+def video_codec_args(bitrate: int) -> list[str]:
+    # 成片固定 hevc_videotoolbox（Mac）。ASSEMBLE_VCODEC=libx264 只给没有 videotoolbox 的机器跑自测用。
+    if os.environ.get("ASSEMBLE_VCODEC") == "libx264":
+        return ["-c:v", "libx264", "-preset", "veryfast", "-b:v", str(bitrate)]
+    return ["-c:v", "hevc_videotoolbox", "-b:v", str(bitrate), "-tag:v", "hvc1"]
+
+
+def fmt_ts(sec: float) -> str:
+    m, x = divmod(sec, 60)
+    return f"{int(m)}:{x:05.2f}"
 
 
 def run(cmd: list[str], dry_run: bool = False) -> None:
@@ -246,10 +445,19 @@ def build_filter(
     whoosh_index: int | None,
     whoosh_volume: float,
     loudness_fix: bool = True,
+    loudness_af: str | None = None,
+    overlays: list[tuple[int, dict]] | None = None,
+    audio_only: bool = False,
 ) -> str:
+    """audio_only=True 只出 [a]（两遍 loudnorm 的测量遍用，不解码视频）。loudness_af 覆盖默认响度链。"""
     parts: list[str] = []
+
+    def vp(x: str) -> None:  # 视频滤镜；audio_only 时不进图
+        if not audio_only:
+            parts.append(x)
+
     for i in range(n_inputs):
-        parts.append(f"[{i}:v]fps=60,settb=1/60,format=yuv420p,setsar=1[v{i}]")
+        vp(f"[{i}:v]fps=60,settb=1/60,format=yuv420p,setsar=1[v{i}]")
         parts.append(audio_lock_to_video(f"{i}:a", f"a{i}", durations[i]))
 
     run_start = 1 if has_open else 0
@@ -274,34 +482,34 @@ def build_filter(
         want_in = not is_first
         want_out = not is_last
         if want_in and want_out:
-            parts.append(f"[v{idx}]split=3[{tag}h][{tag}m][{tag}t]")
-            parts.append(f"[{tag}h]trim=duration={wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}hr]")
-            parts.append(
+            vp(f"[v{idx}]split=3[{tag}h][{tag}m][{tag}t]")
+            vp(f"[{tag}h]trim=duration={wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}hr]")
+            vp(
                 f"[{tag}m]trim=start={wind:.6f}:end={d - wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}body]"
             )
-            parts.append(f"[{tag}t]trim=start={d - wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}tr]")
-            parts.append(wind_chain(f"{tag}hr", f"{tag}hi", wind, width, height, "in"))
-            parts.append(wind_chain(f"{tag}tr", f"{tag}to", wind, width, height, "out"))
-            parts.append(f"[{tag}hi][{tag}body][{tag}to]concat=n=3:v=1:a=0,fps=60,settb=1/60[{tag}p]")
+            vp(f"[{tag}t]trim=start={d - wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}tr]")
+            vp(wind_chain(f"{tag}hr", f"{tag}hi", wind, width, height, "in"))
+            vp(wind_chain(f"{tag}tr", f"{tag}to", wind, width, height, "out"))
+            vp(f"[{tag}hi][{tag}body][{tag}to]concat=n=3:v=1:a=0,fps=60,settb=1/60[{tag}p]")
         elif want_out:
-            parts.append(f"[v{idx}]split=2[{tag}m][{tag}t]")
-            parts.append(f"[{tag}m]trim=duration={d - wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}body]")
-            parts.append(f"[{tag}t]trim=start={d - wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}tr]")
-            parts.append(wind_chain(f"{tag}tr", f"{tag}to", wind, width, height, "out"))
-            parts.append(f"[{tag}body][{tag}to]concat=n=2:v=1:a=0,fps=60,settb=1/60[{tag}p]")
+            vp(f"[v{idx}]split=2[{tag}m][{tag}t]")
+            vp(f"[{tag}m]trim=duration={d - wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}body]")
+            vp(f"[{tag}t]trim=start={d - wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}tr]")
+            vp(wind_chain(f"{tag}tr", f"{tag}to", wind, width, height, "out"))
+            vp(f"[{tag}body][{tag}to]concat=n=2:v=1:a=0,fps=60,settb=1/60[{tag}p]")
         else:
-            parts.append(f"[v{idx}]split=2[{tag}h][{tag}m]")
-            parts.append(f"[{tag}h]trim=duration={wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}hr]")
-            parts.append(f"[{tag}m]trim=start={wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}body]")
-            parts.append(wind_chain(f"{tag}hr", f"{tag}hi", wind, width, height, "in"))
-            parts.append(f"[{tag}hi][{tag}body]concat=n=2:v=1:a=0,fps=60,settb=1/60[{tag}p]")
+            vp(f"[v{idx}]split=2[{tag}h][{tag}m]")
+            vp(f"[{tag}h]trim=duration={wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}hr]")
+            vp(f"[{tag}m]trim=start={wind:.6f},setpts=PTS-STARTPTS,settb=1/60[{tag}body]")
+            vp(wind_chain(f"{tag}hr", f"{tag}hi", wind, width, height, "in"))
+            vp(f"[{tag}hi][{tag}body]concat=n=2:v=1:a=0,fps=60,settb=1/60[{tag}p]")
         processed.append((f"{tag}p", a_label))
 
     v0, a0 = processed[0]
     if has_open:
         offset = max(0.0, durations[0] - XFADE)
         vcur, acur = "vx0", "ax0"
-        parts.append(
+        vp(
             f"[{v0}]fps=60,settb=1/60[{v0}f];"
             f"[v0][{v0}f]xfade=transition=fade:duration={XFADE}:offset={offset:.6f},settb=1/60[{vcur}]"
         )
@@ -316,7 +524,7 @@ def build_filter(
         pv, pa = processed[step]
         if do_wind:
             whoosh_delays.append(max(0, int(round((acc - wind) * 1000))))
-        parts.append(f"[{vcur}][{pv}]concat=n=2:v=1:a=0,fps=60,settb=1/60[{nv}]")
+        vp(f"[{vcur}][{pv}]concat=n=2:v=1:a=0,fps=60,settb=1/60[{nv}]")
         parts.append(f"[{acur}][{pa}]concat=n=2:v=0:a=1[{na}]")
         vcur, acur = nv, na
         acc += durations[idx]
@@ -324,9 +532,9 @@ def build_filter(
     if has_close:
         close_i = n_inputs - 1
         offset = max(0.0, acc - XFADE)
-        parts.append(f"[{vcur}]fps=60,settb=1/60[vpre]")
-        parts.append(f"[v{close_i}]fps=60,settb=1/60[vcls]")
-        parts.append(f"[vpre][vcls]xfade=transition=fade:duration={XFADE}:offset={offset:.6f}[vxf]")
+        vp(f"[{vcur}]fps=60,settb=1/60[vpre]")
+        vp(f"[v{close_i}]fps=60,settb=1/60[vcls]")
+        vp(f"[vpre][vcls]xfade=transition=fade:duration={XFADE}:offset={offset:.6f}[vxf]")
         parts.append(f"[{acur}][a{close_i}]acrossfade=d={XFADE}[a0x]")
         vout = "vxf"
         a_pre = "a0x"
@@ -342,9 +550,17 @@ def build_filter(
 
     # whoosh 叠完后再 leveling+loudnorm，避免 SFX 被单独猛推，同时 TP 仍由 loudnorm 卡住。
     if loudness_fix:
-        parts.append(f"[am]{LOUDNESS_AF}[a]")
+        parts.append(f"[am]{loudness_af or LOUDNESS_AF}[a]")
     else:
         parts.append(f"[am]anull[a]")
+
+    if audio_only:
+        return ";".join(parts)
+
+    for k, (index, ov) in enumerate(overlays or []):
+        nxt = f"vov{k}"
+        vp(overlay_chain(index, ov, k, vout, nxt))
+        vout = nxt
 
     if ass is not None:
         ass_path = str(ass).replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
@@ -352,22 +568,22 @@ def build_filter(
         if fontsdir is not None:
             fonts_esc = str(fontsdir).replace(":", "\\:")
             fonts = f":fontsdir={fonts_esc}"
-        parts.append(f"[{vout}]subtitles={ass_path}{fonts}:charenc=UTF-8[v]")
+        vp(f"[{vout}]subtitles={ass_path}{fonts}:charenc=UTF-8[v]")
     else:
-        parts.append(f"[{vout}]format=yuv420p[v]")
+        vp(f"[{vout}]format=yuv420p[v]")
 
     return ";".join(parts)
 
 
 def encode_cmd(
-    inputs: list[Path],
+    inputs: list[Path] | list[list[str]],
     filt: str,
     out: Path,
     bitrate: int,
 ) -> list[str]:
     cmd = ["ffmpeg", "-y", "-hide_banner"]
-    for path in inputs:
-        cmd.extend(["-i", str(path)])
+    for spec in inputs:
+        cmd.extend(spec if isinstance(spec, list) else ["-i", str(spec)])
     cmd.extend(
         [
             "-filter_complex",
@@ -376,12 +592,7 @@ def encode_cmd(
             "[v]",
             "-map",
             "[a]",
-            "-c:v",
-            "hevc_videotoolbox",
-            "-b:v",
-            str(bitrate),
-            "-tag:v",
-            "hvc1",
+            *video_codec_args(bitrate),
             "-pix_fmt",
             "yuv420p",
             "-c:a",
@@ -521,6 +732,16 @@ def main() -> int:
         action="store_true",
         help="Only render short run-run join previews into media-dir/qc/",
     )
+    parser.add_argument(
+        "--single-pass-loudnorm",
+        action="store_true",
+        help="响度链只跑单遍（默认两遍：先测量再 linear=true 套用；测量失败自动退回单遍）",
+    )
+    parser.add_argument(
+        "--overlays",
+        help="叠加层配置 JSON。默认找 <media-dir>/overlays.json，再找 episodes/<媒体目录名>/overlays.json",
+    )
+    parser.add_argument("--no-overlays", action="store_true", help="有 overlays.json 也不叠")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -579,19 +800,33 @@ def main() -> int:
         if FONT_SRC.exists():
             shutil.copyfile(FONT_SRC, fontsdir / FONT_SRC.name)
 
-    ffmpeg_inputs = list(inputs)
+    ffmpeg_inputs: list[list[str]] = [["-i", str(p)] for p in inputs]
     whoosh_index = None
     if whoosh is not None and transition == "wind":
-        ffmpeg_inputs.append(whoosh)
+        ffmpeg_inputs.append(["-i", str(whoosh)])
         whoosh_index = len(inputs)
 
-    filt = build_filter(
+    close_start, total = timeline(durations, open_clip is not None, close_clip is not None)
+    ov_specs: list[tuple[int, dict]] = []
+    ov_file = None if args.no_overlays else find_overlays_file(media_dir, args.overlays)
+    if ov_file is not None:
+        resolved = resolve_overlays(load_overlays(ov_file, media_dir), close_start, total)
+        print(f"Overlays: {ov_file}")
+        for ov in resolved:
+            print(
+                f"  #{ov['n']} {ov['file'].name}  {fmt_ts(ov['t0'])} → {fmt_ts(ov['t1'])}"
+                f"（停住 {ov['hold']:.1f}s）  x={ov['x']} y={ov['y']}"
+            )
+            ov_specs.append((len(ffmpeg_inputs), ov))
+            ffmpeg_inputs.append(overlay_input_spec(ov))
+    else:
+        print("Overlays: none")
+
+    common = dict(
         n_inputs=len(inputs),
         durations=durations,
         has_open=open_clip is not None,
         has_close=close_clip is not None,
-        ass=ass,
-        fontsdir=fontsdir,
         run_transition=transition,
         wind=args.wind,
         width=width,
@@ -601,12 +836,42 @@ def main() -> int:
         loudness_fix=loudness_fix,
     )
 
+    loudness_af = None
+    if loudness_fix and not args.single_pass_loudnorm:
+        if args.dry_run:
+            print("Loudnorm: two-pass（dry-run 不测量；正式跑先只解码音频测一遍）")
+        else:
+            audio_filt = build_filter(**common, ass=None, fontsdir=None, loudness_af=LOUDNESS_MEASURE_AF,
+                                      audio_only=True)
+            measured = measure_loudness(ffmpeg_inputs[: len(inputs) + (1 if whoosh_index is not None else 0)],
+                                        audio_filt)
+            if measured is None:
+                print("⚠ Loudnorm 测量失败，退回单遍响度链")
+            else:
+                loudness_af = loudness_af_two_pass(measured)
+                print(
+                    f"Loudnorm pass 1（链内 loudnorm 之前）: I={measured['input_i']} LUFS  "
+                    f"TP={measured['input_tp']} dBTP  LRA={measured['input_lra']}  "
+                    f"thresh={measured['input_thresh']}  offset={measured['target_offset']}"
+                )
+                print(f"Loudnorm pass 2: {loudness_af}")
+
+    filt = build_filter(**common, ass=ass, fontsdir=fontsdir, loudness_af=loudness_af, overlays=ov_specs)
+
     cmd = encode_cmd(ffmpeg_inputs, filt, out, bitrate)
     run(cmd, dry_run=args.dry_run)
     if not args.dry_run:
         print(f"Wrote {out}")
         ls = subprocess.check_output(["ls", "-lh", str(out)], text=True).strip()
         print(ls)
+        if loudness_fix:
+            got = measure_output(out)
+            if got is None:
+                print("⚠ 成片响度实测失败，手动跑 SKILL 里的 loudnorm summary")
+            else:
+                tp = float(got["input_tp"])
+                flag = "OK" if tp <= -1.0 else "⚠ 超过 -1.0 dBTP，查局部"
+                print(f"成片实测: I={got['input_i']} LUFS  TP={got['input_tp']} dBTP  LRA={got['input_lra']}  {flag}")
     return 0
 
 
