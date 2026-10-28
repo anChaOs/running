@@ -45,7 +45,7 @@ LOUDNESS_AF = (
 
 
 # 两遍 loudnorm：第一遍用同一条链（loudnorm 带 print_format=json）只测量，第二遍把测量值喂回去 + linear=true。
-# 前面四个滤镜和单遍完全一样，只换最后的 loudnorm；测量失败就回到单遍 LOUDNESS_AF。
+# loudnorm 之前的滤镜和单遍完全一样，只换最后的 loudnorm；测量失败就回到单遍 LOUDNESS_AF。
 LOUDNORM_TARGET = "loudnorm=I=-16:TP=-1.5:LRA=7"
 LOUDNESS_PRE, _LOUDNESS_POST = LOUDNESS_AF.split(LOUDNORM_TARGET + ",")
 assert _LOUDNESS_POST == "aformat=sample_rates=48000:channel_layouts=stereo"
