@@ -3,8 +3,8 @@ slug: vo2max
 captured: 2026-10-28
 kind: 聊跑步知识
 size: large
-status: scoped
-wiki: []
+status: wiki
+wiki: [knowledge/wiki/running/VO2max.md]
 episodes: []
 ---
 
@@ -54,6 +54,8 @@ VO₂max 是身体用氧的上限；百分比加在氧耗上，不是把配速�
 - 带走：百分比对氧耗，不对配速做除法；表分参考，课表看目的
 
 ## 调研
+
+- wiki: `knowledge/wiki/running/VO2max.md`（运动科学 2026-10-28）
 
 - 待 wiki ingest；可请 @运动科学 补 Bassett/Howley、Midgley、Jones 等指针
 
