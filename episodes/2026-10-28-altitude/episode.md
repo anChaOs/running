@@ -2,7 +2,7 @@
 date: 2026-10-28
 slug: altitude
 title: 高原 | 高住低训到底是什么？
-status: planned
+status: hud
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-28-altitude/
 ---
