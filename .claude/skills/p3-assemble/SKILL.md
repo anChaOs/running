@@ -16,11 +16,10 @@ HUD 走 `p3-hud`，封面走 `p3-cover`（二者并行），字幕走 `p3-subs`�
 ## 不要做的事
 
 - 不要在这里渲 HUD 或从口播卡写字幕
-- **默认不要传 `--ass`。** 字幕外挂：B 站和 YouTube 都传 `subtitles.srt`。改字幕只改 sidecar，不用重拼
+- **默认不要传 `--ass`，用户没明确说「烧进去」时不要烧字幕。** 字幕外挂：B 站和 YouTube 都传 `subtitles.srt`。改字幕只改 sidecar，不用重拼
 - 不要把字幕轨 mux 进 mp4（平台转码会丢掉）
 - 不要用 alpha 层当主轨，主轨是 `*-hud-preview.mp4`
 - 不要降码
-- 用户没明确说「烧进去」时，不要烧字幕
 - 成片写好后不要只丢路径；接着抽帧核对
 - 冷开场不要从 HUD preview / close-stats 截；不要默叠化（默认硬切）
 
@@ -72,9 +71,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 
 ## 音频（默认响度链 + 拼完必测）
 
-**为什么在 assemble，不在 hud / subs：** HUD 只叠画面；字幕是外挂轴。人声+环境+whoosh 的最终听感只在成片混音这一次定型，所以 leveling / loudnorm 放在 `assemble_episode.py` 的 post-mix（whoosh 叠完、AAC 编码前）。
-
-对比黑影儿TV 等参考片：整轨 flat gain（旧记忆「至少 ×1.5 / ≈+3.5 dB」）不够——峰值先顶满，轻句仍小，麦克风偶发掉音也补不回。默认改为 **dynaudnorm 拉平起伏 → compressor → loudnorm 对齐整体响度**。
+响度只在成片混音定型：`assemble_episode.py` 的 post-mix（whoosh 叠完、AAC 编码前）。不要整轨 flat gain（旧习惯 ×1.5 / ≈+3.5 dB）——峰值先顶满，轻句仍小。默认 **dynaudnorm → compressor → loudnorm**。
 
 脚本默认开启（`--no-loudness-fix` 关掉）。滤镜字符串（**起点参数**，POV 实拍未逐条精调）：
 
@@ -103,9 +100,9 @@ ffmpeg -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
   -af volumedetect -f null -
 ```
 
-目标：**LUFS ≈ −16**（与常见跑步口播参考接近）、**峰值 ≤ −1.5 dB**（勿顶到 0 dB 削波）。超标再查是否误关了响度链、或个别句要局部补增益——不要整轨再盲目 ×1.5。
+目标：**LUFS ≈ −16**、**峰值 ≤ −1.5 dB**（勿顶到 0 dB 削波）。超标再查是否误关了响度链、或个别句要局部补增益——不要整轨再盲目 ×1.5。
 
-录的时候尽量加风棉/死猫；开场自拍口播清楚，切到 POV 后别炸。拼完用 IINA 听开场、第一段 run、风声最大处与已知掉音处。
+拼完用 IINA 听开场、第一段 run、风声最大处、已知掉音处。开场口播要清楚，切到 POV 后别炸。
 
 ## 叠加层（动画 / 小视频，按时间停住）
 
@@ -127,7 +124,7 @@ ffmpeg -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
 - `file` 相对媒体目录。带透明的动画用 ProRes 4444 `.mov` 或 PNG；全画幅透明动画 `x/y` 不写（默认 0,0）
 - 可选：`x` / `y`（ffmpeg overlay 表达式，如 `W-w-40`）、`width`（等比缩放）、`fade_in` / `fade_out`（秒）、`opacity`（0–1）
 - 超出成片的 `hold_until` 会截到片尾并警告；`start` 超出直接报错
-- 10-15 那期手工做过同样的事（lt-01 停到约 5:50、lt-02 到约 6:30、lt-03 约 6:44 起停到约 7:11），以后写进 `overlays.json` 让 assemble 一次拼完，不要拼完再二次压。核对时在每层起点、停住中段、撤掉后各抽一帧
+- 写进 `overlays.json` 让 assemble 一次拼完，不要拼完再二次压。核对时在每层起点、停住中段、撤掉后各抽一帧
 
 只有用户明确要求硬字幕时才加 `--ass episodes/.../subtitles.ass`。
 

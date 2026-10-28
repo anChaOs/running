@@ -14,7 +14,6 @@ HUD 吃 `run-*` + FIT。封面走 `p3-cover`（自拍抠图合成），和 HUD �
 - `~/Movies/running-content/YYYY-MM-DD-slug/` 里已有 `*-run-*.mp4` 和 `*-run-data.fit`
 - `-sn` / `-sk` 已由 `p3-shoes` 确认（`-sk` = 本场跑完后累计 km）。HUD 会用整场 FIT 总距离反推开跑前，再按当前帧 FIT `distance` 往前滚；不是每段视频各自顶到 `-sk`。
 - 文件 `mtime` 能当视频结束时间（ingest 阶段应已校正）
-- 封面句：默认 `episode.md` / `talk.md` 标题，系列名「破三实验室」。用户改过就用用户的。
 
 ## 不要做的事
 
@@ -25,7 +24,6 @@ HUD 吃 `run-*` + FIT。封面走 `p3-cover`（自拍抠图合成），和 HUD �
 - 不要改 `--video-end-time-mode`，保持 `file-modified`
 - 短样不要裁出来再渲；正式片段直接用原片
 - **不要用 HUD preview 当封面底图**，数据条会进封面
-- 不要在封面堆第二句鸡汤；不要为了空路用糊帧
 
 ## HUD
 
@@ -92,10 +90,6 @@ preview 出完后，对 **preview** 做句间粗剪（原片 `run-*` 不剪，HU
 没有就从 `https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin` 拉到这个路径（约 864K）。ModelScope 没有这个模型；直连不通就把域名换成 `hf-mirror.com`。CLI 是 brew 的 `whisper-vad-speech-segments`，打印的时间是百分之一秒。只剪 `max(2×均值, 均值+1.2s)` 以上的停顿，收到均值 + 安全余量，左右留肩，片尾 3 秒不剪。对比旧能量门限加 `--speech-detect band`。
 
 拼成片用粗剪后的 **preview**。`--preview` 会先渲透明层再叠回原片同档，alpha 是渲染中间件，不是成片交付。不走剪映可以不理 `*-hud-alpha.mov`。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
-
-## 封面（并行）
-
-封面不在本 skill 做，走 `p3-cover`：拍摄单 → 自拍抠图 → 粗描边 → 设计底 → 三比例手排。不要用 HUD preview 当封面底图。
 
 ## 完成
 
