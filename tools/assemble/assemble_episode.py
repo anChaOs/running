@@ -30,12 +30,13 @@ WHOOSH_PATH = Path(__file__).resolve().parent / "sfx" / "whoosh.wav"
 
 
 # 成片默认响度链（起点参数；POV 实拍未逐条精调，拼完仍测 LUFS/峰值）。
-# 顺序：高通去轰隆 → 轻降噪 → 动态拉平人声起伏 → 压缩 → EBU R128 到 −16 LUFS / −1.5 dBTP。
+# 顺序：高通去轰隆 → 轻降噪 → 3.5 kHz 存在感（+2.5 dB）→ 动态拉平人声起伏 → 压缩 → EBU R128 到 −16 LUFS / −1.5 dBTP。
 # 意图约等于「整体至少再响 ~3.5 dB / 旧记忆 ×1.5」，但用 leveling+loudnorm，
 # 避免 flat gain 先把峰值顶满、轻句仍小。
 LOUDNESS_AF = (
     "highpass=f=90,"
     "afftdn=nf=-25,"
+    "equalizer=f=3500:t=q:w=1.2:g=2.5,"  # 人声存在感：跑步口播偏闷，轻抬 3.5 kHz
     "dynaudnorm=f=250:g=15:p=0.9:m=8,"
     "acompressor=threshold=-20dB:ratio=3:attack=10:release=150:makeup=2,"
     "loudnorm=I=-16:TP=-1.5:LRA=7,"
