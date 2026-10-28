@@ -2,7 +2,7 @@
 date: 2026-10-28
 slug: altitude
 title: 会长的高住低训是什么？
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-28-altitude/
 ---
@@ -22,3 +22,8 @@ media: ~/Movies/running-content/2026-10-28-altitude/
 - `talk.md`：边跑边说提纲（要点提纲，用户自由发挥）
 - `NOTES.md`：制作备注（bot 用）
 - `assets.md`：素材索引
+
+## 发布
+
+- YouTube: https://youtu.be/bx-p5g3QwR0
+- Bilibili: https://www.bilibili.com/video/BV1Wfx56JEYG/

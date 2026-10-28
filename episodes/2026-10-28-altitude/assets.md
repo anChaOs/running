@@ -40,4 +40,6 @@
 - cover: done（主推 16:9 cover-1920x1080.jpg；另有 4:3 / 3:4；句「高住低训|到底|是什么？」）
 - assemble: done（已改名「会长的高住低训是什么？.mp4」；I=-16.1 LUFS / TP=-1.3 dBTP；时长 960.7s）
 - qc: done（抽帧 open/接缝/HUD/close；鞋 C202 7、°C 正常）
-- upload: ready（成片已按标题改名；外挂 subtitles.srt）
+- upload: done（成片「会长的高住低训是什么？.mp4」；外挂 subtitles.srt）
+- YouTube: https://youtu.be/bx-p5g3QwR0
+- Bilibili: BV1Wfx56JEYG
