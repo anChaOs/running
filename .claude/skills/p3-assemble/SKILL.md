@@ -79,7 +79,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 脚本默认开启（`--no-loudness-fix` 关掉）。滤镜字符串（**起点参数**，POV 实拍未逐条精调）：
 
 ```text
-highpass=f=90,afftdn=nf=-25,dynaudnorm=f=250:g=15:p=0.9:m=8,acompressor=threshold=-20dB:ratio=3:attack=10:release=150:makeup=2,loudnorm=I=-16:TP=-1.5:LRA=7,aformat=sample_rates=48000:channel_layouts=stereo
+highpass=f=90,afftdn=nf=-25,equalizer=f=3500:t=q:w=1.2:g=2.5,dynaudnorm=f=250:g=15:p=0.9:m=8,acompressor=threshold=-20dB:ratio=3:attack=10:release=150:makeup=2,loudnorm=I=-16:TP=-1.5:LRA=7,aformat=sample_rates=48000:channel_layouts=stereo
 ```
 
 顺序：
@@ -89,7 +89,7 @@ highpass=f=90,afftdn=nf=-25,dynaudnorm=f=250:g=15:p=0.9:m=8,acompressor=threshol
 3. 上述响度链 → 目标约 **I=-16 LUFS**，**TP=-1.5 dBTP**（loudnorm 卡住真峰值）
 4. AAC 192k 写出
 
-**两遍 loudnorm（默认）：** 第一遍只解码音频，跑同一条链（前四个滤镜完全一样，loudnorm 加 `print_format=json`）测出 `measured_I/TP/LRA/thresh/offset`；第二遍把最后的 loudnorm 换成带测量值 + `linear=true` 的版本再编码。线性增益不会像单遍那样边走边推，句间起伏更自然，I 更贴近 −16。日志里有 `Loudnorm pass 1`（链内 loudnorm 之前的 I / 峰值 TP）和 `Loudnorm pass 2` 的完整滤镜；loudnorm 判断线性做不到（LRA/峰值卡住）会自己退回动态，日志 summary 的 `Normalization Type` 能看到。测量失败（报错、全静音 `-inf`）自动退回单遍 `LOUDNESS_AF`，日志有 `⚠ Loudnorm 测量失败`。想强制单遍加 `--single-pass-loudnorm`。
+**两遍 loudnorm（默认）：** 第一遍只解码音频，跑同一条链（loudnorm 之前的滤镜完全一样，loudnorm 加 `print_format=json`）测出 `measured_I/TP/LRA/thresh/offset`；第二遍把最后的 loudnorm 换成带测量值 + `linear=true` 的版本再编码。线性增益不会像单遍那样边走边推，句间起伏更自然，I 更贴近 −16。日志里有 `Loudnorm pass 1`（链内 loudnorm 之前的 I / 峰值 TP）和 `Loudnorm pass 2` 的完整滤镜；loudnorm 判断线性做不到（LRA/峰值卡住）会自己退回动态，日志 summary 的 `Normalization Type` 能看到。测量失败（报错、全静音 `-inf`）自动退回单遍 `LOUDNESS_AF`，日志有 `⚠ Loudnorm 测量失败`。想强制单遍加 `--single-pass-loudnorm`。
 
 拼完日志末尾有 `成片实测: I=… TP=…`（AAC 编码后真峰值可能比 −1.5 高零点几，−1.0 以内算过）。还要人工复核时（严重麦掉音如 −13 dB 处可能需手工局部增益）：
 
