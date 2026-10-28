@@ -222,11 +222,17 @@ iina --mpv-geometry=320x180-8+8 \
 
 发布后记链接，`status` 改为 `published`。还要 60–90 秒短视频才提 `/p3-jianying`。
 
+两边链接齐、写完链接并改 `status=published` 之后，**立刻**把该期 episode PR squash 合进 `main`（可删远程分支），不要等用户再点合。然后再做「发布后清临时文件」。
+
 ### 发布后清临时文件
 
 **真源在此。** 其它 skill / 文档只引用本节，不要另写一份保留/删除清单。
 
-触发：用户说「发布完毕 / 发完了 / 已发布」之类，并且同时给了 **B 站 BV（或完整 B 站链接）** 和 **YouTube 链接**。先写链接、改 `status=published`，再清这一期媒体目录。
+触发：用户说「发布完毕 / 发完了 / 已发布」之类，并且同时给了 **B 站 BV（或完整 B 站链接）** 和 **YouTube 链接**。顺序：
+
+1. 写两边链接、`episode.md` 的 `status=published`
+2. **立刻合并该期 episode PR 进 `main`**（squash；可删远程分支）；不要等用户再点合
+3. 再按本节列清临时清单（体积）→ 用户确认 → 进废纸篓（禁止 `rm`）
 
 媒体目录：`~/Movies/running-content/YYYY-MM-DD-slug/`。
 
