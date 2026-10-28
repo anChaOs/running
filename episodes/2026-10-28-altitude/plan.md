@@ -4,7 +4,7 @@
 
 发这个：
 
-> 高原 | 高住低训到底是什么？
+> 会长的高住低训是什么？
 
 ## 封面句
 
@@ -44,7 +44,7 @@
 
 ## 发布准备
 
-- 成片：`~/Movies/running-content/2026-10-28-altitude/高原 | 高住低训到底是什么？.mp4`（由 `2026-10-28-run-final.mp4` 原地改名）
+- 成片：`~/Movies/running-content/2026-10-28-altitude/会长的高住低训是什么？.mp4`（由 `2026-10-28-run-final.mp4` 原地改名）
 - 外挂：`subtitles.srt`（制作期另有 `2026-10-28-run-final.srt` 方便 IINA；上传用 `subtitles.srt`）
 - 封面：`cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg`
 - 账号：B 站 mid 3687100；YouTube @anChaOs天天写bug
