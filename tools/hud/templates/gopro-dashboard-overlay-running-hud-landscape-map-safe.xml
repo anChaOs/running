@@ -1,12 +1,11 @@
 <layout>
-    <!-- 暖墨沙面板。各块相对原布局整体 1.2x，块内字仍按原相对位置排。字体由 gopro_dashboard_wrap 统一偏粗：默认捆绑 Source Han Sans SC Heavy（Mac+Linux）；可用 HUD_FONT_PATH 或 font 参数覆盖。字色纯白，无描边。 -->
+    <!-- 暖墨沙面板。左列三块同宽，块内文字右对齐；地图未跑灰+三角朝向。 -->
+    <!-- 列规：x=40 · 宽 300 · 块间距 14 · 底边距 48 · 内边距 20 · 右缘内容 x=280 · 圆角 22。 -->
 
-    <!-- 左上路线，无底框。360px，线宽 10，3 倍超采样。loc-size 是当前位置圆半径（像素），画在缩小后的最终图上。 -->
     <translate x="40" y="40">
-        <component type="circuit-map" size="360" loc-size="12" fill="232,201,164,255" outline="42,26,16,200" fill_width="10" outline_width="4"/>
+        <component type="circuit-map" size="360" loc-size="14" fill="232,201,164,255" outline="42,26,16,200" fill_width="10" outline_width="4"/>
     </translate>
 
-    <!-- 顶栏居中胶囊，无描边。进度条末端用圆钮（knob-size 直径），不再用第二根高亮条当方头。 -->
     <frame x="444" y="40" width="1032" height="77" bg="77,49,30,255" cr="38" opacity="0.87" name="context_top_rail">
         <translate x="26" y="22">
             <component type="metric" x="86" y="0" metric="odo" units="km" dp="2" size="26" align="right" rgb="255,255,255" outline_width="0"/>
@@ -21,46 +20,37 @@
         </translate>
     </frame>
 
-    <!-- 左下配速 235×154。整组上移，使首行/末行到面板上下边的留白接近（约 19px）。配速与心率拉开，心率与步频更近。 -->
-    <frame x="40" y="809" width="235" height="154" bg="77,49,30,255" cr="22" opacity="0.87" name="performance_primary_panel">
-        <translate x="19" y="1">
-            <component type="metric" x="197" y="0" metric="speed" units="pace_km" format="pace_quote" size="53" align="right" rgb="255,255,255" outline_width="0"/>
-            <translate x="0" y="70">
-                <component type="metric" x="142" y="0" metric="hr" dp="0" size="29" align="right" rgb="255,255,255" outline_width="0"/>
-                <component type="text" x="149" y="7" size="17" rgb="255,255,255" outline_width="0">bpm</component>
-            </translate>
-            <translate x="0" y="103">
-                <component type="metric" x="142" y="0" metric="cadence" units="spm" dp="0" size="29" align="right" rgb="255,255,255" outline_width="0"/>
-                <component type="text" x="149" y="7" size="17" rgb="255,255,255" outline_width="0">spm</component>
-            </translate>
-        </translate>
+    <!-- P0 配速：列宽 250，右边距 20（锚点 x=230） -->
+    <frame x="40" y="588" width="250" height="158" bg="77,49,30,255" cr="22" opacity="0.87" name="performance_primary_panel">
+        <component type="metric" x="230" y="18" metric="speed" units="pace_km" format="pace_quote" size="52" align="right" rgb="255,255,255" outline_width="0"/>
+        <component type="metric" x="187" y="84" metric="hr" dp="0" size="26" align="right" rgb="255,255,255" outline_width="0"/>
+        <component type="text" x="193" y="90" size="16" rgb="255,255,255" outline_width="0">bpm</component>
+        <component type="metric" x="187" y="118" metric="cadence" units="spm" dp="0" size="26" align="right" rgb="255,255,255" outline_width="0"/>
+        <component type="text" x="193" y="124" size="16" rgb="255,255,255" outline_width="0">spm</component>
     </frame>
 
-    <!-- 配速下方跑鞋条：字组垂直居中（上下约 21px）。不加「累计」。 -->
-    <frame x="40" y="982" width="235" height="58" bg="77,49,30,255" cr="22" opacity="0.82" name="shoe_chip_panel">
-        <translate x="19" y="14">
-            <translate name="shoe_mileage_group" x="0" y="0">
-                <component type="text" name="shoe_name_text" x="0" y="6" size="15" rgb="255,255,255,200" outline_width="0">shoe name</component>
-                <component type="metric" x="168" y="0" name="shoe_mileage_metric" metric="shoe_odo" units="km" dp="0" size="22" align="right" rgb="255,255,255,220" outline_width="0"/>
-                <component type="text" x="175" y="6" size="14" rgb="255,255,255,180" outline_width="0">km</component>
-            </translate>
-        </translate>
-    </frame>
-
-    <!-- 右下（v12a）。时长/日期右对齐，二者纵向间距加大；两枚右对齐胶囊：标签左对齐（AIR/FEEL）、数值右对齐（湿度%·气温° / 体感°）。宽 302；v15a 底边距加大，进度条圆钮 knob-size=26（map 对齐后再 +1）地图 loc-size 半径。 -->
-    <frame x="1578" y="838" width="302" height="202" bg="77,49,30,255" cr="22" opacity="0.87" name="context_secondary_panel">
-        <component type="metric" x="282" y="8" metric="elapsed" format="hms" size="46" align="right" rgb="255,255,255" outline_width="0"/>
-        <component type="datetime" x="282" y="74" format="%Y/%m/%d · %H:%M:%S" size="16" align="right" rgb="255,255,255,170" outline_width="0"/>
+    <!-- P1 时长+天气 -->
+    <frame x="40" y="760" width="250" height="202" bg="77,49,30,255" cr="22" opacity="0.87" name="context_secondary_panel">
+        <component type="metric" x="230" y="16" metric="elapsed" format="hms" size="44" align="right" rgb="255,255,255" outline_width="0"/>
+        <component type="datetime" x="230" y="70" format="%Y/%m/%d · %H:%M:%S" size="15" align="right" rgb="255,255,255,170" outline_width="0"/>
         <translate name="weather_group" x="0" y="0">
-            <!-- v14b: AIR/FEEL left; values right (humidity% · temp° / feels°). -->
-            <frame x="126" y="110" width="156" height="32" bg="112,78,52,255" cr="16" opacity="1" name="wx_env_pill">
-                <component type="text" x="14" y="5" size="14" rgb="255,255,255" outline_width="0">AIR</component>
-                <component type="text" name="wx_env_values" x="142" y="5" size="14" align="right" rgb="255,255,255" outline_width="0">88% · 23°</component>
+            <frame x="90" y="104" width="140" height="32" bg="112,78,52,255" cr="16" opacity="1" name="wx_env_pill">
+                <component type="text" x="12" y="5" size="14" rgb="255,255,255" outline_width="0">AIR</component>
+                <component type="text" name="wx_env_values" x="128" y="5" size="14" align="right" rgb="255,255,255" outline_width="0">88% · 23°</component>
             </frame>
-            <frame x="126" y="150" width="156" height="32" bg="112,78,52,255" cr="16" opacity="1" name="wx_body_pill">
-                <component type="text" x="14" y="5" size="14" rgb="255,255,255" outline_width="0">FEEL</component>
-                <component type="text" name="wx_body_values" x="142" y="5" size="14" align="right" rgb="255,255,255" outline_width="0">27°</component>
+            <frame x="90" y="148" width="140" height="32" bg="112,78,52,255" cr="16" opacity="1" name="wx_body_pill">
+                <component type="text" x="12" y="5" size="14" rgb="255,255,255" outline_width="0">FEEL</component>
+                <component type="text" name="wx_body_values" x="128" y="5" size="14" align="right" rgb="255,255,255" outline_width="0">27°</component>
             </frame>
+        </translate>
+    </frame>
+
+    <!-- P2 鞋 -->
+    <frame x="40" y="976" width="250" height="56" bg="77,49,30,255" cr="22" opacity="0.82" name="shoe_chip_panel">
+        <translate name="shoe_mileage_group" x="0" y="0">
+            <component type="text" name="shoe_name_text" x="98" y="16" size="15" align="right" rgb="255,255,255,200" outline_width="0">shoe name</component>
+            <component type="metric" x="111" y="10" name="shoe_mileage_metric" metric="shoe_odo" units="km" dp="2" size="22" align="left" rgb="255,255,255,220" outline_width="0"/>
+            <component type="text" x="207" y="16" size="14" rgb="255,255,255,180" outline_width="0">km</component>
         </translate>
     </frame>
 </layout>

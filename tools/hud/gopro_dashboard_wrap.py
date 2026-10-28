@@ -577,16 +577,30 @@ def gopro_dashboard_arguments(args=None):
 _ROUTE_SCALE = 3
 
 
-def _draw_location_marker(draw, position, size: int = 12) -> None:
-    # 白瓷圆点，褐边。loc-size 是半径（像素）。线宽约 10，点要比线明显更大。
+def _draw_location_marker(draw, position, size: int = 12, heading_rad: float | None = None) -> None:
+    # 导航三角箭头：白瓷填充、褐边；尖端朝行进方向。loc-size≈半长。
+    # heading_rad：屏幕坐标，0=向上（由 dx,dy 用 atan2(dx,-dy)）。
     x, y = position
+    if heading_rad is None:
+        heading_rad = 0.0
+    tip_len = size * 1.55
+    half_w = size * 0.95
+    back = size * 0.55
+    cos_a = math.cos(heading_rad)
+    sin_a = math.sin(heading_rad)
+
+    def rot(lx: float, ly: float):
+        sx = x + lx * cos_a + ly * sin_a
+        sy = y + lx * sin_a - ly * cos_a
+        return (sx, sy)
+
+    tip = rot(0, tip_len)
+    bl = rot(-half_w, -back)
+    br = rot(half_w, -back)
+    bm = rot(0, -back * 0.35)
     outline_w = 3 if size >= 11 else 2
-    draw.ellipse(
-        [(x - size, y - size), (x + size, y + size)],
-        fill=(255, 255, 255, 255),
-        outline=(42, 26, 16, 255),
-        width=outline_w,
-    )
+    draw.polygon([tip, br, bm, bl], fill=(255, 255, 255, 255), outline=(42, 26, 16, 255))
+    draw.line([tip, br, bm, bl, tip], fill=(42, 26, 16, 255), width=outline_w, joint="curve")
 
 
 def _outline_draw(self, draw, points):
@@ -599,35 +613,107 @@ def _outline_draw(self, draw, points):
     draw.line(points, fill=self.fill, width=inner, **line_kw)
 
 
+_REMAINING_FILL = (150, 150, 150, 210)
+_REMAINING_OUTLINE = (70, 70, 70, 200)
+
+
+def _nearest_route_index(locs, location) -> int:
+    if not locs:
+        return 0
+    best_i, best_d = 0, float("inf")
+    for i, p in enumerate(locs):
+        d = (p.lat - location.lat) ** 2 + (p.lon - location.lon) ** 2
+        if d < best_d:
+            best_d, best_i = d, i
+    return best_i
+
+
+def _route_heading_rad(locs, idx: int) -> float:
+    """地图朝向：用经纬度算方位角（0=北=屏上），向前/向后找有位移的点，避免像素重合导致朝上死默认。"""
+    n = len(locs)
+    if n < 2:
+        return 0.0
+
+    def bearing(i0: int, i1: int) -> float | None:
+        dlon = locs[i1].lon - locs[i0].lon
+        dlat = locs[i1].lat - locs[i0].lat
+        if abs(dlon) + abs(dlat) < 1e-9:
+            return None
+        # scale(): +lon→+x, +lat→-y(上)；atan2(dlon, dlat) 即屏上 0=上
+        return math.atan2(dlon, dlat)
+
+    for span in range(1, min(80, n)):
+        if idx + span < n:
+            b = bearing(idx, idx + span)
+            if b is not None:
+                return b
+        if idx - span >= 0:
+            b = bearing(idx - span, idx)
+            if b is not None:
+                return b
+    return 0.0
+
+
 def _circuit_draw(self, image, draw):
-    if self.image is None:
+    # 灰=全程底/未跑；沙色=已跑；三角=当前位置朝向。
+    if getattr(self, "_hud_route_ready", False) is False:
         journey = Journey()
         self.framemeta.process(journey.accept)
         self.bbox = journey.bounding_box
         self.size = self.bbox.size() * 1.1
 
+        locs = [p for p in journey.locations if not self.privacy_zone.encloses(p)]
+        self._hud_route_locs = locs
+
         orig_dim = self.dimensions
         orig_fill = self.outline.fill_width
         orig_out = self.outline.outline_width
+        sand_fill = self.outline.fill
+        sand_outline = self.outline.outline
+
         self.dimensions = Dimension(orig_dim.x * _ROUTE_SCALE, orig_dim.y * _ROUTE_SCALE)
         self.outline.fill_width = orig_fill * _ROUTE_SCALE
         self.outline.outline_width = orig_out * _ROUTE_SCALE
+        points_hi = [self.scale(p) for p in locs]
+        self._hud_points_hi = points_hi
 
+        self.outline.fill = _REMAINING_FILL
+        self.outline.outline = _REMAINING_OUTLINE
         hi = Image.new("RGBA", self.dimensions.tuple(), (0, 0, 0, 0))
         hi_draw = ImageDraw.Draw(hi)
-        points = [self.scale(p) for p in journey.locations if not self.privacy_zone.encloses(p)]
-        self.outline.draw(hi_draw, rdp(points, 1))
+        if len(points_hi) >= 2:
+            self.outline.draw(hi_draw, rdp(points_hi, 1))
         self.image = hi.resize(orig_dim.tuple(), Image.Resampling.LANCZOS)
 
+        self.outline.fill = sand_fill
+        self.outline.outline = sand_outline
         self.dimensions = orig_dim
         self.outline.fill_width = orig_fill
         self.outline.outline_width = orig_out
+        self._hud_points = [self.scale(p) for p in locs]
+        self._hud_route_ready = True
 
     location = self.location()
     frame = self.image.copy()
     frame_draw = ImageDraw.Draw(frame)
-    if not self.privacy_zone.encloses(location):
-        _draw_location_marker(frame_draw, self.scale(location), getattr(self, "_hud_marker_size", 12))
+    locs = getattr(self, "_hud_route_locs", [])
+    pts = getattr(self, "_hud_points", [])
+    if locs and pts and not self.privacy_zone.encloses(location):
+        idx = _nearest_route_index(locs, location)
+        done = pts[: max(1, idx + 1)]
+        if len(done) >= 2:
+            line_kw = {"joint": "curve"}
+            if self.outline.outline_width > 0:
+                frame_draw.line(done, fill=self.outline.outline, width=self.outline.fill_width, **line_kw)
+            inner = max(1, self.outline.fill_width - self.outline.outline_width)
+            frame_draw.line(done, fill=self.outline.fill, width=inner, **line_kw)
+        heading = _route_heading_rad(locs, idx)
+        _draw_location_marker(
+            frame_draw,
+            self.scale(location),
+            getattr(self, "_hud_marker_size", 12),
+            heading_rad=heading,
+        )
     image.alpha_composite(frame, (0, 0))
 
 

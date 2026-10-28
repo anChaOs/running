@@ -177,6 +177,18 @@ def prepare_resolved_template(
         _remove_named_translate(root, shoe_group_name)
     else:
         shoe_name_component.text = cleaned_shoe_name
+        # 鞋名右对齐：左内边距与右边距同为 20（按实际字形宽度算锚点）
+        try:
+            from PIL import ImageFont
+            font_path = Path(__file__).resolve().parent / "fonts" / "SourceHanSansSC-Heavy.otf"
+            size = int(shoe_name_component.get("size") or 15)
+            font = ImageFont.truetype(str(font_path), size)
+            name_w = font.getbbox(cleaned_shoe_name)[2] - font.getbbox(cleaned_shoe_name)[0]
+            pad = 20
+            shoe_name_component.set("x", str(pad + name_w))
+            shoe_name_component.set("align", "right")
+        except Exception:
+            pass
 
     if not weather_ok:
         _remove_named_translate(root, "weather_group")
