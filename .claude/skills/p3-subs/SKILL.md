@@ -7,15 +7,7 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播（词级
 
 识别稿只提供时间和草稿。**校正不是润色。** 字必须跟嘴里说的走；切条只断开，不改字。
 
-<<<<<<< HEAD
-发布默认**外挂**：B 站和 YouTube 都传 SRT。不要生成 ASS，不要烧进成片，也不要 mux 进 mp4。单行、字数、停顿和词组边界见「写 SRT / txt」；脚本阈值见「转写 + 初稿」。
-=======
-观感：横屏底栏还有 HUD，两行会抢位置。一次只上一行，大约 8～16 个字，在屏幕上 1～4 秒，读速不超过每秒 7 个字。同一句话可以连着几条，不必合成一条超长的。**停顿是切条的第一优先级**（停顿要落在词组边界上）。超长必须切时，在整句里找**最长的停顿**切，不要只把最后一个词或几个字拆走；停顿差不多长时才看标点。短句首（OK / 今天 / 一种 等）按停顿归下一句：它前面停得比后面久，就放到下一条开头。
-
-词组要完整留在同一行。按字数硬切会把双音节词拆开，例如「配 / 速」「训 / 练」「恢 / 复」。下一行只剩「了」「的」「量」，或和上一行末字拼得成词，就是切条切错了。英文专名同样从词边界断开。
-
-发布默认**烧进成片**（从 2026-10-29 Fatmax 期起）：定稿 force_align 后生成 `subtitles.ass`，由 `p3-assemble --ass` 烧入最终片。校对期（waiting-review）仍外挂 SRT 给人改字/审片。平台可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。
->>>>>>> 5c8f2ce (feat(subs): 最终片默认烧 ASS（自 2026-10-29 Fatmax）)
+发布默认**烧进成片**（从 2026-10-29 Fatmax 期起）：定稿 force_align 后生成 `subtitles.ass`，由 `p3-assemble --ass` 烧入最终片。校对期（waiting-review）仍外挂 SRT 给人改字/审片。平台可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。单行、字数、停顿和词组边界见「写 SRT / txt」；脚本参数见「转写 + 初稿」。不要把字幕轨 mux 进 mp4（平台转码会丢掉）。
 
 ## 流水线
 
@@ -73,14 +65,6 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播（词级
 - 不要只靠 VAD 停顿切条；停顿只有落在词组边界上才是切口
 - 不要把一段识别的起止按字数均分给几条字幕，也不要手填等步长的时间（如每条 0.99s、间隔 0.06s）。对不上的条留给 `force_align.py` 报出来，人听了再定
 - 不要用 tiny / small；只用 large-v3-turbo
-<<<<<<< HEAD
-=======
-- 转写模型不要从 Hugging Face 拉，用 ModelScope（脚本默认就是）
-- 不要把校正做成「语义改写 / 摘要 / 更像字幕的句子」
-- 不要把 whisper 吐出的繁体当「忠于原句」留下
-- 听不清的不要编
-- 不要把字幕轨 **mux** 进 mp4（平台转码会丢掉）。最终片烧字用 ASS 滤镜（`assemble --ass`），不是 mux；校对期中间版可以不烧
->>>>>>> 5c8f2ce (feat(subs): 最终片默认烧 ASS（自 2026-10-29 Fatmax）)
 
 ## 转写 + 初稿
 
@@ -194,11 +178,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 3. 外挂拷到成片旁边（IINA 自动挂）：最后一次 `txt_to_subs.py ... --media-dir auto` 已经拷好，不用再手动 `cp`。
 4. **烧字（最终片，从 2026-10-29 起默认）**：机器过门并把对齐后的 `subtitles.srt` 定稿后，从 SRT 生成 `episodes/.../subtitles.ass`（Style：Hiragino Sans GB、单行底中、1080p Fontsize≈56、Outline=3、MarginV≈100，避开左栏 HUD），再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链，不要 `--no-loudness-fix`）。无烧字成片先备份为 `YYYY-MM-DD-run-final-no-burn.mp4`。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` / 制作期同名 `.srt` 仍保留供平台选用。可对字幕中间版（waiting-review）可以不烧。
 
-<<<<<<< HEAD
-`check_subs.py` 机器过门之后，把硬失败行和 `interp` / `unanchored` 条列给人听；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。
-=======
 `check_subs.py` 机器过门之后，把硬失败行和 `interp` / `unanchored` 条列给人听；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。比例过门本身不够，agent 不得自行写 `subs: done`。烧字可在人听确认前后做，但最终发布片必须已烧。
->>>>>>> 5c8f2ce (feat(subs): 最终片默认烧 ASS（自 2026-10-29 Fatmax）)
 
 然后才写简介：读校准后的 `subtitles.txt`，短句总结本期实际说了什么，写入该期 `plan.md` 的简介栏。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。大多数期没有「参考」，只写摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI。视频优先用当前平台的地址：B 站简介用 B 站链接，YouTube 简介用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没念到的不列。摘要两个平台相同，有参考时参考按平台分开。
 

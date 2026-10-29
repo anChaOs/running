@@ -16,18 +16,11 @@ HUD 走 `p3-hud`，封面走 `p3-cover`（二者并行），字幕走 `p3-subs`�
 ## 不要做的事
 
 - 不要在这里渲 HUD 或从口播卡写字幕
-<<<<<<< HEAD
-- **默认不要传 `--ass`，用户没明确说「烧进去」时不要烧字幕。** 字幕外挂：B 站和 YouTube 都传 `subtitles.srt`。改字幕只改 sidecar，不用重拼
-- 不要把字幕轨 mux 进 mp4（平台转码会丢掉）
-- 不要用 alpha 层当主轨，主轨是 `*-hud-preview.mp4`
-- 不要降码
-=======
 - **最终片（从 2026-10-29 起）传 `--ass episodes/.../subtitles.ass` 烧硬字幕。** 可对字幕中间版（`--no-loudness-fix` / waiting-review）可不烧；平台仍可另挂 `subtitles.srt`
 - 不要把字幕轨 mux 进 mp4（平台转码会丢掉）；烧字用滤镜，不是 mux
 - 不要用 alpha 层当主轨，主轨是 `*-hud-preview.mp4`
 - 不要降码
 - 改字幕字/时间后要重烧才更新画面；校对期改 sidecar 不用重拼
->>>>>>> 5c8f2ce (feat(subs): 最终片默认烧 ASS（自 2026-10-29 Fatmax）)
 - 成片写好后不要只丢路径；接着抽帧核对
 - 冷开场不要从 HUD preview / close-stats 截；不要默叠化（默认硬切）
 
