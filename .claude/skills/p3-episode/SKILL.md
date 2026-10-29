@@ -106,5 +106,5 @@ python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
 
 ## 3. 状态
 
-`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；字幕对口型完成后 `edited`；发布后记链接（B 站 + YouTube）后 `published`；`published` 且双链写完后，**自动 merge 该期 episode PR 进 `main`**（细节以 `p3-subs` 为准），再按 `p3-subs`「发布后清临时文件」清该期媒体目录（先列保留/删除清单与体积 → 用户确认 → 进废纸篓，禁止 `rm`）。
+`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；字幕对口型完成后 `edited`；发布后记链接（B 站 + YouTube）后 `published`（**抖音不挡** `published`）；`published` 且双链写完后，**自动 merge 该期 episode PR 进 `main`**（细节以 `p3-subs` 为准），再按 `p3-subs`「发布后清临时文件」清该期媒体目录（先列保留/删除清单与体积 → 用户确认 → 进废纸篓，禁止 `rm`）。抖音短链随后写入「发布」栏；抖音齐后按 `p3-subs` 只留一份烧字幕成片、无字幕备份进废纸篓。抖音文案与 `#` 话题规则见 `p3-subs`（国内热门标签优先）。
 `assets.md`：assemble 画面核对通过后 `assemble: done`、`qc: done`；此时 `episode.md` 仍是 `hud`。
