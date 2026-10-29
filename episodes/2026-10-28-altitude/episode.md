@@ -25,5 +25,6 @@ media: ~/Movies/running-content/2026-10-28-altitude/
 
 ## 发布
 
+- 抖音：已设定期发布，短链待定时放出后补
 - YouTube: https://youtu.be/bx-p5g3QwR0
 - Bilibili: https://www.bilibili.com/video/BV1Wfx56JEYG/
