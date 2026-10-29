@@ -1,6 +1,6 @@
 ---
 name: p3-assemble
-description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。混音后默认 dynaudnorm+loudnorm 到约 −16 LUFS（峰值 ≤ −1.5 dBTP）；拼完仍测 LUFS/峰值。字幕默认外挂，不要烧进成片。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
+description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。混音后默认 dynaudnorm+loudnorm 到约 −16 LUFS（峰值 ≤ −1.5 dBTP）；拼完仍测 LUFS/峰值。从 2026-10-29 起最终片默认传 `--ass` 烧字幕；可对字幕中间版可不烧。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
 ---
 
 # 拼接 + 核对
@@ -16,10 +16,18 @@ HUD 走 `p3-hud`，封面走 `p3-cover`（二者并行），字幕走 `p3-subs`�
 ## 不要做的事
 
 - 不要在这里渲 HUD 或从口播卡写字幕
+<<<<<<< HEAD
 - **默认不要传 `--ass`，用户没明确说「烧进去」时不要烧字幕。** 字幕外挂：B 站和 YouTube 都传 `subtitles.srt`。改字幕只改 sidecar，不用重拼
 - 不要把字幕轨 mux 进 mp4（平台转码会丢掉）
 - 不要用 alpha 层当主轨，主轨是 `*-hud-preview.mp4`
 - 不要降码
+=======
+- **最终片（从 2026-10-29 起）传 `--ass episodes/.../subtitles.ass` 烧硬字幕。** 可对字幕中间版（`--no-loudness-fix` / waiting-review）可不烧；平台仍可另挂 `subtitles.srt`
+- 不要把字幕轨 mux 进 mp4（平台转码会丢掉）；烧字用滤镜，不是 mux
+- 不要用 alpha 层当主轨，主轨是 `*-hud-preview.mp4`
+- 不要降码
+- 改字幕字/时间后要重烧才更新画面；校对期改 sidecar 不用重拼
+>>>>>>> 5c8f2ce (feat(subs): 最终片默认烧 ASS（自 2026-10-29 Fatmax）)
 - 成片写好后不要只丢路径；接着抽帧核对
 - 冷开场不要从 HUD preview / close-stats 截；不要默叠化（默认硬切）
 
@@ -49,6 +57,18 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
   > ~/Movies/running-content/YYYY-MM-DD-slug/assemble.log 2>&1 &
 # 等待期间去做封面 / 鞋账本；结束后看 assemble.log 末尾再核对
 ```
+
+## 流程顺序（从 2026-10-29 起）
+
+**先出可对字幕成片，响度链后置。** 用户校对字幕期间再跑音频优化，提高并行效率：
+
+1. `assemble_episode.py --no-loudness-fix` → 写出 `YYYY-MM-DD-run-final.mp4`（画面+转场+whoosh 齐，响度未修、可不烧字）供 `p3-subs` 立刻开工
+2. `p3-subs` 做到 `waiting-review`（等人手改字；外挂 SRT）
+3. 校对期间另开一遍：对同一媒体目录再跑 `assemble_episode.py`（**不加** `--no-loudness-fix`，即默认响度链），覆盖/写出响度版；或保留预响度副本为 `YYYY-MM-DD-run-final-pre-loudnorm.mp4` 再覆盖 `run-final`
+4. 字校对 + force_align 定稿后：生成 `subtitles.ass`，备份无烧字片为 `YYYY-MM-DD-run-final-no-burn.mp4`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链）→ **最终发布片**
+5. QC 峰值/LUFS 与烧字抽帧跟**最终片**（响度 + 烧字）
+
+不要等响度链跑完才开字幕。`--no-loudness-fix` 就是「可对字幕版」开关。最终片从 2026-10-29 起默认带 `--ass`。
 
 已有字幕时（重拼后）脚本不会拷 SRT，跑一次同步：
 
@@ -126,7 +146,7 @@ ffmpeg -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
 - 超出成片的 `hold_until` 会截到片尾并警告；`start` 超出直接报错
 - 写进 `overlays.json` 让 assemble 一次拼完，不要拼完再二次压。核对时在每层起点、停住中段、撤掉后各抽一帧
 
-只有用户明确要求硬字幕时才加 `--ass episodes/.../subtitles.ass`。
+最终片（从 2026-10-29 起）加 `--ass episodes/.../subtitles.ass`；可对字幕中间版省略。
 
 先看接缝小样（不拼全片）：
 
@@ -149,7 +169,7 @@ ffmpeg -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
 
 ## 核对（拼完立刻做）
 
-至少抽这几帧，写到媒体目录 `qc/`（成片画面没有字幕，不要从成片里找字幕帧）：
+至少抽这几帧，写到媒体目录 `qc/`（最终片应有烧字；可对字幕中间版可以无，那时不要从成片里找字幕帧）：
 
 1. open 开头（应无 HUD）
 2. open→run 接缝（HUD 刚出现）
@@ -167,11 +187,11 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 清单：
 
 - open / close 没有 HUD
-- 成片画面里没有烧进去的字幕
+- 最终片画面里**应有**烧进去的字幕（底中、不挡左栏 HUD）；可对字幕中间版可以无烧字
 - 跑鞋名和 `-sk` 与 `training/logs/shoes.md` 一致
 - 天气是「数字°C / 数字°C」，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
-- 已测 LUFS ≈ −16、峰值 ≤ −1.5 dB（loudnorm summary / volumedetect）；无明显削波；POV 风噪不盖过人声；未误加 `--no-loudness-fix`
+- 最终片（响度链后）已测 LUFS ≈ −16、峰值 ≤ −1.5 dB；可对字幕版允许先加 `--no-loudness-fix`，响度在字幕 waiting-review 期间补上后再测
 
 通过后：`assets.md` 的 `assemble: done`、`qc: done`。`episode.md` 仍是 `hud`。字幕核对在 `p3-subs`。
 
@@ -181,7 +201,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 
 | 现象 | 原因 |
 | --- | --- |
-| 成片里已经有字 | 误传了 `--ass`，或烧到已有成片上 |
+| 最终片没有字 / 中间版不该有字 | 最终片漏传 `--ass`；或中间版误烧；ASS Style/MarginV 压 HUD 则调样式重烧 |
 | xfade 报 timebase mismatch | 没做 `fps=60,settb=1/60`，concat 后没再 settb |
 | 主轨没有 HUD | 拼了原片而不是 `*-hud-preview.mp4` |
 | 平台字幕压 HUD | SRT 没有位置信息，属预期；公开前在网页播放器开 CC |
