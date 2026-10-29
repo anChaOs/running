@@ -176,7 +176,13 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
    - 不要为对齐改字。只改 sidecar，不用重拼成片。preview 时长变了（重渲 HUD），对着新成片重抽 wav、重跑这一步。
    - 改完 txt 时间后跑 `txt_to_subs.py --media-dir auto` 回写 SRT 并同步媒体目录
 3. 外挂拷到成片旁边（IINA 自动挂）：最后一次 `txt_to_subs.py ... --media-dir auto` 已经拷好，不用再手动 `cp`。
-4. **烧字（最终片，从 2026-10-29 起默认）**：机器过门并把对齐后的 `subtitles.srt` 定稿后，从 SRT 生成 `episodes/.../subtitles.ass`（Style：Hiragino Sans GB、单行底中、1080p Fontsize≈56、Outline=3、MarginV≈100，避开左栏 HUD），再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链，不要 `--no-loudness-fix`）。无烧字成片先备份为 `YYYY-MM-DD-run-final-no-burn.mp4`。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` / 制作期同名 `.srt` 仍保留供平台选用。可对字幕中间版（waiting-review）可以不烧。
+4. **烧字（最终片，从 2026-10-29 Fatmax 起默认）**：机器过门并把对齐后的 `subtitles.srt` 定稿后，从 SRT 生成 `episodes/.../subtitles.ass`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链，不要 `--no-loudness-fix`）。无烧字成片先备份为 `YYYY-MM-DD-run-final-no-burn.mp4`。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` / 制作期同名 `.srt` 仍保留供平台选用。可对字幕中间版（waiting-review）可以不烧；平台可另挂 SRT。
+
+   **ASS Style（烧字默认，非 HUD）**
+   - Font：`Source Han Sans SC Heavy`（文件 `SourceHanSansSC-Heavy.otf`；仓库有 `tools/hud/fonts/SourceHanSansSC-Heavy.otf` 可复用）
+   - 1080p：`Fontsize=72`、`Outline=3`、`MarginV≈100`；单行底中，避开左栏 HUD
+   - ASS `Fontname` 必须让 ffmpeg/libass **真选中** Heavy：Mac 把 otf **装入 `~/Library/Fonts`**（或配 FONTCONFIG）；**勿只靠 `fontsdir`**——CoreText 常落到 PingFang SC Regular，字重/字形不对
+   - 校对期仍外挂 SRT；烧字是最终发布片默认，与 HUD 字体规则无关
 
 `check_subs.py` 机器过门之后，把硬失败行和 `interp` / `unanchored` 条列给人听；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。比例过门本身不够，agent 不得自行写 `subs: done`。烧字可在人听确认前后做，但最终发布片必须已烧。
 

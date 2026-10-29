@@ -58,7 +58,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 1. `assemble_episode.py --no-loudness-fix` → 写出 `YYYY-MM-DD-run-final.mp4`（画面+转场+whoosh 齐，响度未修、可不烧字）供 `p3-subs` 立刻开工
 2. `p3-subs` 做到 `waiting-review`（等人手改字；外挂 SRT）
 3. 校对期间另开一遍：对同一媒体目录再跑 `assemble_episode.py`（**不加** `--no-loudness-fix`，即默认响度链），覆盖/写出响度版；或保留预响度副本为 `YYYY-MM-DD-run-final-pre-loudnorm.mp4` 再覆盖 `run-final`
-4. 字校对 + force_align 定稿后：生成 `subtitles.ass`，备份无烧字片为 `YYYY-MM-DD-run-final-no-burn.mp4`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链）→ **最终发布片**
+4. 字校对 + force_align 定稿后：生成 `subtitles.ass`（Style 默认见 `p3-subs`：Source Han Sans SC Heavy、1080p Fontsize=72；Fontname 须系统真选中 Heavy，勿只靠 fontsdir），备份无烧字片为 `YYYY-MM-DD-run-final-no-burn.mp4`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链）→ **最终发布片**
 5. QC 峰值/LUFS 与烧字抽帧跟**最终片**（响度 + 烧字）
 
 不要等响度链跑完才开字幕。`--no-loudness-fix` 就是「可对字幕版」开关。最终片从 2026-10-29 起默认带 `--ass`。
@@ -180,7 +180,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 清单：
 
 - open / close 没有 HUD
-- 最终片画面里**应有**烧进去的字幕（底中、不挡左栏 HUD）；可对字幕中间版可以无烧字
+- 最终片画面里**应有**烧进去的字幕（Source Han Sans SC Heavy / Fontsize=72、底中、不挡左栏 HUD）；可对字幕中间版可以无烧字
 - 跑鞋名和 `-sk` 与 `training/logs/shoes.md` 一致
 - 天气是「数字°C / 数字°C」，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
@@ -194,7 +194,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 
 | 现象 | 原因 |
 | --- | --- |
-| 最终片没有字 / 中间版不该有字 | 最终片漏传 `--ass`；或中间版误烧；ASS Style/MarginV 压 HUD 则调样式重烧 |
+| 最终片没有字 / 中间版不该有字 | 最终片漏传 `--ass`；或中间版误烧；ASS Style/MarginV 压 HUD 则调样式重烧（默认 Heavy 72，见 `p3-subs`） |
 | xfade 报 timebase mismatch | 没做 `fps=60,settb=1/60`，concat 后没再 settb |
 | 主轨没有 HUD | 拼了原片而不是 `*-hud-preview.mp4` |
 | 平台字幕压 HUD | SRT 没有位置信息，属预期；公开前在网页播放器开 CC |
