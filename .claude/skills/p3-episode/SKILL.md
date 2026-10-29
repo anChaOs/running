@@ -32,10 +32,9 @@ run-* + FIT + -sk
   p3-cover     → cover-*.jpg（与 HUD 并行，自拍抠图合成）
 
 hud-preview + open/close
-  p3-assemble   → YYYY-MM-DD-run-final.mp4 + 抽帧核对
-
-成片音频
-  p3-subs  → asr/* + 忠于原句 subtitles.srt / .txt（校正不改写；外挂；status=edited）
+  p3-assemble   → 可对字幕成片（`--no-loudness-fix`）+ 抽帧核对画面
+  p3-subs       → asr/* + 忠于原句 subtitles.srt / .txt（停 waiting-review）
+  p3-assemble   → 响度链回写最终成片（与字幕校对并行）
 
 换封面句
   p3-cover       → 重出 cover-*.jpg，不重渲 HUD

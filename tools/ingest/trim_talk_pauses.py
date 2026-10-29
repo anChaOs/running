@@ -233,14 +233,19 @@ def keep_windows(
     duration: float,
     keep_gap: float,
     cut_gaps: list[tuple[float, float]],
+    keep_lead_silence: bool = False,
 ) -> list[tuple[float, float]]:
     if not speech:
         return [(0.0, duration)]
     cuts = {(round(a, 2), round(b, 2)) for a, b in cut_gaps}
     windows: list[tuple[float, float]] = []
     first = speech[0][0]
-    lead = min(HEAD_TAIL, first)
-    start0 = max(0.0, first - lead)
+    if keep_lead_silence:
+        # 开口前静默/呼吸/跑镜全部保留（强度课表现艰难）
+        start0 = 0.0
+    else:
+        lead = min(HEAD_TAIL, first)
+        start0 = max(0.0, first - lead)
     windows.append((start0, speech[0][1]))
     for i in range(len(speech) - 1):
         gap_a, gap_b = speech[i][1], speech[i + 1][0]
@@ -341,6 +346,7 @@ def plan_clip(
     path: Path,
     speech_detect: str = "vad",
     vad_model: Path | None = None,
+    keep_lead_silence: bool = False,
 ) -> dict:
     duration = probe_duration(path)
     if speech_detect == "vad":
@@ -366,7 +372,9 @@ def plan_clip(
     mean = statistics.mean(lengths) if lengths else 0.0
     keep_gap = max(MIN_KEEP_GAP, mean + GAP_SAFETY) if mean else MIN_KEEP_GAP
     outliers = [(a, b) for a, b in gaps if is_outlier(b - a, mean)]
-    windows = keep_windows(speech, duration, keep_gap, outliers)
+    windows = keep_windows(
+        speech, duration, keep_gap, outliers, keep_lead_silence=keep_lead_silence
+    )
     kept = sum(b - a for a, b in windows)
     return {
         "path": path,
@@ -380,6 +388,7 @@ def plan_clip(
         "saved": duration - kept,
         "speech_detect": speech_detect,
         "speech_count": len(speech),
+        "keep_lead_silence": keep_lead_silence,
     }
 
 
@@ -468,6 +477,17 @@ def main() -> int:
         default=str(DEFAULT_VAD_MODEL),
         help="whisper.cpp ggml Silero VAD model",
     )
+    parser.add_argument(
+        "--keep-lead-silence",
+        action="store_true",
+        help="Keep silence/breathing before first speech (start0=0). "
+        "Default ON for --targets preview (intensity effort shots).",
+    )
+    parser.add_argument(
+        "--no-keep-lead-silence",
+        action="store_true",
+        help="Force trimming lead silence even for preview targets.",
+    )
     args = parser.parse_args()
     media_dir = Path(args.media_dir).expanduser().resolve()
     targets = {part.strip() for part in args.targets.split(",") if part.strip()}
@@ -475,15 +495,28 @@ def main() -> int:
     if not clips:
         print(f"No clips for targets {sorted(targets)} in {media_dir}")
         return 0
+    # preview 默认保留开口前静默；open/close 默认仍裁 lead
+    if args.no_keep_lead_silence:
+        keep_lead = False
+    elif args.keep_lead_silence:
+        keep_lead = True
+    else:
+        keep_lead = "preview" in targets
     dry_run = not args.apply
     print(
         f"Mode: {'APPLY' if args.apply else 'DRY-RUN'}  "
-        f"detect={args.speech_detect}"
+        f"detect={args.speech_detect}  "
+        f"keep_lead_silence={keep_lead}"
     )
     vad_model = Path(args.vad_model).expanduser()
     for clip in clips:
         source = raw_path(clip) if raw_path(clip).exists() else clip
-        plan = plan_clip(source, speech_detect=args.speech_detect, vad_model=vad_model)
+        plan = plan_clip(
+            source,
+            speech_detect=args.speech_detect,
+            vad_model=vad_model,
+            keep_lead_silence=keep_lead,
+        )
         plan["path"] = clip
         apply_clip(plan, dry_run=dry_run)
     return 0
