@@ -27,3 +27,4 @@ media: ~/Movies/running-content/2026-10-11-chicago-30k/
 
 - B 站：https://www.bilibili.com/video/BV1MGpE64EHo
 - YouTube：https://youtu.be/pWyalE7f3Mo
+- 抖音：https://v.douyin.com/nAkslqXZ6c4/
