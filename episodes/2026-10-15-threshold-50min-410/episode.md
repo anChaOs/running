@@ -28,6 +28,7 @@ bilibili_bvid: BV14LJC6DE4Z
 
 ## 发布
 
+- 抖音：已设定期发布，短链待定时放出后补
 - YouTube：https://youtu.be/3qLuzzgW9js
 - Bilibili：BV14LJC6DE4Z（https://www.bilibili.com/video/BV14LJC6DE4Z）
 - 抖音：https://v.douyin.com/JRMktwyshy4/
