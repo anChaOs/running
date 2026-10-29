@@ -50,7 +50,7 @@
 - shoes: done（Plaid 1.5 / -sk 532.52；FIT 16.477）
 - hud: done（Plaid 1.5 / -sk 532.52；preview keep-lead 句间粗剪）
 - cover: done（16:9/4:3/3:4；句「燃脂区，是不是被神化了？」）
-- assemble: done（响度+烧字最终片 2026-10-29-run-final.mp4；Hiragino56 备份 2026-10-29-run-final-burn-hira56.mp4；无烧字备份 2026-10-29-run-final-no-burn.mp4；预响度备份 2026-10-29-run-final-pre-loudnorm.mp4；实测 I=-16.10 LUFS TP=-0.97 dBTP LRA=5.10；**试烧暂定** ASS Source Han Sans SC Heavy Fontsize=72 MarginV=100；日志 assemble-burn-sh72.log）
-- qc: done（烧字抽帧 qc/burn-final-*.jpg；SH72 试烧抽帧 qc/burn-sh72-*.jpg 含 09:53「肯定就很困难」）
-- subs: aligning（未写 done；切条已并 09:53「肯定就很困难」；试烧 Source Han Heavy 72 进最终片，等人确认字号/字体后再定稿）
-- upload: pending
+- assemble: done（成片=`Fatmax｜燃脂区是不是被神化了？.mp4`，由 run-final 原地改名；硬字幕已烧进成片 Source Han Sans SC Heavy Fontsize=72 MarginV=100；外挂=`subtitles.srt`（平台可另挂）；Hiragino56 备份 `2026-10-29-run-final-burn-hira56.mp4`；无烧字 `*-no-burn`；预响度 `*-pre-loudnorm`；实测 I=-16.10 LUFS TP=-0.97 dBTP LRA=5.10；日志 assemble-burn-sh72.log）
+- qc: done（烧字抽帧 qc/burn-final-*.jpg；SH72 抽帧 qc/burn-sh72-*.jpg 含 09:53「肯定就很困难」）
+- subs: done（用户确认可发；烧字 Source Han Heavy 72；09:53「困难」已并；简介按校准字幕写入 plan.md）
+- upload: ready
