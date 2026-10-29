@@ -2,7 +2,7 @@
 date: 2026-10-29
 slug: fatmax
 title: Fatmax｜燃脂区是不是被神化了？
-status: planned
+status: edited
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-29-fatmax/
 ---

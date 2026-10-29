@@ -50,7 +50,7 @@
 - shoes: done（Plaid 1.5 / -sk 532.52；FIT 16.477）
 - hud: done（Plaid 1.5 / -sk 532.52；preview keep-lead 句间粗剪）
 - cover: done（16:9/4:3/3:4；句「燃脂区，是不是被神化了？」）
-- assemble: done（默认两遍 loudnorm + presence EQ；最终片 2026-10-29-run-final.mp4；预响度备份 2026-10-29-run-final-pre-loudnorm.mp4；实测 I=-16.10 LUFS TP=-0.97 dBTP LRA=5.10；日志 assemble-loudnorm.log）
-- qc: done（抽帧 qc/；响度后复核帧 ln-01..05；画面未烧字）
-- subs: waiting-review
+- assemble: done（响度+烧字最终片 2026-10-29-run-final.mp4；无烧字备份 2026-10-29-run-final-no-burn.mp4；预响度备份 2026-10-29-run-final-pre-loudnorm.mp4；实测 I=-16.10 LUFS TP=-0.97 dBTP LRA=5.10；ASS Fontsize=56 MarginV=100；日志 assemble-burn.log）
+- qc: done（烧字抽帧 qc/burn-final-*.jpg）
+- subs: aligning（force_align + check 机器过门；硬失败/interp/unanchored 待人听确认；未写 done；ASS 已烧进最终片）
 - upload: pending

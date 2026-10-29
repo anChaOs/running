@@ -79,7 +79,7 @@ preview 出完后，对 **preview** 做句间粗剪（原片 `run-*` 不剪，HU
   --targets preview
 ```
 
-默认 dry-run。确认后 `--apply`。工作文件仍是 `*-hud-preview.mp4`，未剪的 preview 改名为 `*-hud-preview-raw.mp4`。确认时看两件事：最后一句有没有被片尾保护段前面的空洞吃掉；强度课硬段不说话，那是课不是句间停顿，不要整段剪掉。
+默认 dry-run。确认后 `--apply`。`--targets preview` 时**默认启用 `--keep-lead-silence`**（`start0=0`，开口前静默/呼吸/跑镜全部保留，用来表现强度课艰难）；整段无语音的 clip 本来就原样保留。需要裁掉 lead 时才加 `--no-keep-lead-silence`。工作文件仍是 `*-hud-preview.mp4`，未剪的 preview 改名为 `*-hud-preview-raw.mp4`。确认时看两件事：最后一句有没有被片尾保护段前面的空洞吃掉；强度课硬段不说话，那是课不是句间停顿，不要整段剪掉——**只在画面开始说话以后才剪句间停顿**。
 
 口播检测默认 **Silero VAD**（人声 vs 风/车，不是声纹）。模型：
 
