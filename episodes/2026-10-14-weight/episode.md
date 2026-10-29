@@ -28,6 +28,7 @@ bilibili_bvid: BV1Kypy6hEui
 
 ## 发布
 
+- 抖音：已设定期发布，短链待定时放出后补
 - YouTube：https://youtu.be/Ms-rZwFUyaQ
 - Bilibili：BV1Kypy6hEui（https://www.bilibili.com/video/BV1Kypy6hEui）
 - 成片：`~/Movies/running-content/2026-10-14-weight/体重 | 减肥能帮我破三吗？.mp4`

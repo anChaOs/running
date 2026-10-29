@@ -55,3 +55,23 @@
 
 - YouTube：https://youtu.be/Ms-rZwFUyaQ
 - Bilibili：BV1Kypy6hEui（https://www.bilibili.com/video/BV1Kypy6hEui）
+
+## 抖音
+
+标题同发：
+
+> 体重 | 减肥能帮我破三吗？
+
+正文（可粘贴）：
+
+```
+半马PB时65kg，现在68.5。减回去能帮全马快几分钟，破三主要靠训练。不戒零食，先换着吃。
+```
+
+建议话题（最多 5 个，发布页点「#」从列表点选变蓝；勿整段粘贴）：
+
+1. 跑步
+2. 马拉松
+3. 破三
+4. 跑步日常
+5. 减肥
