@@ -28,6 +28,8 @@ bilibili_bvid: BV1nYpR6UEMv
 
 ## 发布
 
+- 抖音：https://v.douyin.com/jmnY4kDZWPw/
+
 - YouTube：https://youtu.be/lB-BPp_CnaA
 - Bilibili：BV1nYpR6UEMv（https://www.bilibili.com/video/BV1nYpR6UEMv）
 - 成片：`~/Movies/running-content/2026-10-12-chicago-results/芝加哥马拉松 | 结果如何？.mp4`

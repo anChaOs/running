@@ -43,3 +43,24 @@
 - YouTube：https://youtu.be/lB-BPp_CnaA
 - Bilibili：BV1nYpR6UEMv（https://www.bilibili.com/video/BV1nYpR6UEMv）
 
+## 抖音
+
+标题同发：
+
+> 芝加哥马拉松 | 结果如何？
+
+作品描述（极简）：
+
+正文（可粘贴）：
+
+```
+轻松跑唠昨晚芝马。冠军不是基普里莫；Clayton Young、跑步机哥、赤崎晓各自什么成绩。
+```
+
+建议话题（最多 5 个，发布页点「#」从列表点选变蓝；勿整段粘贴）：
+
+1. 跑步
+2. 马拉松
+3. 芝加哥马拉松
+4. 跑步日常
+5. 破三
