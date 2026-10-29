@@ -51,3 +51,23 @@
 - 状态：`subs: done`；`status: published`；`upload: done`；双发已完成
 - YouTube: https://youtu.be/vwc129Z3RHE
 - Bilibili: BV1ausZ6UEkW
+
+## 抖音
+
+标题同发：
+
+> Fatmax｜燃脂区是不是被神化了？
+
+正文（可粘贴）：
+
+```
+脂肪不是跑满30分钟才开始烧。Fatmax只是脂肪氧化最快附近那一片，别当唯一正确的有氧。
+```
+
+建议话题（最多 5 个，发布页点「#」从列表点选变蓝；勿整段粘贴）：
+
+1. 跑步
+2. 燃脂
+3. Fatmax
+4. 跑步训练
+5. 有氧运动
