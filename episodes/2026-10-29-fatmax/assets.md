@@ -50,7 +50,7 @@
 - shoes: done（Plaid 1.5 / -sk 532.52；FIT 16.477）
 - hud: done（Plaid 1.5 / -sk 532.52；preview keep-lead 句间粗剪）
 - cover: done（16:9/4:3/3:4；句「燃脂区，是不是被神化了？」）
-- assemble: done（响度+烧字最终片 2026-10-29-run-final.mp4；无烧字备份 2026-10-29-run-final-no-burn.mp4；预响度备份 2026-10-29-run-final-pre-loudnorm.mp4；实测 I=-16.10 LUFS TP=-0.97 dBTP LRA=5.10；ASS Fontsize=56 MarginV=100；日志 assemble-burn.log）
-- qc: done（烧字抽帧 qc/burn-final-*.jpg）
-- subs: aligning（force_align + check 机器过门；硬失败/interp/unanchored 待人听确认；未写 done；ASS 已烧进最终片）
+- assemble: done（响度+烧字最终片 2026-10-29-run-final.mp4；Hiragino56 备份 2026-10-29-run-final-burn-hira56.mp4；无烧字备份 2026-10-29-run-final-no-burn.mp4；预响度备份 2026-10-29-run-final-pre-loudnorm.mp4；实测 I=-16.10 LUFS TP=-0.97 dBTP LRA=5.10；**试烧暂定** ASS Source Han Sans SC Heavy Fontsize=72 MarginV=100；日志 assemble-burn-sh72.log）
+- qc: done（烧字抽帧 qc/burn-final-*.jpg；SH72 试烧抽帧 qc/burn-sh72-*.jpg 含 09:53「肯定就很困难」）
+- subs: aligning（未写 done；切条已并 09:53「肯定就很困难」；试烧 Source Han Heavy 72 进最终片，等人确认字号/字体后再定稿）
 - upload: pending
