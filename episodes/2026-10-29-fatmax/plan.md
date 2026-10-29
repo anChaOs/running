@@ -48,4 +48,6 @@
 - 外挂：`subtitles.srt`（制作期另有 `2026-10-29-run-final.srt` 方便 IINA；上传用 `subtitles.srt`；ASS 源 `subtitles.ass` 可留）
 - 封面：`cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg`
 - 账号：B 站 mid 3687100；YouTube @anChaOs天天写bug
-- 状态：`subs: done`；`episode.md` `status: edited`；`upload: ready`（未替用户上传）
+- 状态：`subs: done`；`status: published`；`upload: done`；双发已完成
+- YouTube: https://youtu.be/vwc129Z3RHE
+- Bilibili: BV1ausZ6UEkW

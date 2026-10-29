@@ -2,7 +2,7 @@
 date: 2026-10-29
 slug: fatmax
 title: Fatmax｜燃脂区是不是被神化了？
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-29-fatmax/
 ---
@@ -23,3 +23,8 @@ media: ~/Movies/running-content/2026-10-29-fatmax/
 - `plan.md`：发布计划（标题／封面句／简介）
 - `assets.md`：素材索引
 - `subtitles.txt` / `subtitles.srt` / `subtitles.ass`：字幕定稿（ASS 已烧进成片）
+
+## 发布
+
+- YouTube: https://youtu.be/vwc129Z3RHE
+- Bilibili: https://www.bilibili.com/video/BV1ausZ6UEkW
