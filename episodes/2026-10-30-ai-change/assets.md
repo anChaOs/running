@@ -57,4 +57,8 @@
 - assemble: done（烧字最终片 → `AI，让我有点怕.mp4` 1284.08s / 2.4G；ASS Source Han Sans SC Heavy 72；实测 I=-16.03 LUFS / TP=-0.72 dBTP / LRA=5.20；无烧字备份 `2026-10-30-run-final-no-burn.mp4`；`pre-loudnorm` 仍保留）
 - qc: done（`qc/01..05`：open 无 HUD；run HUD 见 C2027 / °C；close 为 stats 叠层）
 - subs: done（用户确认可发；force_align 已过门；两处改字：单一额度是20x / 数据记忆的迁移；ASS 已烧；简介按校准字幕写入 plan.md）
-- upload: ready（成片=`AI，让我有点怕.mp4`；外挂=`subtitles.srt`；ASS 源 `subtitles.ass`）
+- upload: done
+  - YouTube：https://youtu.be/xtnJqtuIrPM
+  - Bilibili：https://www.bilibili.com/video/BV1GvxY6UEvV （BV1GvxY6UEvV）
+  - 抖音：定时发布（短链待补）
+  - 成片=`AI，让我有点怕.mp4`；外挂=`subtitles.srt`；ASS 源 `subtitles.ass`

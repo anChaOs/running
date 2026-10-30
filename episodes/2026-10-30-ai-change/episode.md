@@ -2,9 +2,12 @@
 date: 2026-10-30
 slug: ai-change
 title: AI，让我有点怕
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-30-ai-change/
+youtube: https://youtu.be/xtnJqtuIrPM
+bilibili: https://www.bilibili.com/video/BV1GvxY6UEvV
+bilibili_bvid: BV1GvxY6UEvV
 ---
 
 # 2026-10-30 AI，让我有点怕
@@ -20,5 +23,14 @@ media: ~/Movies/running-content/2026-10-30-ai-change/
 ## 文件
 
 - `talk.md`：边跑边说提纲（要点，非完整可念稿）
-- `plan.md`：发布计划占位
+- `plan.md`：发布计划与简介
 - `assets.md`：素材索引
+- `subtitles.txt` / `subtitles.srt` / `subtitles.ass`：字幕定稿（ASS 已烧进成片）
+
+## 发布
+
+- YouTube：https://youtu.be/xtnJqtuIrPM
+- Bilibili：BV1GvxY6UEvV（https://www.bilibili.com/video/BV1GvxY6UEvV）
+- 抖音：定时发布（短链待补）
+- 成片：`~/Movies/running-content/2026-10-30-ai-change/AI，让我有点怕.mp4`
+- 外挂：`subtitles.srt`（不改成标题名）
