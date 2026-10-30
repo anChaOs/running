@@ -54,7 +54,7 @@
 - hud: done（-sn C202 7 / -sk 403.74；FIT 14.026 km；before=389.71；preview a/b/c 齐；weather shanghai）
   - 注：句间粗剪 dry-run 约省 52s，但 `--apply` 被 Auto-review 分类器反复报错拦截；成片用未粗剪 preview（keep-lead 本会保留）
 - cover: done（16:9/4:3/3:4；句：AI，让我有点怕）
-- assemble: done（响度链完成 → `2026-10-30-run-final.mp4` 1284.08s / 2.4G；实测 I=-16.03 LUFS / TP=-0.72 dBTP / LRA=5.20；滤镜目标 I=-16 TP=-1.5；备份 `2026-10-30-run-final-pre-loudnorm.mp4` 仍保留）
+- assemble: done（烧字最终片 → `AI，让我有点怕.mp4` 1284.08s / 2.4G；ASS Source Han Sans SC Heavy 72；实测 I=-16.03 LUFS / TP=-0.72 dBTP / LRA=5.20；无烧字备份 `2026-10-30-run-final-no-burn.mp4`；`pre-loudnorm` 仍保留）
 - qc: done（`qc/01..05`：open 无 HUD；run HUD 见 C2027 / °C；close 为 stats 叠层）
-- subs: waiting-review（draft_subs 初稿 + 切条易错自检 + 专名/同音扫；376 条；`subtitles.txt`/`subtitles.srt`；媒体旁已拷 `subtitles.srt` + `2026-10-30-run-final.srt`；**未** force_align / 未烧 ASS）
-- upload: pending
+- subs: done（用户确认可发；force_align 已过门；两处改字：单一额度是20x / 数据记忆的迁移；ASS 已烧；简介按校准字幕写入 plan.md）
+- upload: ready（成片=`AI，让我有点怕.mp4`；外挂=`subtitles.srt`；ASS 源 `subtitles.ass`）

@@ -2,7 +2,7 @@
 date: 2026-10-30
 slug: ai-change
 title: AI，让我有点怕
-status: waiting-review
+status: edited
 series: 破三实验室
 media: ~/Movies/running-content/2026-10-30-ai-change/
 ---
