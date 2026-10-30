@@ -28,6 +28,7 @@ bilibili_bvid: BV1sdWF6ME8a
 
 ## 发布
 
+- 抖音：https://v.douyin.com/M6T3Hp-GiZ0/
 - YouTube：https://youtu.be/gSJVibcJlYI
 - Bilibili：BV1sdWF6ME8a（https://www.bilibili.com/video/BV1sdWF6ME8a）
 - 成片：`~/Movies/running-content/2026-10-13-threshold-test/高驰体能测试 | 乳酸阈配速多少？.mp4`
