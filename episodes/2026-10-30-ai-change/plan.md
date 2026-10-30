@@ -28,7 +28,7 @@
 
 ### YouTube
 
-个人视频制作来自：https://github.com/anChaOs/running
+个人视频制作来自：github.com/anChaOs/running
 
 今天是轻松有氧，边跑边聊 Personal Agent。从 Grok Bot 用户视角讲：它自带云端电脑／沙箱，比单纯聊天或单次 Agent 循环能做更多事；各家也在跟进类似产品（如 Claude Duet）。
 
