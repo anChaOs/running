@@ -35,8 +35,8 @@
   p3-hud          overlay + 同档 preview，并行封面
   p3-assemble     拼画面（推荐拼时带响度）+ 抽帧核对
   p3-subs         字幕（转写→人改→对齐）
-  p3-loudness     响度补跑（现状=全量重拼；拼时已带则跳过）
-  p3-burn         烧字 / 改名（现状 --ass 仍全量重拼）
+  p3-loudness     响度补跑（loudness_only / 不重拼；拼时已带则跳过）
+  p3-burn         烧字 / 改名（burn_ass / 不重拼）
   p3-publish      发布：写双链 / published / 合 PR / 清临时
   p3-cover        只换封面 / 重抽
   p3-qc           只再核对；默认已在 assemble 里做过
@@ -58,6 +58,6 @@ p3-library / p3-topic / p3-scaffold
   → archive（满 7 天）
 ```
 
-推荐墙钟：`assemble`（带响度）→ `subs` → `burn` → `publish`。assemble / loudness / burn 现状都可能全量重拼，详见 `p3-assemble`「编码成本」。
+推荐墙钟：`assemble`（带响度）→ `subs` → `burn` → `publish`。响度/烧字走单文件脚本，勿再全量 assemble；详见 `p3-assemble`「编码成本」。
 
 任意一步都可以停。改字幕只改 sidecar，不用重拼。改 `-sk` 要重渲 HUD 再拼。
