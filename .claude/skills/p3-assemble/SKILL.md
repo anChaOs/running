@@ -162,14 +162,14 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 
 ## 冷开场（可选）
 
-用户指定「从 run-c / close 各抽一句接到 open 前」时再做。不是默认流程。通常在字幕轴能定位目标句之后。
+用户指定「把某几句接到 open 前」时再做。**不是默认流程。** 来源可以是**任意一段原片素材**（`open` / `run-*` / `close` / `*-raw` 等），以用户当次点名的句为准；不要写死必须来自 `run-c` / `close`。通常在字幕轴能定位目标句之后再截。
 
-1. **只从原片截**：`YYYY-MM-DD-run-*.mp4` / `open` / `close`（或 `*-raw`）。不要 HUD preview，不要 `*-close-stats`。
-2. **切入点**按字幕轴找目标句，从该句**第一个字**起切到句末。
+1. **只从原片截**：用户指定的 `YYYY-MM-DD-*.mp4`（或 `*-raw`）。不要 HUD preview，不要 `*-close-stats`。
+2. **切入点**按字幕轴找目标句，从该句**第一个字**起切到句末（多句则按用户指定顺序）。
 3. **转场默认硬切**。
 4. **prepend** 到已有 `run-final` 前；记下 bumper 时长 offset；备份旧成片（如 `*-pre-coldopen.mp4`）。
 5. 字幕侧跟进见 `p3-subs`「切条易错」第 6 条（+offset 或重 `force_align`）。
-6. `assets.md` 记：`cold-open: done`、来源与 offset。
+6. `assets.md` 记：`cold-open: done`、来源片段与 offset。
 
 冷开场改了轴之后：响度若已做过可能要重跑 `p3-loudness`；烧字前轴必须与定稿字幕一致。
 

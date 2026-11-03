@@ -12,9 +12,10 @@
 | `p3-shoes` | 算 HUD `-sk` | 鞋名 + 开跑前/跑完后/生涯总里程 | `training/logs/shoes.md` 更新 |
 | `p3-hud` | 同档 preview（出完 VAD 句间粗剪）+ 透明层中间件 | 已命名 run + FIT + `-sk` | `hud-renders/` |
 | `p3-assemble` | 拼画面：叠化/whoosh 拼接 + 立刻抽帧核对（默认不响度、不烧字） | HUD preview | `*-run-final.mp4` + `qc/*.jpg`；`assemble/qc: done` |
-| `p3-subs` | 字幕支路：词级转写 + 忠于原句 SRT；人改后 force_align / check_subs；简介与清临时真源；可与响度并行 | 可对字幕成片 | `subtitles.srt` / `.txt`；`subs: done` |
+| `p3-subs` | 字幕支路：词级转写 + 忠于原句 SRT；人改后 force_align / check_subs；简介 / 抖音文案；可与响度并行 | 可对字幕成片 | `subtitles.srt` / `.txt`；`subs: done`；`plan.md` 简介 |
 | `p3-loudness` | 响度支路：assemble 脚本默认响度链；可与字幕并行；烧字前须就绪 | 已拼成片 | 响度版成片；`loudness: done` |
 | `p3-burn` | 烧字收尾：ASS + `--ass`；清 no-burn；upload-ready 改名 | `subs: done` + `loudness: done` | 烧字最终片；`burn: done` / `upload: ready` |
+| `p3-publish` | 发布：写 B 站/YT/抖音链接、`published`、episode PR squash 合 main；清临时 KEEP/DELETE | 双链或用户说发完了 | `published`；PR 合 main；临时进废纸篓 |
 | `p3-cover` | 封面：拍摄单 → 自拍抠图 → 粗描边 → 设计底 → 三比例手排（与 HUD 并行） | 手持自拍 + 封面句 | `cover-*.jpg` |
 | `p3-qc` | 只再核对 / 重抽 | 成片 | `qc/*.jpg`；`edited` 由字幕确认后写 |
 | `p3-jianying` | 60–90 秒发布剪辑 | 原片 + HUD alpha | 剪映工程 / 发布版 |

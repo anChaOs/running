@@ -16,7 +16,7 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
 - 不要把 FIT GPS 发给 Open-Meteo
 - 不要用生涯总里程直接当 HUD `-sk`
 - 不要覆盖已有 `open/run-*/close`、HUD、成片，除非用户明确要重做
-- 不要在成片流程里自行搬盘或删原片；归档走 `p3-archive`。发布完毕且两边链接都齐时，清临时文件走 `p3-subs`「发布后清临时文件」（真源；先确认再进废纸篓）
+- 不要在成片流程里自行搬盘或删原片；归档走 `p3-archive`。发布完毕且两边链接都齐时，写链接 / `published` / 合 PR / 清临时走 `p3-publish`（真源；先确认再进废纸篓）
 - 发布前**只把成片** `YYYY-MM-DD-run-final.mp4` 原地改成标题名；**字幕文件名不要改**，上传外挂用 `subtitles.srt`
 
 ## 产物图
@@ -40,6 +40,9 @@ hud-preview + open/close
 
 两者都就绪
   p3-burn       → ASS 烧字最终片 → 可选 upload-ready 改名
+
+双链齐
+  p3-publish    → 写链接 / published / 合 episode PR / 清临时
 
 换封面句
   p3-cover       → 重出 cover-*.jpg，不重渲 HUD
@@ -65,6 +68,7 @@ python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
 | 只做字幕 | 成片 `run-final` | `p3-subs`（可与响度并行） |
 | 只做响度 | 成片 `run-final` | `p3-loudness`（可与字幕并行） |
 | 只烧字 | `subs: done` + `loudness: done` | `p3-burn` |
+| 发布 / 清临时 | 双链（B 站+YouTube）或用户说发完了 | `p3-publish` |
 | 只换封面 | 自拍 + 封面句 | `p3-cover` |
 | 再核对 | 成片 | `p3-qc` |
 | 剪映短片 | HUD overlay | `p3-jianying` |
@@ -85,7 +89,7 @@ python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
 6. **里程口径**：开跑前 / 跑完后 / 现在的生涯总里程。生涯总里程要减去本场 km 才是开跑前。本场 km 用 FIT。
 7. **天气**：默认上海城市场点 `--weather-city shanghai`。明确不要则 `--no-weather`。
 8. **封面句**：默认 `episode.md` / `talk.md` 标题，系列名「破三实验室」。封面走 `p3-cover`，与 HUD 并行。
-9. **今天停在哪**：ingest / hud / assemble / subs / loudness / burn / full。
+9. **今天停在哪**：ingest / hud / assemble / subs / loudness / burn / publish / full。
 
 ## 完成后 / 引导下一步
 
@@ -101,6 +105,7 @@ python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
 | 没有字幕稿 | `/p3-subs`（对着成片转写；可与响度并行） |
 | 成片未修响度 | `/p3-loudness`（可与字幕并行） |
 | 字幕+响度都齐、未烧字 | `/p3-burn` |
+| 已烧字、要发 / 清临时 | `/p3-publish` |
 | 只要换封面 | `/p3-cover 封面句「<封面句>」` |
 | 成片要再核对 | `/p3-qc` |
 | 只要 60–90 秒 | `/p3-jianying` |
@@ -115,5 +120,5 @@ python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
 
 ## 3. 状态
 
-`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；字幕对口型完成后 `edited`；发布后记链接（B 站 + YouTube）后 `published`（**抖音不挡** `published`）；`published` 且双链写完后，**自动 merge 该期 episode PR 进 `main`**（细节以 `p3-subs` 为准），再按 `p3-subs`「发布后清临时文件」清该期媒体目录（先列保留/删除清单与体积 → 用户确认 → 进废纸篓，禁止 `rm`）。抖音短链随后写入「发布」栏。成片按 `p3-burn` / `p3-subs`：**只留一份标题烧字 `.mp4`**；`*-no-burn` 清理见 `p3-burn`。抖音文案与 `#` 话题规则见 `p3-subs`。
+`episode.md`：ingest 完成后至少 `shot`；HUD 完成后 `hud`；字幕对口型完成后 `edited`；发布后记链接（B 站 + YouTube）后 `published`（**抖音不挡** `published`）；`published` 且双链写完后，**自动 merge 该期 episode PR 进 `main`**（细节以 `p3-publish` 为准），再按 `p3-publish` 清该期媒体目录（先列保留/删除清单与体积 → 用户确认 → 进废纸篓，禁止 `rm`）。抖音短链随后写入「发布」栏。成片按 `p3-burn` / `p3-publish`：**只留一份标题烧字 `.mp4`**；`*-no-burn` 清理见 `p3-burn`。抖音文案与 `#` 话题规则见 `p3-subs`；写链接与清临时见 `p3-publish`。
 `assets.md`：拼画面核对后 `assemble: done`、`qc: done`；响度后 `loudness: done`；字幕确认后 `subs: done`；烧字后 `burn: done`。`episode.md` 在拼画面后仍是 `hud`，字幕确认后才 `edited`。

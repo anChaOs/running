@@ -1,6 +1,6 @@
 ---
 name: p3-subs
-description: 字幕支路：用 faster-whisper large-v3-turbo 对着成片转写口播，忠于原句写短条字幕；写完先停，等人手改字。改好后 force_align → check_subs，人听硬失败行确认后才写 subs: done，再写简介。可与 p3-loudness 并行。烧字不在本 skill，走 p3-burn。本 skill 只编排与人机关口；默认只调用 tools/subs 脚本看输出/退出码，不为跑流程去读源码。用户说字幕、转写、whisper、对口型、改字幕时用。不要用 talk.md 估时，不要整段均分时间，禁用 tiny/small。没有成片先走 p3-assemble。
+description: 字幕支路：用 faster-whisper large-v3-turbo 对着成片转写口播，忠于原句写短条字幕；写完先停，等人手改字。改好后 force_align → check_subs，人听硬失败行确认后才写 subs: done，再写简介与抖音文案进 plan.md。可与 p3-loudness 并行。烧字走 p3-burn；发布与清临时走 p3-publish。本 skill 只编排与人机关口；默认只调用 tools/subs 脚本看输出/退出码，不为跑流程去读源码。用户说字幕、转写、whisper、对口型、改字幕时用。不要用 talk.md 估时，不要整段均分时间，禁用 tiny/small。没有成片先走 p3-assemble。
 ---
 
 # 字幕（忠于原句）
@@ -15,14 +15,14 @@ description: 字幕支路：用 faster-whisper large-v3-turbo 对着成片转写
 
 | | |
 | --- | --- |
-| **职责** | 转写 → 人改字 → force_align → check_subs → `subs: done`；写简介 / 抖音文案；发布后清临时真源 |
+| **职责** | 转写 → 人改字 → force_align → check_subs → `subs: done`；写简介 / 抖音文案进 `plan.md` |
 | **输入** | 可对字幕成片 `YYYY-MM-DD-run-final.mp4`（`p3-assemble` 产出即可，**不必等响度**） |
-| **输出** | `subtitles.txt` / `.srt`（仓库+媒体）；`subs: done`；`plan.md` 简介；清临时 KEEP/DELETE |
-| **不负责** | 响度（`p3-loudness`）、烧字/ASS/`--ass`（`p3-burn`）、拼画面转场 |
+| **输出** | `subtitles.txt` / `.srt`（仓库+媒体）；`subs: done`；`plan.md` 简介 / 抖音栏 |
+| **不负责** | 响度（`p3-loudness`）、烧字/ASS/`--ass`（`p3-burn`）、拼画面转场、发布写链接 / 清临时（`p3-publish`） |
 
 校对期（waiting-review）外挂 SRT 给人改字/审片。平台可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。硬字幕烧进成片由 `p3-burn` 在字幕定稿 **且** 响度就绪后做。
 
-**真源分工：** 切条 / 对齐 / 质检实现在 `tools/subs/` 脚本里。本 skill 只写何时跑哪个脚本、人改字门、交用户前的切条易错扫、简介与清临时。不要在本文件再抄一套算法。
+**真源分工：** 切条 / 对齐 / 质检实现在 `tools/subs/` 脚本里。本 skill 只写何时跑哪个脚本、人改字门、交用户前的切条易错扫、简介。不要在本文件再抄一套算法。发布与清临时见 `p3-publish`。
 
 **读源码门槛：** 跑本 skill 时**默认只调用脚本，看 stdout/stderr 与退出码**。**不要**为了执行流水线去 Read `.py`、docstring 或「先通读实现再动手」。只有改算法、排错、或解释「为什么这么切」时才打开对应脚本。
 
@@ -219,69 +219,6 @@ iina --mpv-geometry=320x180-8+8 \
 
 小窗贴右上角。制作阶段若有同名 `YYYY-MM-DD-run-final.srt` 会自动挂；成片已按标题改名后，视频是标题名 `.mp4`，字幕仍用 `subtitles.srt`（`iina --mpv-sub-file=.../subtitles.srt` 或上传时手挂）。不要去找与标题同名的 `.srt`。
 
-**先不要给发布流程。** 用户说「没问题了 / 可以发了」再给（且通常已走完 `/p3-burn`）：从 `plan.md` 抄标题、封面句、简介。成片改名规则见 `p3-burn`「发布前改名」。上传成片 → 换封面 → 挂 `subtitles.srt`（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。不要替用户上传。`episode.md` 的 `status` 仍为 `edited`，真正发完、两边链接齐了才改 `published`。
+**先不要给完整发布流程。** 用户说「没问题了 / 可以发了」且通常已走完 `/p3-burn` 后，走 `/p3-publish`（上传清单、写双链、`published`、合 episode PR、清临时）。本 skill 到简介 / 抖音文案写入 `plan.md` 为止。
 
-**抖音（第三平台，不挡 `published`）**
-- 成片：用**已烧字幕**的标题名 `.mp4`（由 `p3-burn` 产出；抖音不依赖外挂 SRT）。
-- 文案：从 `plan.md`「抖音」栏抄正文，再按「建议话题」清单（≤5）在发布页点选变蓝；封面可用 `cover-1080x1440.jpg`（竖封面）或平台裁切。
-- 用户发完后把分享短链（`https://v.douyin.com/…`）写入 `episode.md`「发布」栏「抖音：」。
-- **成片只留一份**：媒体目录**只保留**标题名烧字幕 `.mp4`。`*-no-burn` 清理规则真源见 `p3-burn`（烧字定稿后立刻进废纸篓，不必等抖音）。
-
-
-| 用途 | 文件 |
-| --- | --- |
-| 成片（上传用 = 生产成片） | 媒体目录里以标题命名的 `.mp4`（由 `YYYY-MM-DD-run-final.mp4` 原地改名） |
-| 封面 | `cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg` |
-| 外挂 | **`subtitles.srt`**（不要改成标题名；制作阶段可选保留 `YYYY-MM-DD-run-final.srt`） |
-
-还要 60–90 秒短视频才提 `/p3-jianying`。两边链接齐之后，不要在这里另做一套，直接按「发布后清临时文件」。
-
-### 发布后清临时文件
-
-**真源在此。** 其它 skill / 文档只引用本节，不要另写一份保留/删除清单。
-
-触发：用户说「发布完毕 / 发完了 / 已发布」之类，并且同时给了 **B 站 BV（或完整 B 站链接）** 和 **YouTube 链接**。顺序：
-
-1. 写两边链接、`episode.md` 的 `status=published`
-2. **立刻合并该期 episode PR 进 `main`**（squash；可删远程分支）；不要等用户再点合
-3. 再按本节列清临时清单（体积）→ 用户确认 → 进废纸篓（禁止 `rm`）
-
-媒体目录：`~/Movies/running-content/YYYY-MM-DD-slug/`。
-
-#### 保留（KEEP）
-
-| 保留 | 说明 |
-| --- | --- |
-| 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
-| 成片 | **仅一份**：以标题命名的最终烧字幕 `.mp4`；勿留 `*-no-burn` / 额外 `run-final`（烧字定稿后即可扔，不等抖音） |
-| 字幕 | `subtitles.srt`（制作期可选的 `YYYY-MM-DD-run-final.srt` 可留）；烧字源 `subtitles.ass` 可留 |
-| 封面 | `cover.jpg`、`cover-1920x1080.jpg`、`cover-4x3-1920x1440.jpg`、`cover-1080x1440.jpg` |
-| 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
-| 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
-
-仓库 `episodes/` 里的字幕源稿、跑鞋账本一律不动。
-
-#### 删除（DELETE）
-
-缺了就跳过，不要报错停住：
-
-| 删 | 说明 |
-| --- | --- |
-| `*-no-burn.mp4` | 无字幕备份；**永远不留**。烧字成片定稿/改名后立刻进废纸篓，不必等抖音 |
-| 多余 `YYYY-MM-DD-run-final.mp4` | 已有标题烧字成片时的旧名/无字幕备份；一并进废纸篓 |
-| `*-run-final-pre-*.mp4` | 拼片备份（冷开场前、修剪前等）；发布后不再需要回退 |
-| `close-stats` 等渲染中间件 | 叠了数据的 close 中间件、其它可再生成的渲染产物 |
-| 剪过的 `open` / `close` | **仅当**已有对应 `open-raw` / `close-raw` 时删；没有 `-raw` 则上面 KEEP 已要求保留 |
-| `hud-renders/` | HUD preview / 透明层；可再跑 `p3-hud` |
-| `asr/` | 转写中间产物 |
-| `qc/` | 抽帧核对图 |
-| `cover-candidates/` | 封面候选帧 |
-| `cold-open/` | 冷开场中间件 |
-| `*.bak`、`.DS_Store` | 备份后缀与系统垃圾 |
-
-#### 流程（PROCESS）
-
-1. **先列清单再动手。** 用 `du -sh` / `ls -lh` 列出拟删项与拟留项及体积，报给用户确认。用户没明确同意前不要删。
-2. **进废纸篓，禁止 `rm`。** 在 macOS 上把确认要删的路径 **move 进废纸篓**（`mv … ~/.Trash/`，或已安装的 `trash` CLI）。不要用 `rm` / `rm -rf`。同名冲突时先改名再移入。
-3. 清完把实际移入废纸篓的路径与腾出的体积报给用户。
-4. 这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。
+还要 60–90 秒短视频才提 `/p3-jianying`。

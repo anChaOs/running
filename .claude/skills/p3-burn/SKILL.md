@@ -1,6 +1,6 @@
 ---
 name: p3-burn
-description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS，用 assemble_episode.py --ass 烧进最终片；处理 no-burn 备份与发布前改名。用户说烧字、硬字幕、--ass、最终片、upload-ready 改名时用。不要在字幕未定稿或响度未完成时烧。拼画面走 p3-assemble；字幕走 p3-subs；响度走 p3-loudness。
+description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS，用 assemble_episode.py --ass 烧进最终片；处理 no-burn 备份与发布前改名。用户说烧字、硬字幕、--ass、最终片、upload-ready 改名时用。不要在字幕未定稿或响度未完成时烧。拼画面走 p3-assemble；字幕走 p3-subs；响度走 p3-loudness；发布与清临时走 p3-publish。
 ---
 
 # 烧字
@@ -73,10 +73,10 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 1. **只改成片名**：`YYYY-MM-DD-run-final.mp4` 原地改为 `plan.md` / `episode.md` 标题原文 + `.mp4`。
 2. **不要改字幕文件名**；上传外挂始终 `subtitles.srt`。
 3. 文件名保留标题全部标点（含 `|`、`？`、空格）；不要把 `|` 换成 `-`。
-4. 备份（`*-pre-coldopen` 等）改名阶段保留原名；发布后清临时见 `p3-subs`「发布后清临时文件」。
+4. 备份（`*-pre-coldopen` 等）改名阶段保留原名；发布后清临时见 `p3-publish`。
 5. `assets.md` 加 `upload: ready`。`episode.md` 仍为 `edited`，双链齐了才 `published`。
 
-简介、抖音文案、发布后清临时文件的 KEEP/DELETE 真源仍在 `p3-subs`。
+简介 / 抖音文案正文见 `p3-subs`；发布写链接、合 PR、清临时 KEEP/DELETE 真源见 `p3-publish`。
 
 ## 常见翻车
 
@@ -89,4 +89,4 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 
 ## 完成后
 
-> 用户说「没问题了 / 可以发了」再给上传清单（标题名成片 + `subtitles.srt`）。清临时与双链 `published` 按 `p3-subs`。
+> 用户说「没问题了 / 可以发了」走 `/p3-publish`（上传清单、双链 `published`、合 PR、清临时）。

@@ -37,6 +37,7 @@
   p3-subs         字幕（转写→人改→对齐）；可与响度并行
   p3-loudness     响度支路；可与字幕并行
   p3-burn         烧字收尾（字幕+响度都就绪后）
+  p3-publish      发布：写双链 / published / 合 PR / 清临时
   p3-cover        只换封面 / 重抽
   p3-qc           只再核对；默认已在 assemble 里做过
   p3-jianying     60–90 秒剪映，不走全长脚本
@@ -60,7 +61,7 @@
   → p3-subs ∥ p3-loudness
                     字幕定稿（subs: done）与响度定稿（loudness: done）并行
   → p3-burn         烧字最终片；可选 upload-ready 改名
-  → （发布后）      双链齐 → status=published；清临时真源见 p3-subs
+  → p3-publish      双链齐 → status=published → 合 episode PR → 清临时
 
 满 7 天、要腾本机
   → p3-archive      /Volumes/My Passport/running-content/YYYYMM/
