@@ -1,6 +1,6 @@
 ---
 name: p3-subs
-description: 用 faster-whisper large-v3-turbo 对着成片转写口播，忠于原句写短条字幕；写完先停，等人手改字。改好后 force_align → check_subs，人听硬失败行确认后才写 subs: done；再烧 ASS、写简介。切条算法以 tools/subs/draft_subs.py 为准，本 skill 只编排与人机关口。用户说字幕、转写、whisper、对口型、改字幕时用。不要用 talk.md 估时，不要整段均分时间，禁用 tiny/small。没有成片先走 p3-assemble。
+description: 用 faster-whisper large-v3-turbo 对着成片转写口播，忠于原句写短条字幕；写完先停，等人手改字。改好后 force_align → check_subs，人听硬失败行确认后才写 subs: done；再烧 ASS、写简介。本 skill 只编排与人机关口；默认只调用 tools/subs 脚本看输出/退出码，不为跑流程去读源码。用户说字幕、转写、whisper、对口型、改字幕时用。不要用 talk.md 估时，不要整段均分时间，禁用 tiny/small。没有成片先走 p3-assemble。
 ---
 
 # 字幕（忠于原句）
@@ -9,11 +9,13 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播，忠于
 
 发布默认**烧进成片**（从 2026-10-29 Fatmax 期起）：定稿后生成 `subtitles.ass`，由 `p3-assemble --ass` 烧入最终片。校对期（waiting-review）仍外挂 SRT 给人改字/审片。平台可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。不要把字幕轨 mux 进 mp4（平台转码会丢掉）。
 
-**真源分工：** 切条 / 对齐 / 质检阈值与实现以 `tools/subs/` 脚本为准（尤其 `draft_subs.py`、`force_align.py`、`check_subs.py` 的 docstring）。本 skill 只写何时跑哪个脚本、人改字门、交用户前的切条易错扫、烧字发布与清临时。不要在本文件再抄一套算法。
+**真源分工：** 切条 / 对齐 / 质检实现在 `tools/subs/` 脚本里。本 skill 只写何时跑哪个脚本、人改字门、交用户前的切条易错扫、烧字发布与清临时。不要在本文件再抄一套算法。
+
+**读源码门槛：** 跑本 skill 时**默认只调用脚本，看 stdout/stderr 与退出码**。**不要**为了执行流水线去 Read `.py`、docstring 或「先通读实现再动手」。只有改算法、排错、或解释「为什么这么切」时才打开对应脚本。
 
 ## 流水线
 
-1. 转写 + 初稿：跑 `tools/subs/draft_subs.py`（词级时间；专名表当提示）。切条规则**以该脚本为准**。词级缓存和原始初稿留在媒体目录 `asr/`，不要覆盖
+1. 转写 + 初稿：跑 `tools/subs/draft_subs.py`（词级时间；专名表当提示）；看打印与产物即可，不必读源码。词级缓存和原始初稿留在媒体目录 `asr/`，不要覆盖
 2. **校正**：只做下面「可以做」，绝不做「不能做」；交稿前做同音字扫描
 3. **切条**：由 `draft_subs` 产出；agent **不重跑切条算法**。字一个都不改，**不对口型**
 4. **自检切条（必做，交用户前）**：对照下方「切条易错」**逐条**扫初稿，只改切分、不改嘴里说的字。用户到手后**只需抽听核对**，不要把第一轮切条扫漏推给用户
@@ -50,7 +52,7 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播，忠于
 
 需要 `YYYY-MM-DD-run-final.mp4`。没有则先 `/p3-assemble`（**可先 `--no-loudness-fix` 出可对字幕版**；响度链放到本 skill 停在 waiting-review 之后，与用户校对并行，见 `p3-assemble`「流程顺序」）。转写听成片一条，时间就是成片轴。写完稿等人手改字，改好了再对口型。只改字不重转写。
 
-依赖（一次）：`.venv/bin/pip install -r tools/subs/requirements.txt`。Apple Silicon 上 pip 直接装，CPU 跑。模型首次运行自动从 ModelScope 拉到 `~/Movies/running-content/.models/faster-whisper-large-v3-turbo/`（约 1.6 GB），不连 Hugging Face。细节与耗时见脚本 docstring。
+依赖（一次）：`.venv/bin/pip install -r tools/subs/requirements.txt`。Apple Silicon 上 pip 直接装，CPU 跑。模型首次运行自动从 ModelScope 拉到 `~/Movies/running-content/.models/faster-whisper-large-v3-turbo/`（约 1.6 GB），不连 Hugging Face。耗时与进度看脚本打印即可，不必为跑流程去读源码。
 
 专名表：`episode.md` 里写一行 `专名：Personal Agent、HUD、……`（本期口播会说到的产品名、人名、英文术语）。它只当识别提示纠拼写，不能拿来改用词。`p3-topic` 建期时就该写好；转写时脚本自动读，不用再手抄。
 
@@ -64,13 +66,13 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播，忠于
 
 - 不要用 `talk.md` / `script.md` 估时间，也不要用它们改口播用词
 - 不要在字幕校准前写简介，也不要用 `talk.md` 写简介
-- 不要自造第二套切条/对齐规则；算法以 `tools/subs/` 脚本为准
+- 不要自造第二套切条/对齐规则；也不要为跑流程去 Read `tools/subs/` 源码（改算法 / 排错 / 解释切法除外）
 - 不要把一段识别的起止按字数均分给几条字幕，也不要手填等步长的时间。对不上的条留给 `force_align.py` 报出来，人听了再定
 - 不要用 tiny / small；只用 large-v3-turbo
 
 ## 转写 + 初稿
 
-`--audio` 直接给成片 mp4 即可（脚本抽 wav / 复用缓存）。不传 `--prompt` 时自动读 `--txt` 同目录 `episode.md` 的「专名：」一行。**先把专名表写进 `episode.md` 再转写**；临时不要提示用 `--prompt ""`。切条实现与参数见 `draft_subs.py`。
+`--audio` 直接给成片 mp4 即可（脚本抽 wav / 复用缓存）。不传 `--prompt` 时自动读 `--txt` 同目录 `episode.md` 的「专名：」一行。**先把专名表写进 `episode.md` 再转写**；临时不要提示用 `--prompt ""`。直接跑命令看输出即可，不要为跑初稿去 Read `draft_subs.py`。
 
 ```bash
 .venv/bin/python tools/subs/draft_subs.py \
@@ -130,7 +132,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 ## 改好字之后：对口型
 
-用户说「改好了」之后，先回写 SRT，再对口型。对齐与质检的实现、阈值、退出码以 `force_align.py` / `check_subs.py` 为准；下面只写编排。
+用户说「改好了」之后，先回写 SRT，再对口型。下面只写编排：直接跑 `force_align.py` / `check_subs.py`，看打印与退出码；不要为跑对齐/质检去 Read 源码（改算法 / 排错除外）。
 
 1. 若动了 txt：
 

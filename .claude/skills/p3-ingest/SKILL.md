@@ -61,7 +61,7 @@ MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间�
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
 ```
 
-默认 dry-run，列出要剪短的间隔。确认后加 `--apply`。原片改名为 `*-open-raw.mp4` / `*-close-raw.mp4`，工作文件仍是 `*-open.mp4` / `*-close.mp4`。停顿门槛、安全余量、VAD/能量门限、片尾保护等**以 `tools/ingest/trim_talk_pauses.py` 为准**；skill 不复述算法。音画必须同一起止 trim 再 concat，不要用 `select`/`aselect` 分轨切（会漂）。不要剪 `run-*`，也不要动 `run-*` 的 mtime。不需要粗剪时，ingest 加 `--skip-pause-trim`。
+默认 dry-run，列出要剪短的间隔。确认后加 `--apply`。原片改名为 `*-open-raw.mp4` / `*-close-raw.mp4`，工作文件仍是 `*-open.mp4` / `*-close.mp4`。停顿门槛等实现在 `tools/ingest/trim_talk_pauses.py`；skill 不复述算法。**跑流程时只调用脚本看打印/退出码，不要为执行本步去 Read 源码**（改算法 / 排错除外）。音画必须同一起止 trim 再 concat，不要用 `select`/`aselect` 分轨切（会漂）。不要剪 `run-*`，也不要动 `run-*` 的 mtime。不需要粗剪时，ingest 加 `--skip-pause-trim`。
 
 ingest `--apply` 会直接跑粗剪 `--apply`。已经收过的素材，单独跑上面这条。
 
