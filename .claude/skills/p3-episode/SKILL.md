@@ -49,6 +49,8 @@ subs + loudness 都就绪
 
 **推荐墙钟：** `assemble`（带响度）→ `subs` → `burn` → `publish`。响度/烧字勿再全量 assemble；编码成本见 `p3-assemble`。
 
+**耗时记录（每期默认）：** 各 stage 写墙钟到媒体目录 `logs/timeline.txt`（step / elapsed_s / rc）；失败另记 `logs/failures.md`（step、rc、日志路径、短错误）。汇报时给各步加总 + 墙上总时长（并行步会短于加总）。
+
 ## 1. 先盘点，再问目标
 
 在仓库和 `~/Movies/running-content/` 里找该日已有文件。对照 `episodes/*/assets.md` 的「制作状态」。先跑：
