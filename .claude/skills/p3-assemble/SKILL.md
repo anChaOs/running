@@ -1,15 +1,13 @@
 ---
 name: p3-assemble
-description: 拼画面：把 open + HUD preview + close 拼成可对字幕的全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声；本步默认 `--no-loudness-fix`、不加 `--ass`。响度走 p3-loudness，字幕走 p3-subs（二者并行），烧字走 p3-burn。用户说拼接、转场、assemble、拼画面、成片导出时用。不要在这里渲 HUD、写字幕、做响度主流程或烧字。只再核对一次走 p3-qc。
+description: 拼画面：把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。推荐拼时带响度（不加 --no-loudness-fix）；急着先转写才加 --no-loudness-fix。本步不加 --ass。总序见 p3-episode。用户说拼接、转场、assemble、拼画面、成片导出时用。不要在这里渲 HUD、写字幕或烧字。只再核对一次走 p3-qc。
 ---
 
 # 拼画面
 
-把已有 HUD preview 拼成一条**可对字幕**的全长成片，**拼完立刻抽帧核对画面**。不要停下来等人发 `/p3-qc`。这不是 60–90 秒发布剪辑。
+把已有 HUD preview 拼成一条全长成片，**拼完立刻抽帧核对画面**。不要停下来等人发 `/p3-qc`。这不是 60–90 秒发布剪辑。
 
-```text
-总序：拼画面（本 skill）→（字幕 p3-subs ∥ 响度 p3-loudness）→ 烧字 p3-burn
-```
+**总序 / 产物图真源：** `p3-episode`。本 skill 只负责拼画面（+ 推荐顺带响度）与画面抽帧。
 
 产物：
 
@@ -17,31 +15,45 @@ description: 拼画面：把 open + HUD preview + close 拼成可对字幕的全
 ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
 ```
 
+## 编码成本（必读）
+
+当前 `assemble_episode.py` **只有一条路**：从 open + HUD preview + close **全量重拼重编**。`p3-loudness` / `p3-burn` 若再调同一入口，等于再编整片——最坏 **拼 / 响度 / 烧字编 3 遍**。
+
+**推荐路径（省一遍）：拼时带响度 → 人改字幕 → `/p3-burn`。** 不要默认「拼（关响度）∥ 单独 loudness ∥ 再 burn」三条全跑。
+
+| 路径 | 怎么做 | 全片大约编几次 |
+| --- | --- | --- |
+| **推荐** | 本步**不加** `--no-loudness-fix`；字幕走 `p3-subs`；最后 `p3-burn` | **2**（拼+响度一次，烧字再一次） |
+| 急着先转写 | 本步加 `--no-loudness-fix`，稍后再 `/p3-loudness` | loudness **再全量重拼一遍**（成本高） |
+| 烧字 | 见 `p3-burn`（当前仍全量重拼） | 再 +1 |
+
+**冷开场：** 事后 prepend 进 `run-final` 后，**禁止**再无脑跑会覆盖成片的 assemble（含 loudness / burn 入口）——会把 bumper **抹掉**。冷开场规则见下文；后续只对带 bumper 的文件操作，或等脚本支持「只响度 / 只烧字」（另 PR）。
+
 ## 职责 / 输入 / 输出
 
 | | |
 | --- | --- |
-| **职责** | 拼 open / HUD preview / close（转场、whoosh、可选 overlays / close-stats / 冷开场）；画面抽帧核对 |
+| **职责** | 拼 open / HUD preview / close（转场、whoosh、可选 overlays / close-stats / 冷开场）；画面抽帧核对；**推荐顺带响度** |
 | **输入** | `hud-renders/*-run-*-hud-preview.mp4`；可选 `open` / `close`、`overlays.json`、高驰 `stats-*.jpg` |
-| **输出** | `YYYY-MM-DD-run-final.mp4`（可对字幕；本步默认未修响度、未烧字）+ `qc/*.jpg`；`assets.md`：`assemble: done`、`qc: done` |
-| **下一步** | 并行开 `/p3-subs` 与 `/p3-loudness`；两者都就绪后再 `/p3-burn` |
+| **输出** | `YYYY-MM-DD-run-final.mp4`；`qc/*.jpg`；`assets.md`：`assemble: done`、`qc: done`；若本步带了响度再写 `loudness: done` + 实测 |
+| **下一步** | `/p3-subs`。若本步关了响度才另开 `/p3-loudness`（有成本）。`subs`+`loudness` 都齐再 `/p3-burn` |
 
-HUD 走 `p3-hud`，封面走 `p3-cover`（二者并行）。本 skill **不管**响度定稿、字幕稿、烧字。
+HUD 走 `p3-hud`，封面走 `p3-cover`（二者并行）。烧字走 `p3-burn`。抽帧核对清单**真源在本 skill**；`p3-qc` 只补做/重做时引用这里。
 
 ## 不要做的事
 
 - 不要在这里渲 HUD 或从口播卡写字幕
-- 不要在本步跑响度主流程（那是 `p3-loudness`）；拼画面默认加 `--no-loudness-fix`
 - 不要在本步加 `--ass` 烧字（那是 `p3-burn`）
 - 不要把字幕轨 mux 进 mp4
 - 不要用 alpha 层当主轨，主轨是 `*-hud-preview.mp4`
 - 不要降码
 - 成片写好后不要只丢路径；接着抽帧核对画面
 - 冷开场不要从 HUD preview / close-stats 截；不要默叠化（默认硬切）
+- 冷开场 prepend 之后不要再跑全量 assemble 覆盖（见上）
 
 ## 前置
 
-`hud-renders/*-run-*-hud-preview.mp4` 齐。`open` / `close` 可缺。**不要等字幕、不要等响度。** 已有 SRT 则拷到成片旁边（可选）。
+`hud-renders/*-run-*-hud-preview.mp4` 齐。`open` / `close` 可缺。**不要等字幕。** 已有 SRT 则拷到成片旁边（可选）。
 
 有高驰截图 `YYYY-MM-DD-stats-*.jpg` 时，先叠到 close 左侧（半透明、多张均分轮播），再拼。原 close 不动：
 
@@ -59,12 +71,13 @@ HUD 走 `p3-hud`，封面走 `p3-cover`（二者并行）。本 skill **不管**
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
   --dry-run
 
-# 正式拼：默认出可对字幕版（关响度、不烧字）；后台跑
+# 推荐：拼时带响度（不要 --no-loudness-fix）；后台跑
 nohup .venv/bin/python tools/assemble/assemble_episode.py \
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
-  --no-loudness-fix \
   > ~/Movies/running-content/YYYY-MM-DD-slug/assemble.log 2>&1 &
 # 等待期间去做封面 / 鞋账本；结束后看 assemble.log 末尾再核对画面
+
+# 仅当急着先转写：再加 --no-loudness-fix（响度稍后再跑=又全量重拼）
 ```
 
 已有字幕时（重拼后）脚本不会拷 SRT，跑一次同步：
@@ -81,7 +94,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 - run 与 run：一阵风刮过（各约 0.08 秒横向拖影刮出/刮入），叠 `tools/assemble/sfx/whoosh.wav`
 - `最后一段 run → close` 叠化 0.2 秒，close 无 HUD
 - 统一 60 fps、`settb=1/60`
-- 视频 HEVC videotoolbox；音频 AAC 192k（本步 `--no-loudness-fix`，响度细节见 `p3-loudness`）
+- 视频 HEVC videotoolbox；音频 AAC 192k（推荐本步走默认响度链；细节见 `p3-loudness`）
 - 有 `overlays.json` 时按成片时间轴叠动画/小视频
 
 ## 叠加层（动画 / 小视频）
@@ -122,7 +135,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 - 其后 run 时长累加（风转场不重叠，轴和硬切一样）
 - close 从 `Do + sum(R) - 2X` 开始叠化
 
-## 核对（拼完立刻做 · 只看画面）
+## 核对（拼完立刻做 · 只看画面）**【抽帧真源】**
 
 至少抽这几帧到媒体目录 `qc/`（本步无烧字，不要从成片里找字幕帧）：
 
@@ -144,9 +157,10 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 - 跑鞋名和 `-sk` 与 `training/logs/shoes.md` 一致
 - 天气是「数字°C / 数字°C」，不是方框 `℃`
 - 没有明显降码、花屏、音画不同步
-- **本步不要求** LUFS 达标或画面有烧字（分别见 `p3-loudness` / `p3-burn`）
+- 若本步带了响度：听开场与接缝；日志/实测约 I=−16、TP≤−1.5（细则 `p3-loudness`）
+- **本步不要求**画面有烧字（见 `p3-burn`）
 
-通过后：`assets.md` 的 `assemble: done`、`qc: done`。`episode.md` 仍是 `hud`。
+通过后：`assets.md` 的 `assemble: done`、`qc: done`；拼时带响度则一并 `loudness: done`。`episode.md` 仍是 `hud`。
 
 失败：鞋错 → `p3-hud`；接缝错 → 查 open/close 是否被当成 run。
 
@@ -162,7 +176,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 
 ## 冷开场（可选）
 
-用户指定「把某几句接到 open 前」时再做。**不是默认流程。** 来源可以是**任意一段原片素材**（`open` / `run-*` / `close` / `*-raw` 等），以用户当次点名的句为准；不要写死必须来自 `run-c` / `close`。通常在字幕轴能定位目标句之后再截。
+用户指定「把某几句接到 open 前」时再做。**不是默认流程。** 来源可以是**任意一段原片素材**（`open` / `run-*` / `close` / `*-raw` 等），以用户当次点名的句为准。通常在字幕轴能定位目标句之后再截。
 
 1. **只从原片截**：用户指定的 `YYYY-MM-DD-*.mp4`（或 `*-raw`）。不要 HUD preview，不要 `*-close-stats`。
 2. **切入点**按字幕轴找目标句，从该句**第一个字**起切到句末（多句则按用户指定顺序）。
@@ -170,15 +184,12 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 4. **prepend** 到已有 `run-final` 前；记下 bumper 时长 offset；备份旧成片（如 `*-pre-coldopen.mp4`）。
 5. 字幕侧跟进见 `p3-subs`「切条易错」第 6 条（+offset 或重 `force_align`）。
 6. `assets.md` 记：`cold-open: done`、来源片段与 offset。
-
-冷开场改了轴之后：响度若已做过可能要重跑 `p3-loudness`；烧字前轴必须与定稿字幕一致。
+7. **prepend 之后**：不要再跑全量 assemble / 当前的 loudness·burn 入口覆盖 `run-final`（会抹掉 bumper）。烧字前轴必须与定稿字幕一致。
 
 ## 完成后
 
 画面核对通过。不要再推荐 `/p3-qc`，除非核对失败。不要给发布文案。
 
-> 下一步并行：`/p3-subs`（字幕）与 `/p3-loudness`（响度）。两者都就绪后再 `/p3-burn`。
+> 下一步：`/p3-subs`。若本步用了 `--no-loudness-fix`，另开 `/p3-loudness`（=再全量重拼，有成本）；拼时已带响度则跳过 loudness。
 >
 > `/p3-subs`
->
-> `/p3-loudness`

@@ -33,10 +33,10 @@
   p3-ingest       VID_ / FIT → open/run-*/close
   p3-shoes        training/logs/shoes.md，算出 -sk
   p3-hud          overlay + 同档 preview，并行封面
-  p3-assemble     拼画面（默认不响度、不烧字）+ 抽帧核对
-  p3-subs         字幕（转写→人改→对齐）；可与响度并行
-  p3-loudness     响度支路；可与字幕并行
-  p3-burn         烧字收尾（字幕+响度都就绪后）
+  p3-assemble     拼画面（推荐拼时带响度）+ 抽帧核对
+  p3-subs         字幕（转写→人改→对齐）
+  p3-loudness     响度补跑（现状=全量重拼；拼时已带则跳过）
+  p3-burn         烧字 / 改名（现状 --ass 仍全量重拼）
   p3-publish      发布：写双链 / published / 合 PR / 清临时
   p3-cover        只换封面 / 重抽
   p3-qc           只再核对；默认已在 assemble 里做过
@@ -46,25 +46,18 @@
 
 ## 产物顺序
 
+**总序真源：`p3-episode`。** 这里只留短摘要，避免双源。
+
 ```text
-灵光一闪 / 还没拍摄日
-  → p3-library      topics/<slug>.md
-想法 / 一次训练（当天要拍）
-  → p3-topic        选题 + 分段口播卡
-  → p3-scaffold     episodes/YYYY-MM-DD-slug/
-
-手机导出 + FIT
-  → p3-ingest       ~/Movies/running-content/YYYY-MM-DD-slug/
-  → p3-shoes        -sn / -sk（跑完后累计 km）
-  → p3-hud          hud-renders/*-hud-preview.mp4 + cover-*.jpg
-  → p3-assemble     拼画面 → YYYY-MM-DD-run-final.mp4 + 抽帧核对
-  → p3-subs ∥ p3-loudness
-                    字幕定稿（subs: done）与响度定稿（loudness: done）并行
-  → p3-burn         烧字最终片；可选 upload-ready 改名
-  → p3-publish      双链齐 → status=published → 合 episode PR → 清临时
-
-满 7 天、要腾本机
-  → p3-archive      /Volumes/My Passport/running-content/YYYYMM/
+p3-library / p3-topic / p3-scaffold
+  → ingest → shoes → hud ∥ cover
+  → assemble（推荐拼时带响度；抽帧真源在 assemble）
+  → subs（∥ 仅当需要时的 loudness 补跑）
+  → burn（改名 / subtitles.srt / no-burn 真源）
+  → publish（published 门闩 / 清临时真源）
+  → archive（满 7 天）
 ```
+
+推荐墙钟：`assemble`（带响度）→ `subs` → `burn` → `publish`。assemble / loudness / burn 现状都可能全量重拼，详见 `p3-assemble`「编码成本」。
 
 任意一步都可以停。改字幕只改 sidecar，不用重拼。改 `-sk` 要重渲 HUD 再拼。

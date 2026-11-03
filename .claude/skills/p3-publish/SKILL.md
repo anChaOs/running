@@ -7,9 +7,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 烧字 / upload-ready 之后的收尾：**写双链 → `published` → squash 合本期 episode PR → 清临时**。不要替用户上传成片。
 
-```text
-总序：… → 烧字 p3-burn → 发布 本 skill（双链齐）→ 清临时
-```
+**总序真源：** `p3-episode`。本 skill 是 **published 门闩 / 抖音是否挡发布 / 清临时 KEEP·DELETE** 的真源。
 
 ## 职责 / 输入 / 输出
 
@@ -36,25 +34,24 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 ## 上传清单（用户说可以发了时给；不要替传）
 
-从 `plan.md` 抄标题、封面句、简介。成片改名规则见 `p3-burn`「发布前改名」。
+从 `plan.md` 抄标题、封面句、简介。**改名 / 外挂文件名 / no-burn：`p3-burn`。** 抖音文案怎么写：`p3-subs`。
 
-1. 上传成片（标题名烧字 `.mp4`）→ 换封面 → 挂 `subtitles.srt`（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。
-2. `episode.md` 的 `status` 在真正发完、**两边链接齐了**之前仍为 `edited`。
+1. 上传成片（标题名烧字 `.mp4`）→ 换封面 → 挂 `subtitles.srt` → 先不公开、开 CC → 再公开。
+2. `status` 在 **B 站 + YouTube 双链齐**之前仍为 `edited`。
 
 | 用途 | 文件 |
 | --- | --- |
-| 成片（上传用 = 生产成片） | 媒体目录里以标题命名的 `.mp4`（由 `YYYY-MM-DD-run-final.mp4` 原地改名） |
-| 封面 | `cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg` |
-| 外挂 | **`subtitles.srt`**（不要改成标题名；制作阶段可选保留 `YYYY-MM-DD-run-final.srt`） |
+| 成片 | 标题名烧字 `.mp4` |
+| 封面 | `cover-*.jpg` / `cover.jpg` |
+| 外挂 | `subtitles.srt` |
 
-**抖音（第三平台，不挡 `published`）**
+**抖音（第三平台，不挡 `published`）**【门闩真源在本 skill】
 
-- 成片：用**已烧字幕**的标题名 `.mp4`（`p3-burn` 产出；抖音不依赖外挂 SRT）。
-- 文案：从 `plan.md`「抖音」栏抄正文，再按「建议话题」清单（≤5）在发布页点选变蓝；封面可用 `cover-1080x1440.jpg` 或平台裁切。
-- 发完后把分享短链（`https://v.douyin.com/…`）写入 `episode.md`「发布」栏「抖音：」。
-- **成片只留一份**：媒体目录只保留标题名烧字幕 `.mp4`。`*-no-burn` 见 `p3-burn`（烧字定稿后立刻进废纸篓，不必等抖音）。
+- 成片：已烧字幕的标题名 `.mp4`（不依赖外挂 SRT）。
+- 上传：从 `plan.md`「抖音」栏抄正文；话题在发布页点选变蓝（≤5）。短链随后写入 `episode.md`「抖音：」。
+- `*-no-burn` 清理见 `p3-burn`（不必等抖音）。
 
-还要 60–90 秒短视频才提 `/p3-jianying`。简介 / 抖音文案正文怎么写见 `p3-subs`（字幕定稿后写入 `plan.md`）。
+还要短视频才提 `/p3-jianying`。
 
 ## 双链齐 → published → 合 PR
 

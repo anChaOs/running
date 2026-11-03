@@ -15,7 +15,19 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-STAGES = ["ingest", "shoes", "hud", "cover", "assemble", "qc", "subs", "upload"]
+# 与 p3-episode 总序对齐；upload ≈ burn 后的 upload: ready/done
+STAGES = [
+    "ingest",
+    "shoes",
+    "hud",
+    "cover",
+    "assemble",
+    "qc",
+    "loudness",
+    "subs",
+    "burn",
+    "upload",
+]
 
 
 def read_kv(path: Path) -> dict[str, str]:
@@ -83,6 +95,7 @@ def main() -> int:
     final = media / f"{date}-run-final.mp4"
     titled = [p for p in media.glob("*.mp4") if not p.name.startswith(date)] if media.is_dir() else []
     subs_txt = ep / "subtitles.txt"
+    has_final = has(final) or bool(titled)
 
     print(f"# {name}  status={fm.get('status', '?')}")
     print(f"- 仓库：{'有' if ep.is_dir() else '无'} episode.md={'有' if has(ep / 'episode.md') else '无'} "
@@ -98,9 +111,10 @@ def main() -> int:
               f"hud-preview={len(previews)}/{len(clips) or '?'} "
               f"cover={sum(covers.values())}/3 成片={'run-final' if has(final) else ('标题名' if titled else '无')} "
               f"字幕txt={'有' if has(subs_txt) else '无'}")
-    print("- 制作状态：" + "，".join(f"{k}={st.get(k, '-').split('（')[0].split('(')[0].strip()}" for k in STAGES))
+    print("- 制作状态：" + "，".join(
+        f"{k}={st.get(k, '-').split('（')[0].split('(')[0].strip()}" for k in STAGES
+    ))
 
-    # 下一步（按主轨顺序取第一个缺口）
     nxt: list[str] = []
     if fm.get("status") == "published":
         nxt.append("已发布。满 7 天 → `/p3-archive`" + ("" if media.is_dir() else "（本机没有媒体目录，可能已归档）"))
@@ -115,19 +129,41 @@ def main() -> int:
         nxt.append("`/p3-shoes 鞋是 <HUD 名>，这是开跑前/跑完后 <数字> 公里`")
     elif len(previews) < len(clips):
         nxt.append("`/p3-hud`")
-    elif not (has(final) or titled):
-        nxt.append("`/p3-assemble`（拼完立刻核对）")
-    elif not has(subs_txt):
-        nxt.append("`/p3-subs`（对着成片转写）")
-    elif not done(st.get("subs")):
-        nxt.append("等用户改好字幕，说「改好了」→ `/p3-subs` 对口型")
-    elif not done(st.get("upload")):
-        nxt.append("用户说「可以发了」→ 按 p3-subs 发布流程改名、上传准备")
-    elif fm.get("status") != "published":
-        nxt.append("发布后给齐 B 站 + YouTube 链接 → status=published，清临时文件")
+    elif not has_final:
+        nxt.append("`/p3-assemble`（推荐拼时带响度；拼完立刻核对）")
+    else:
+        # 成片已在：字幕与响度可并行；推荐拼时已带响度
+        if not has(subs_txt):
+            nxt.append("`/p3-subs`（对着成片转写）")
+        elif not done(st.get("subs")):
+            nxt.append("等用户改好字幕，说「改好了」→ `/p3-subs` 对口型")
+
+        if not done(st.get("loudness")):
+            nxt.append(
+                "`/p3-loudness`（当前=全量重拼；若 assemble 拼时已带响度应已写 loudness: done，可跳过）"
+            )
+
+        if done(st.get("subs")) and done(st.get("loudness")):
+            if not done(st.get("burn")) and not done(st.get("upload")):
+                nxt.append("`/p3-burn`（烧字；当前 --ass 仍全量重拼）")
+            elif not done(st.get("upload")):
+                nxt.append("烧字已齐 → `/p3-burn` 做 upload-ready 改名，或用户可发了 → `/p3-publish`")
+            elif fm.get("status") != "published":
+                nxt.append("双链（B 站+YouTube）齐 → `/p3-publish`（写链接 / published / 合 PR / 清临时）")
+        elif done(st.get("subs")) and not done(st.get("loudness")):
+            nxt.append("字幕已定稿，还差响度 → 补 `/p3-loudness` 或确认拼时是否已带响度后写 loudness: done，再 `/p3-burn`")
+
     if clips and not all(covers.values()) and fm.get("status") != "published":
         nxt.append("并行：`/p3-cover 封面句「" + (fm.get("封面句") or "<封面句>") + "」`（不依赖 HUD）")
-    print("\n下一步：\n" + "\n".join(f"> {n}" for n in nxt))
+
+    # 去重保序
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for n in nxt:
+        if n not in seen:
+            seen.add(n)
+            uniq.append(n)
+    print("\n下一步：\n" + "\n".join(f"> {n}" for n in uniq))
     return 0
 
 

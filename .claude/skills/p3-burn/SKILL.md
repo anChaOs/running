@@ -1,40 +1,50 @@
 ---
 name: p3-burn
-description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS，用 assemble_episode.py --ass 烧进最终片；处理 no-burn 备份与发布前改名。用户说烧字、硬字幕、--ass、最终片、upload-ready 改名时用。不要在字幕未定稿或响度未完成时烧。拼画面走 p3-assemble；字幕走 p3-subs；响度走 p3-loudness；发布与清临时走 p3-publish。
+description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS，用 assemble_episode.py --ass 烧进最终片；处理 no-burn 备份与发布前改名（改名/subtitles.srt/no-burn 真源）。当前 --ass 仍全量重拼。用户说烧字、硬字幕、--ass、最终片、upload-ready 改名时用。拼画面走 p3-assemble；字幕走 p3-subs；响度走 p3-loudness；发布走 p3-publish。总序见 p3-episode。
 ---
 
 # 烧字
 
-**字幕定稿（`subs: done`）+ 响度就绪（`loudness: done`）之后**的收尾：把硬字幕烧进最终发布片。不要提前烧，也不要把烧字写进拼画面或字幕校对主流程。
+**字幕定稿（`subs: done`）+ 响度就绪（`loudness: done`）之后**的收尾：把硬字幕烧进最终发布片。
 
-```text
-总序：拼画面 p3-assemble →（字幕 p3-subs ∥ 响度 p3-loudness）→ 烧字 本 skill
-```
+**总序真源：** `p3-episode`。编码成本与推荐路径见 `p3-assemble`「编码成本」。
+
+**本 skill 是真源：** upload-ready **改名**、外挂始终 **`subtitles.srt`**、**`*-no-burn`** 何时进废纸篓。其它 skill 只引用这里。
+
+## 成本警告（必读）
+
+**当前 `assemble_episode.py --ass` = 再从 open/HUD/close 全量重拼一遍**（且默认再走响度链），不是「对已有 mp4 只烧 ASS」。
+
+- 推荐上游：`p3-assemble` **拼时带响度** + `p3-subs` 定稿 → 本步只再编 **1** 次。
+- 若上游还单独跑过 `p3-loudness`，整条链路可能已编 **3** 遍；本步会再次覆盖成片。
+- **冷开场 prepend 之后**：不要无脑跑本步的 assemble 入口——会**抹掉 bumper**。须先保证 bumper 仍在最终时间轴上（或脚本已支持单文件 burn，另 PR）。
+
+烧字这次**保留响度链**，不要加 `--no-loudness-fix`。
 
 ## 职责 / 输入 / 输出
 
 | | |
 | --- | --- |
 | **职责** | 生成 ASS → `--ass` 烧字 → 抽烧字帧 → 清 `*-no-burn` → 可选 upload-ready 改名 |
-| **输入** | 定稿 `episodes/.../subtitles.srt`（及 txt）；已响度的 `YYYY-MM-DD-run-final.mp4` |
-| **输出** | 烧字最终片（同名覆盖或随后改成标题名）；`subtitles.ass`；`assets.md`：`burn: done` / `upload: ready` |
-| **实现** | `assemble_episode.py --ass ...`（**保留响度链**，不要 `--no-loudness-fix`） |
+| **输入** | 定稿 `episodes/.../subtitles.srt`（及 txt）；已响度的成片 |
+| **输出** | 烧字最终片；`subtitles.ass`；`assets.md`：`burn: done` / `upload: ready` |
+| **实现（现状）** | `assemble_episode.py --ass ...`（全量重拼；**不要** `--no-loudness-fix`） |
 
-平台仍可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。不要把字幕轨 mux 进 mp4（平台转码会丢掉）；烧字用滤镜。
+平台仍可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。不要把字幕轨 mux 进 mp4。
 
 ## 不要做的事
 
 - 不要在 `waiting-review` / 响度未完成时烧最终片
-- 不要加 `--no-loudness-fix`（烧字这次必须带响度链）
+- 不要加 `--no-loudness-fix`
 - 不要长期保留 `*-no-burn.mp4`：烧字定稿/改名后立刻进废纸篓，不必等抖音
 - 不要在这里重做切条或 force_align（回 `p3-subs`）
-- 不要在这里重拼画面转场逻辑以外的「再发明」；调用现有 assemble 入口即可
+- 冷开场后不要无脑全量重跑 assemble
 
 ## 前置
 
-- `p3-subs`：`subs: done`（用户确认改好了 / 可以了）
-- `p3-loudness`：`loudness: done`（或成片已确认过响度链实测）
-- 缺哪条补哪条；两者曾并行，烧字闸门要两边都齐
+- `p3-subs`：`subs: done`
+- `loudness: done`（拼时带响度或已跑 `/p3-loudness`）
+- 缺哪条补哪条
 
 ## 步骤
 
@@ -58,15 +68,16 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
   --ass episodes/YYYY-MM-DD-slug/subtitles.ass \
   > "$MEDIA/burn.log" 2>&1 &
 # 保留响度链：不要 --no-loudness-fix
+# 注意：现状=全量重拼；有冷开场时先确认不会抹 bumper
 ```
 
 3. **抽烧字帧**核对：底中、Heavy 72、不挡左栏 HUD；再测最终片 I/TP（应仍约 −16 / ≤ −1.5）。
 
-4. **立刻处理 no-burn**：烧字成片定稿（或已按标题改名）后，把 `*-no-burn.mp4` **进废纸篓**（禁止 `rm`），永远不留，不必等抖音。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍保留。
+4. **立刻处理 no-burn**【真源】：烧字成片定稿（或已按标题改名）后，把 `*-no-burn.mp4` **进废纸篓**（禁止 `rm`），永远不留，不必等抖音。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍保留。
 
 5. `assets.md` 写 `burn: done`（附 ASS 样式与实测）。
 
-## 发布前改名（upload-ready）
+## 发布前改名（upload-ready）**【改名 / subtitles.srt 真源】**
 
 用户说可以发了、要准备上传时（通常烧字之后）：
 
@@ -74,9 +85,9 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 2. **不要改字幕文件名**；上传外挂始终 `subtitles.srt`。
 3. 文件名保留标题全部标点（含 `|`、`？`、空格）；不要把 `|` 换成 `-`。
 4. 备份（`*-pre-coldopen` 等）改名阶段保留原名；发布后清临时见 `p3-publish`。
-5. `assets.md` 加 `upload: ready`。`episode.md` 仍为 `edited`，双链齐了才 `published`。
+5. `assets.md` 加 `upload: ready`。`episode.md` 仍为 `edited`，双链齐了才 `published`（门闩见 `p3-publish`）。
 
-简介 / 抖音文案正文见 `p3-subs`；发布写链接、合 PR、清临时 KEEP/DELETE 真源见 `p3-publish`。
+简介 / 抖音**文案怎么写**见 `p3-subs`；**写链接 / published / 合 PR / 清临时**见 `p3-publish`。
 
 ## 常见翻车
 
@@ -86,7 +97,8 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 | 字重不对（变细） | Fontname 未真选中 Heavy，只靠 fontsdir |
 | 烧完音量不对 | 误加了 `--no-loudness-fix` |
 | 字幕轴错位 | 冷开场/重拼后未 +offset 或未重对齐（回 `p3-subs`） |
+| 冷开场消失 | prepend 后又跑了全量 assemble（本步） |
 
 ## 完成后
 
-> 用户说「没问题了 / 可以发了」走 `/p3-publish`（上传清单、双链 `published`、合 PR、清临时）。
+> 用户说「没问题了 / 可以发了」走 `/p3-publish`。

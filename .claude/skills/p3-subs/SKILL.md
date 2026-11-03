@@ -1,28 +1,26 @@
 ---
 name: p3-subs
-description: 字幕支路：用 faster-whisper large-v3-turbo 对着成片转写口播，忠于原句写短条字幕；写完先停，等人手改字。改好后 force_align → check_subs，人听硬失败行确认后才写 subs: done，再写简介与抖音文案进 plan.md。可与 p3-loudness 并行。烧字走 p3-burn；发布与清临时走 p3-publish。本 skill 只编排与人机关口；默认只调用 tools/subs 脚本看输出/退出码，不为跑流程去读源码。用户说字幕、转写、whisper、对口型、改字幕时用。不要用 talk.md 估时，不要整段均分时间，禁用 tiny/small。没有成片先走 p3-assemble。
+description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句；人改字后 force_align → check_subs，确认后 subs: done；再写简介与抖音文案进 plan.md。可与响度并行。烧字走 p3-burn；发布走 p3-publish。默认只调 tools/subs 脚本。用户说字幕、转写、whisper、对口型、改字幕时用。没有成片先走 p3-assemble。总序见 p3-episode。
 ---
 
 # 字幕（忠于原句）
 
 识别稿只提供时间和草稿。**校正不是润色。** 字必须跟嘴里说的走；切条只断开，不改字。
 
-```text
-总序：拼画面 p3-assemble →（字幕 本 skill ∥ 响度 p3-loudness）→ 烧字 p3-burn
-```
+**总序真源：** `p3-episode`。推荐上游：`p3-assemble` **拼时带响度**（见该 skill「编码成本」）；本支路与补跑响度可并行。烧字走 `p3-burn`。
 
 ## 职责 / 输入 / 输出
 
 | | |
 | --- | --- |
 | **职责** | 转写 → 人改字 → force_align → check_subs → `subs: done`；写简介 / 抖音文案进 `plan.md` |
-| **输入** | 可对字幕成片 `YYYY-MM-DD-run-final.mp4`（`p3-assemble` 产出即可，**不必等响度**） |
+| **输入** | 成片 `YYYY-MM-DD-run-final.mp4`（`p3-assemble` 产出即可，**不必等响度**） |
 | **输出** | `subtitles.txt` / `.srt`（仓库+媒体）；`subs: done`；`plan.md` 简介 / 抖音栏 |
-| **不负责** | 响度（`p3-loudness`）、烧字/ASS/`--ass`（`p3-burn`）、拼画面转场、发布写链接 / 清临时（`p3-publish`） |
+| **不负责** | 响度（`p3-loudness`）、烧字/改名/`no-burn`（`p3-burn`）、发布门闩/清临时（`p3-publish`） |
 
-校对期（waiting-review）外挂 SRT 给人改字/审片。平台可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。硬字幕烧进成片由 `p3-burn` 在字幕定稿 **且** 响度就绪后做。
+校对期外挂 SRT 给人改字。硬字幕由 `p3-burn` 在 `subs: done` **且** `loudness: done` 后做。
 
-**真源分工：** 切条 / 对齐 / 质检实现在 `tools/subs/` 脚本里。本 skill 只写何时跑哪个脚本、人改字门、交用户前的切条易错扫、简介。不要在本文件再抄一套算法。发布与清临时见 `p3-publish`。
+**真源分工：** 切条/对齐/质检在 `tools/subs/`；本 skill 只管编排与人改字门、切条易错扫、简介/抖音**文案**。改名与 `subtitles.srt` 文件名见 `p3-burn`；published / 清临时见 `p3-publish`。
 
 **读源码门槛：** 跑本 skill 时**默认只调用脚本，看 stdout/stderr 与退出码**。**不要**为了执行流水线去 Read `.py`、docstring 或「先通读实现再动手」。只有改算法、排错、或解释「为什么这么切」时才打开对应脚本。
 
@@ -68,11 +66,9 @@ description: 字幕支路：用 faster-whisper large-v3-turbo 对着成片转写
 
 专名表：`episode.md` 里写一行 `专名：Personal Agent、HUD、……`（本期口播会说到的产品名、人名、英文术语）。它只当识别提示纠拼写，不能拿来改用词。`p3-topic` 建期时就该写好；转写时脚本自动读，不用再手抄。
 
-## 成片路径（制作期 vs 改名后）
+## 成片路径
 
-- **制作期**：成片固定为 `YYYY-MM-DD-run-final.mp4`；工作字幕 `subtitles.txt` / `subtitles.srt`；对口型 wav 跟成片名。制作阶段可另拷 `YYYY-MM-DD-run-final.srt` 方便 IINA 同名挂载。
-- **upload-ready 改名后**：只把成片原地改名为标题原文 + `.mp4`（如 `芝加哥马拉松 | 结果如何？.mp4`）。**外挂始终叫 `subtitles.srt`**，不要改成与标题同名的 `.srt`。
-- 改名后若再对齐 / 审片：视频用标题名 `.mp4`，字幕显式 `--sub-file=subtitles.srt`（或 IINA 手动挂）。不要让工具去找「和成片名同名的 `.srt`」。
+制作期成片固定 `YYYY-MM-DD-run-final.mp4`；工作字幕 `subtitles.txt` / `subtitles.srt`（可另拷同名 `.srt` 方便 IINA）。**upload-ready 改名 / 外挂始终 `subtitles.srt`：真源见 `p3-burn`。**
 
 ## 不要做的事
 
@@ -189,11 +185,9 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 然后才写简介：读校准后的 `subtitles.txt`，短句总结本期实际说了什么，写入该期 `plan.md` 的简介栏。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。大多数期没有「参考」，只写摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI。视频优先用当前平台的地址：B 站简介用 B 站链接，YouTube 简介用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没念到的不列。摘要两个平台相同，有参考时参考按平台分开。
 
-**抖音作品描述（另栏，勿复用 B 站 / YouTube 长简介）** 同时写入该期 `plan.md` 的「抖音」栏：
-- **极致压缩**：两三短句说清本期在干嘛即可；不要 GitHub 行、不要分段长摘要、不要「参考」。正文可整段粘贴。
-- **话题（最多 5 个）**：在 `plan.md` 里写成「建议话题」清单（不含可粘贴的 `#xxx` 整行）。**尽量贴合国内抖音跑步圈热门标签**（如 跑步、马拉松、全马、半马、破三、跑步日常、跑步训练、配速、轻松跑、间歇跑、燃脂、乳酸阈），再按本期内容换进贴题词（赛事名、专名如 大迫杰、训练课型）。禁止把「破三实验室」等频道名当话题（系列名只用在标题里）。宁缺毋滥，**不超过 5 个**。
-- **挂载方式**：用户在发布页点「#」/「话题」，搜词后从官方列表**点选**，变蓝才算挂上。整段复制 `#xxx` 常不变蓝（灰色＝未挂载）。已发作品可「更多 → 编辑作品」改话题。
-- 标题与 B 站 / YouTube 同发；用户上传时从 `plan.md`「抖音」栏抄正文 + 手选话题。
+**抖音作品描述（另栏，勿复用 B 站 / YouTube 长简介）** 写入该期 `plan.md`「抖音」栏（**文案真源在本 skill**；上传/挂话题/`published` 门闩见 `p3-publish`）：
+- **极致压缩**：两三短句说清本期在干嘛即可；不要 GitHub 行、不要分段长摘要、不要「参考」。
+- **话题（最多 5 个）**：写成「建议话题」清单（不要可粘贴的 `#xxx` 整行）。尽量贴合国内抖音跑步圈热门标签，再按本期换贴题词。禁止把「破三实验室」等频道名当话题。宁缺毋滥，**不超过 5 个**。
 
 
 ## 完成后
@@ -217,8 +211,8 @@ iina --mpv-geometry=320x180-8+8 \
   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
 ```
 
-小窗贴右上角。制作阶段若有同名 `YYYY-MM-DD-run-final.srt` 会自动挂；成片已按标题改名后，视频是标题名 `.mp4`，字幕仍用 `subtitles.srt`（`iina --mpv-sub-file=.../subtitles.srt` 或上传时手挂）。不要去找与标题同名的 `.srt`。
+小窗贴右上角。制作阶段若有同名 `YYYY-MM-DD-run-final.srt` 会自动挂；改名后怎么挂字幕见 `p3-burn`。
 
-**先不要给完整发布流程。** 用户说「没问题了 / 可以发了」且通常已走完 `/p3-burn` 后，走 `/p3-publish`（上传清单、写双链、`published`、合 episode PR、清临时）。本 skill 到简介 / 抖音文案写入 `plan.md` 为止。
+**先不要给完整发布流程。** 响度齐了走 `/p3-burn`；用户说可以发了走 `/p3-publish`。本 skill 到简介 / 抖音文案写入 `plan.md` 为止。
 
 还要 60–90 秒短视频才提 `/p3-jianying`。
