@@ -25,8 +25,8 @@ MIN_SILENCE = 0.22
 # 短音节也要留下，否则会被并进「超长停顿」从左边剪掉
 MIN_SPEECH = 0.08
 OUTLIER_RATIO = 1.2
-# 思考停顿常在均值以上 1 秒左右，+0.7 会误伤
-OUTLIER_EXTRA = 1.2
+# 离群门槛：max(均值×RATIO, 均值+EXTRA)；EXTRA 默认 0.4（原 1.2 偏保守）
+OUTLIER_EXTRA = 0.4
 HEAD_TAIL = 0.45
 # 离群停顿压短后留下的长度：0.45 与本期均值的中点（mean=0 时退回 GAP_SAFETY）
 GAP_SAFETY = 0.45
