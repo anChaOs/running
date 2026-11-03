@@ -140,12 +140,12 @@ def main() -> int:
 
         if not done(st.get("loudness")):
             nxt.append(
-                "`/p3-loudness`（当前=全量重拼；若 assemble 拼时已带响度应已写 loudness: done，可跳过）"
+                "`/p3-loudness`（loudness_only，不重拼；若拼时已带响度应已写 loudness: done，可跳过）"
             )
 
         if done(st.get("subs")) and done(st.get("loudness")):
             if not done(st.get("burn")) and not done(st.get("upload")):
-                nxt.append("`/p3-burn`（烧字；当前 --ass 仍全量重拼）")
+                nxt.append("`/p3-burn`（burn_ass 烧字，不重拼）")
             elif not done(st.get("upload")):
                 nxt.append("烧字已齐 → `/p3-burn` 做 upload-ready 改名，或用户可发了 → `/p3-publish`")
             elif fm.get("status") != "published":

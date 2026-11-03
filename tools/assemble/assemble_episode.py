@@ -7,8 +7,8 @@
 
 混音后默认走响度链（dynaudnorm → compressor → loudnorm I=-16/TP=-1.5），
 whoosh 叠完再 leveling，避免整轨盲目抬增益把峰值顶满。--no-loudness-fix 可关。
-编排上：拼画面阶段用 --no-loudness-fix（见 p3-assemble）；响度并行支路勿加该开关（p3-loudness）；
-烧字收尾再加 --ass 且保留响度链（p3-burn）。不要把响度/烧字当成拼画面的串行捆绑。
+编排上：拼画面推荐直接带响度（见 p3-assemble）；急着转写才 --no-loudness-fix。
+响度补跑用 loudness_only.py；烧字用 burn_ass.py。不要为响度/烧字再全量调本脚本。
 """
 
 from __future__ import annotations

@@ -35,10 +35,10 @@ hud-preview + open/close
 
 然后（可并行）
   p3-subs       → 转写→人改→force_align→subs: done + 简介/抖音文案
-  p3-loudness   → 仅当拼时关了响度才补跑
+  p3-loudness   → 仅当拼时关了响度才补跑（loudness_only，不重拼）
 
 subs + loudness 都就绪
-  p3-burn       → ASS 烧字 → 可选 upload-ready 改名
+  p3-burn       → burn_ass 烧字（不重拼）→ 可选 upload-ready 改名
 
 双链齐
   p3-publish    → 写链接 / published / 合 episode PR / 清临时
@@ -47,7 +47,7 @@ subs + loudness 都就绪
 再核对   → p3-qc（默认抽帧已在 assemble）
 ```
 
-**推荐墙钟：** `assemble`（带响度）→ `subs` → `burn` → `publish`。编码成本见 `p3-assemble`。
+**推荐墙钟：** `assemble`（带响度）→ `subs` → `burn` → `publish`。响度/烧字勿再全量 assemble；编码成本见 `p3-assemble`。
 
 ## 1. 先盘点，再问目标
 

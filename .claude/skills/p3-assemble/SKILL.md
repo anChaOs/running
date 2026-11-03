@@ -11,7 +11,7 @@ description: 拼画面：把 open + HUD preview + close 拼成全长成片，拼
 
 ## 编码成本
 
-当前 `assemble_episode.py` 只有一条路：从 open + HUD preview + close **全量重拼**。loudness / burn 若再调同一入口，最坏编 3 遍。**推荐：本步不加 `--no-loudness-fix` → 人改字幕 → `/p3-burn`（约编 2 次）。** 急着先转写才加 `--no-loudness-fix`（稍后 loudness = 再全量重拼）。冷开场 prepend 后禁止再跑会覆盖成片的 assemble。
+本步 `assemble_episode.py`：**唯一**全量重拼入口（open + HUD + close）。响度补跑走 `loudness_only.py`（`-c:v copy`）；烧字走 `burn_ass.py`（单文件烧 ASS）。**推荐：本步不加 `--no-loudness-fix` → 人改字幕 → `/p3-burn`（画面全量重编 ≤2：拼一次 + 烧字再压）。** 急着先转写才加 `--no-loudness-fix`，稍后 `/p3-loudness`。冷开场 prepend 后禁止再跑本脚本覆盖成片。
 
 ## 不要做的事
 
@@ -154,7 +154,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 4. **prepend** 到已有 `run-final` 前；记下 bumper 时长 offset；备份旧成片（如 `*-pre-coldopen.mp4`）。
 5. 字幕：prepend 后 body 全部 +offset（或从新成片重抽 wav 再 `force_align`），文首补上冷开场几条；同步仓库与媒体 `subtitles.srt`。
 6. `assets.md` 记：`cold-open: done`、来源片段与 offset。
-7. **prepend 之后**：不要再跑全量 assemble 覆盖 `run-final`。
+7. **prepend 之后**：不要再跑全量 assemble 覆盖 `run-final`；响度/烧字只用 `loudness_only` / `burn_ass`。
 
 ## 完成后
 

@@ -13,8 +13,8 @@
 | `p3-hud` | 同档 preview（出完 VAD 句间粗剪）+ 透明层中间件 | 已命名 run + FIT + `-sk` | `hud-renders/` |
 | `p3-assemble` | 拼画面 + 抽帧（推荐拼时带响度；总序见 `p3-episode`） | HUD preview | `*-run-final.mp4` + `qc/*.jpg`；`assemble/qc`（+常 `loudness`） |
 | `p3-subs` | 字幕：转写→人改→对齐；简介/抖音文案 | 成片 | `subtitles.*`；`subs: done`；`plan.md` |
-| `p3-loudness` | 响度补跑（现状=全量重拼；拼时已带则跳过） | 未响度成片 | `loudness: done` |
-| `p3-burn` | 烧字；改名/`subtitles.srt`/`no-burn` 真源（现状 `--ass` 仍全量重拼） | `subs`+`loudness` | 烧字片；`burn`/`upload` |
+| `p3-loudness` | 响度补跑（`loudness_only`，`-c:v copy`；拼时已带则跳过） | 未响度成片 | `loudness: done` |
+| `p3-burn` | 烧字（`burn_ass`）；改名/`subtitles.srt`/`no-burn` 真源 | `subs`+`loudness` | 烧字片；`burn`/`upload` |
 | `p3-publish` | 发布门闩/清临时真源：双链、`published`、合 PR、KEEP/DELETE | 双链或发完了 | `published`；临时进废纸篓 |
 | `p3-cover` | 封面：拍摄单 → 自拍抠图 → 粗描边 → 设计底 → 三比例手排（与 HUD 并行） | 手持自拍 + 封面句 | `cover-*.jpg` |
 | `p3-qc` | 只再核对 / 重抽 | 成片 | `qc/*.jpg`；`edited` 由字幕确认后写 |
