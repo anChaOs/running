@@ -28,6 +28,7 @@ bilibili_bvid: BV1Kypy6hEui
 
 ## 发布
 
+- 抖音：已设定期发布，短链待定时放出后补
 - YouTube：https://youtu.be/Ms-rZwFUyaQ
 - Bilibili：BV1Kypy6hEui（https://www.bilibili.com/video/BV1Kypy6hEui）
 - 抖音：https://v.douyin.com/nIR_tgox8gI/
