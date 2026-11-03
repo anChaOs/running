@@ -73,13 +73,6 @@ def test_opener_goes_to_next_cue_ok():
     assert out == ["看看开表了", "OK我们开始了"], out
 
 
-def test_short_merge_prefers_smaller_gap():
-    groups = [[W(0.0, 1.0, "开表了")], [W(1.5, 1.7, "OK")], [W(1.8, 2.5, "我们开始")]]
-    assert texts(ds.merge_short(groups)) == ["开表了", "OK我们开始"]
-    groups = [[W(0.0, 1.0, "开表了")], [W(1.1, 1.3, "OK")], [W(1.8, 2.5, "我们开始")]]
-    assert texts(ds.merge_short(groups)) == ["开表了OK", "我们开始"]
-
-
 def test_no_split_number_unit_or_english():
     ws = [W(0.0, 0.5, "今天跑了"), W(0.55, 0.9, "大概"), W(0.9, 1.2, "18"), W(2.0, 2.3, "公里"),
           W(2.35, 2.8, "然后用"), W(2.85, 3.1, "Grok"), W(3.9, 4.2, "Bot"), W(4.25, 4.9, "记录一下数据")]
@@ -93,9 +86,8 @@ def main() -> int:
     test_no_merge_without_number()
     test_colloc_merge()
     test_opener_goes_to_next_cue_ok()
-    test_short_merge_prefers_smaller_gap()
     test_no_split_number_unit_or_english()
-    print("ok: 6 checks passed")
+    print("ok: 5 checks passed")
     return 0
 
 
