@@ -83,7 +83,7 @@ preview 出完后，对 **preview** 做句间粗剪（原片 `run-*` 不剪，HU
 
 口播检测与停顿门槛在 `tools/ingest/trim_talk_pauses.py`（默认 Silero VAD）。对比旧能量门限加 `--speech-detect band`。skill 不复述剪停顿算法；**跑流程只调脚本看输出，不要为执行去 Read 源码**（改算法 / 排错除外）。
 
-拼成片用粗剪后的 **preview**。`--preview` 会先渲透明层再叠回原片同档，alpha 是渲染中间件，不是成片交付。不走剪映可以不理 `*-hud-alpha.mov`。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
+多段 `run-*` 默认 `--jobs 2` 并行渲（可改；`-j 1` 串行）；失败看 `hud-renders/*-hud-render.log` 定位哪条 clip。拼成片用粗剪后的 **preview**。`--preview` 会先渲透明层再叠回原片同档，alpha 是渲染中间件，不是成片交付。不走剪映可以不理 `*-hud-alpha.mov`。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
 
 ## 完成
 

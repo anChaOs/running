@@ -7,7 +7,9 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
@@ -61,11 +63,40 @@ OVERLAY_PROFILE_MAP = {
 }
 
 
-def run(cmd: list[str], dry_run: bool = False) -> None:
-    print("$", " ".join(str(part) for part in cmd))
+_print_lock = threading.Lock()
+
+
+def _log(msg: str) -> None:
+    with _print_lock:
+        print(msg, flush=True)
+
+
+def run(
+    cmd: list[str],
+    *,
+    dry_run: bool = False,
+    log_path: Path | None = None,
+    label: str | None = None,
+) -> None:
+    header = f"[{label}] " if label else ""
+    _log(f"{header}$ {' '.join(str(part) for part in cmd)}")
     if dry_run:
         return
-    subprocess.run(cmd, check=True)
+    if log_path is None:
+        subprocess.run(cmd, check=True)
+        return
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("w", encoding="utf-8") as logf:
+        logf.write(f"$ {' '.join(str(part) for part in cmd)}\n")
+        logf.flush()
+        proc = subprocess.run(
+            cmd,
+            stdout=logf,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
 
 
 CLIP_SKIP = ("run-final", "orient", "transpose", "-raw", "pre-", "-bad", "-hud")
@@ -235,7 +266,15 @@ def probe_source_video(path: Path) -> dict[str, str | int]:
     }
 
 
-def bake_matched_preview(source: Path, overlay: Path, dest: Path, dry_run: bool = False) -> None:
+def bake_matched_preview(
+    source: Path,
+    overlay: Path,
+    dest: Path,
+    dry_run: bool = False,
+    *,
+    log_path: Path | None = None,
+    label: str | None = None,
+) -> None:
     # 预览/审片跟原片同档：编码、码率、分辨率都不降
     spec = probe_source_video(source)
     bit_rate = int(spec["bit_rate"])
@@ -265,7 +304,102 @@ def bake_matched_preview(source: Path, overlay: Path, dest: Path, dry_run: bool 
         "copy",
         str(dest),
     ]
-    run(cmd, dry_run=dry_run)
+    if dry_run or log_path is None:
+        run(cmd, dry_run=dry_run, label=label)
+        return
+    # Append into the same per-clip render log.
+    header = f"[{label}] " if label else ""
+    _log(f"{header}$ {' '.join(str(part) for part in cmd)}")
+    with log_path.open("a", encoding="utf-8") as logf:
+        logf.write(f"$ {' '.join(str(part) for part in cmd)}\n")
+        logf.flush()
+        proc = subprocess.run(cmd, stdout=logf, stderr=subprocess.STDOUT, check=False)
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+
+
+def render_one_clip(
+    *,
+    clip: Path,
+    output_dir: Path,
+    gopro_python: Path,
+    gopro_dashboard: Path,
+    font: Path,
+    fit: Path,
+    resolved_template: Path,
+    video_end_time_mode: str,
+    overlay_only: bool,
+    overlay_profile: str,
+    preview: bool,
+    shoe_name: str,
+    shoe_total_km_after_run: float,
+    dry_run: bool,
+) -> Path:
+    """Render one clip. Returns output path. Raises on failure with clip in message."""
+    clip = clip.expanduser().resolve()
+    label = clip.name
+    if overlay_only:
+        out = output_dir / f"{clip.stem}-hud-alpha.mov"
+    else:
+        out = output_dir / f"{clip.stem}-hud.mp4"
+    # Per-clip cache avoids tile/map write races when jobs > 1.
+    cache_dir = DEFAULT_CACHE_DIR / clip.stem
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    log_path = output_dir / f"{clip.stem}-hud-render.log"
+    cmd = [
+        str(gopro_python),
+        str(gopro_dashboard),
+        str(clip),
+        str(out),
+        "--font",
+        str(font),
+        "--config-dir",
+        str(DEFAULT_CONFIG_DIR),
+        "--cache-dir",
+        str(cache_dir),
+        "--gpx",
+        str(fit),
+        "--use-fit-only",
+        "--video-time-end",
+        video_end_time_mode,
+        "--layout",
+        "xml",
+        "--layout-xml",
+        str(resolved_template),
+        "--units-distance",
+        "km",
+    ]
+    if overlay_only:
+        cmd.extend(
+            [
+                "--generate",
+                "overlay",
+                "--profile",
+                OVERLAY_PROFILE_MAP[overlay_profile],
+                "--bg",
+                "0,0,0,0",
+            ]
+        )
+    cmd.extend(["--shoe-name", shoe_name])
+    cmd.extend(["--shoe-total-km-after-run", str(shoe_total_km_after_run)])
+    _log(f"[{label}] start -> {out.name}")
+    try:
+        run(cmd, dry_run=dry_run, log_path=None if dry_run else log_path, label=label)
+        if preview:
+            preview_out = output_dir / f"{clip.stem}-hud-preview.mp4"
+            bake_matched_preview(
+                clip,
+                out,
+                preview_out,
+                dry_run=dry_run,
+                log_path=None if dry_run else log_path,
+                label=label,
+            )
+        _log(f"[{label}] ok -> {out.name}" + (f" (log {log_path.name})" if not dry_run else ""))
+        return out
+    except Exception as exc:
+        raise RuntimeError(f"{label} failed: {exc}; see {log_path}") from exc
 
 
 def main() -> int:
@@ -330,6 +464,13 @@ def main() -> int:
         help="Fetch Open-Meteo with city coordinates and FIT time window. Do not send FIT GPS.",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=2,
+        help="Parallel clip renders (default: 2). Use 1 for serial.",
+    )
     args = parser.parse_args()
     if args.preview:
         args.overlay_only = True
@@ -424,54 +565,55 @@ def main() -> int:
         weather_ok=weather_ok,
     )
 
-    for clip in clips:
-        clip = clip.expanduser().resolve()
-        if args.overlay_only:
-            out = output_dir / f"{clip.stem}-hud-alpha.mov"
-        else:
-            out = output_dir / f"{clip.stem}-hud.mp4"
-        cmd = [
-            str(gopro_python),
-            str(gopro_dashboard),
-            str(clip),
-            str(out),
-            "--font",
-            str(font),
-            "--config-dir",
-            str(DEFAULT_CONFIG_DIR),
-            "--cache-dir",
-            str(DEFAULT_CACHE_DIR),
-            "--gpx",
-            str(fit),
-            "--use-fit-only",
-            "--video-time-end",
-            args.video_end_time_mode,
-            "--layout",
-            "xml",
-            "--layout-xml",
-            str(resolved_template),
-            "--units-distance",
-            "km",
-        ]
-        if args.overlay_only:
-            cmd.extend(
-                [
-                    "--generate",
-                    "overlay",
-                    "--profile",
-                    OVERLAY_PROFILE_MAP[args.overlay_profile],
-                    "--bg",
-                    "0,0,0,0",
-                ]
-            )
-        cmd.extend(["--shoe-name", args.shoe_name])
-        cmd.extend(["--shoe-total-km-after-run", str(default_shoe_total_km_after_run)])
-        run(cmd, dry_run=args.dry_run)
-        if args.preview:
-            preview = output_dir / f"{clip.stem}-hud-preview.mp4"
-            bake_matched_preview(clip, out, preview, dry_run=args.dry_run)
+    if args.jobs < 1:
+        raise SystemExit("--jobs must be >= 1")
+    jobs = min(args.jobs, len(clips))
+    _log(f"Rendering {len(clips)} clip(s) with --jobs {jobs}")
 
-    print(f"\nDone. Output directory: {output_dir}")
+    def _kwargs(clip: Path) -> dict:
+        return dict(
+            clip=clip,
+            output_dir=output_dir,
+            gopro_python=gopro_python,
+            gopro_dashboard=gopro_dashboard,
+            font=font,
+            fit=fit,
+            resolved_template=resolved_template,
+            video_end_time_mode=args.video_end_time_mode,
+            overlay_only=args.overlay_only,
+            overlay_profile=args.overlay_profile,
+            preview=args.preview,
+            shoe_name=args.shoe_name,
+            shoe_total_km_after_run=default_shoe_total_km_after_run,
+            dry_run=args.dry_run,
+        )
+
+    failures: list[str] = []
+    if jobs == 1:
+        for clip in clips:
+            try:
+                render_one_clip(**_kwargs(clip))
+            except Exception as exc:
+                failures.append(str(exc))
+                _log(f"ERROR: {exc}")
+    else:
+        with ThreadPoolExecutor(max_workers=jobs, thread_name_prefix="hud") as pool:
+            futures = {pool.submit(render_one_clip, **_kwargs(clip)): clip for clip in clips}
+            for fut in as_completed(futures):
+                clip = futures[fut]
+                try:
+                    fut.result()
+                except Exception as exc:
+                    failures.append(str(exc))
+                    _log(f"ERROR: {exc}")
+
+    if failures:
+        _log("\nHUD render failed for:")
+        for item in failures:
+            _log(f"  - {item}")
+        raise SystemExit(1)
+
+    _log(f"\nDone. Output directory: {output_dir}")
     return 0
 
 
