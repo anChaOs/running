@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""句间粗剪：明显长于均值的停顿，收到均值加安全余量。
+"""句间粗剪：明显长于均值的停顿，收到 GAP_SAFETY 与均值的中点。
 
 ingest 阶段剪 open/close（不剪原片 run-*，HUD 时间轴才不会漂）。
 HUD preview 出完后再剪 hud-renders/*-hud-preview.mp4。
@@ -27,9 +27,8 @@ MIN_SPEECH = 0.08
 OUTLIER_RATIO = 1.2
 # 思考停顿常在均值以上 1 秒左右，+0.7 会误伤
 OUTLIER_EXTRA = 1.2
-MIN_KEEP_GAP = 0.55
 HEAD_TAIL = 0.45
-# 超长停顿收到「均值 + 安全余量」，不要收到均值，避免切到下一句开头
+# 离群停顿压短后留下的长度：0.45 与本期均值的中点（mean=0 时退回 GAP_SAFETY）
 GAP_SAFETY = 0.45
 # 片尾常更轻、更碎，最后几秒整段保留
 END_PROTECT = 3.0
@@ -417,7 +416,7 @@ def plan_clip(
     protected_gaps = [g for g in gaps if gap_intersects_protect(g, protect)]
     lengths = [b - a for a, b in scored]
     mean = statistics.mean(lengths) if lengths else 0.0
-    keep_gap = max(MIN_KEEP_GAP, mean + GAP_SAFETY) if mean else MIN_KEEP_GAP
+    keep_gap = (GAP_SAFETY + mean) / 2 if mean else GAP_SAFETY
     outliers = [(a, b) for a, b in scored if is_outlier(b - a, mean)]
     windows = keep_windows(
         speech, duration, keep_gap, outliers, keep_lead_silence=keep_lead_silence
