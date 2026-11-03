@@ -27,3 +27,4 @@ media: ~/Movies/running-content/2026-10-22-temperature/
 
 - YouTube: https://youtu.be/PF1__3bmyxI
 - Bilibili: https://www.bilibili.com/video/BV1WQn16oES2
+- 抖音：https://v.douyin.com/yRqzwlwJjQ4/

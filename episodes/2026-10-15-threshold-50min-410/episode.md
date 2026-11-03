@@ -30,5 +30,6 @@ bilibili_bvid: BV14LJC6DE4Z
 
 - YouTube：https://youtu.be/3qLuzzgW9js
 - Bilibili：BV14LJC6DE4Z（https://www.bilibili.com/video/BV14LJC6DE4Z）
+- 抖音：https://v.douyin.com/JRMktwyshy4/
 - 成片：`~/Movies/running-content/2026-10-15-threshold-50min-410/乳酸阈值 | 手表给的值能跑出来吗？.mp4`
 - 外挂：`subtitles.srt`（不改成标题名）

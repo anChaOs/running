@@ -27,3 +27,4 @@ media: ~/Movies/running-content/2026-10-28-altitude/
 
 - YouTube: https://youtu.be/bx-p5g3QwR0
 - Bilibili: https://www.bilibili.com/video/BV1Wfx56JEYG/
+- 抖音：https://v.douyin.com/ZbrWCyK2JrM/
