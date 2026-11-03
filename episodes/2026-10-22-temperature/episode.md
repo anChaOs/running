@@ -25,6 +25,7 @@ media: ~/Movies/running-content/2026-10-22-temperature/
 
 ## 发布
 
+- 抖音：已设定期发布，短链待定时放出后补
 - YouTube: https://youtu.be/PF1__3bmyxI
 - Bilibili: https://www.bilibili.com/video/BV1WQn16oES2
 - 抖音：https://v.douyin.com/yRqzwlwJjQ4/
