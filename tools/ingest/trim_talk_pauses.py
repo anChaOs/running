@@ -24,7 +24,7 @@ SPEECH_LOWPASS = 3500
 MIN_SILENCE = 0.22
 # 短音节也要留下，否则会被并进「超长停顿」从左边剪掉
 MIN_SPEECH = 0.08
-OUTLIER_RATIO = 2.0
+OUTLIER_RATIO = 1.2
 # 思考停顿常在均值以上 1 秒左右，+0.7 会误伤
 OUTLIER_EXTRA = 1.2
 MIN_KEEP_GAP = 0.55
