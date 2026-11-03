@@ -62,4 +62,4 @@
 - 外挂：`subtitles.srt`（ASS 源 `subtitles.ass`）
 - 封面：`cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg`
 - 账号：B 站 mid 3687100；YouTube @anChaOs天天写bug
-- 状态：`subs: done`；`status: edited`；`upload: ready`
+- 状态：已发布（`status: published`）；YouTube https://youtu.be/GnPKW8UnTR8；Bilibili https://www.bilibili.com/video/BV1hJ4M61Epj；抖音定时发布，短链待补

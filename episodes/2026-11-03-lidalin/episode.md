@@ -2,7 +2,7 @@
 date: 2026-11-03
 slug: lidalin
 title: 李大林，强的可怕
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-03-lidalin/
 ---
@@ -22,3 +22,9 @@ media: ~/Movies/running-content/2026-11-03-lidalin/
 - `talk.md`：边跑边说提纲
 - `plan.md`：发布计划（简介等字幕校准后再写）
 - `assets.md`：素材索引
+
+## 发布
+
+- YouTube: https://youtu.be/GnPKW8UnTR8
+- Bilibili: https://www.bilibili.com/video/BV1hJ4M61Epj
+- 抖音：定时发布，短链待补
