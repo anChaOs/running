@@ -9,7 +9,7 @@ description: 只再核对一次成片。默认成片流程里抽帧核对已在 
 
 ## 前置
 
-制作期成片：`YYYY-MM-DD-run-final.mp4`。改名与外挂文件名见 `p3-burn`；时间轴见 `p3-assemble`。外挂源稿在 `episodes/.../subtitles.srt`。
+制作期成片：`YYYY-MM-DD-run-final.mp4`。时间轴见 `p3-assemble`。外挂源稿在 `episodes/.../subtitles.srt`。
 
 ## 不要做的事
 
@@ -19,7 +19,7 @@ description: 只再核对一次成片。默认成片流程里抽帧核对已在 
 
 ## 抽帧
 
-**画面抽帧点与清单真源：`p3-assemble`「核对」。** 本 skill 按那份再抽一轮；制作期用 `run-final`，改名后用标题名 `.mp4`（改名规则见 `p3-burn`）。
+画面抽帧点与清单按 `p3-assemble`「核对」再抽一轮。
 
 ```bash
 mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug/qc
@@ -35,7 +35,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 # 制作期（旁边的 YYYY-MM-DD-run-final.srt 会自动挂上）：
 iina --mpv-geometry=320x180-8+8 \
   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
-# 改名后显式挂 subtitles.srt，不要找与标题同名的 .srt：
+# 改名后显式挂 subtitles.srt：
 # iina --mpv-geometry=320x180-8+8 --mpv-sub-file=.../subtitles.srt \
 #   ~/Movies/running-content/YYYY-MM-DD-slug/<标题>.mp4
 ```
@@ -58,4 +58,4 @@ SRT 贴底栏，可能压 HUD。公开前用私密/不公开稿在网页播放�
 
 ## 完成后
 
-还没有字幕：`/p3-subs`（可与 `/p3-loudness` 并行）。字幕+响度都齐未烧字：`/p3-burn`。已烧字：发布与清临时走 `/p3-publish`。
+还没有字幕：`/p3-subs`。字幕+响度都齐未烧字：`/p3-burn`。已烧字：`/p3-publish`。

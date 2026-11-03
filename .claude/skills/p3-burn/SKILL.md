@@ -1,36 +1,13 @@
 ---
 name: p3-burn
-description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS，用 assemble_episode.py --ass 烧进最终片；处理 no-burn 备份与发布前改名（改名/subtitles.srt/no-burn 真源）。当前 --ass 仍全量重拼。用户说烧字、硬字幕、--ass、最终片、upload-ready 改名时用。拼画面走 p3-assemble；字幕走 p3-subs；响度走 p3-loudness；发布走 p3-publish。总序见 p3-episode。
+description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS，用 assemble_episode.py --ass 烧进最终片；处理 no-burn 备份与发布前改名。用户说烧字、硬字幕、--ass、最终片、upload-ready 改名时用。
 ---
 
 # 烧字
 
-**字幕定稿（`subs: done`）+ 响度就绪（`loudness: done`）之后**的收尾：把硬字幕烧进最终发布片。
+**`subs: done` + `loudness: done` 之后**：生成 ASS → `--ass` 烧字 → 抽烧字帧 → 清 `*-no-burn` → 可选 upload-ready 改名。平台仍可另挂 `subtitles.srt`；不要把字幕轨 mux 进 mp4。
 
-**总序真源：** `p3-episode`。编码成本与推荐路径见 `p3-assemble`「编码成本」。
-
-**本 skill 是真源：** upload-ready **改名**、外挂始终 **`subtitles.srt`**、**`*-no-burn`** 何时进废纸篓。其它 skill 只引用这里。
-
-## 成本警告（必读）
-
-**当前 `assemble_episode.py --ass` = 再从 open/HUD/close 全量重拼一遍**（且默认再走响度链），不是「对已有 mp4 只烧 ASS」。
-
-- 推荐上游：`p3-assemble` **拼时带响度** + `p3-subs` 定稿 → 本步只再编 **1** 次。
-- 若上游还单独跑过 `p3-loudness`，整条链路可能已编 **3** 遍；本步会再次覆盖成片。
-- **冷开场 prepend 之后**：不要无脑跑本步的 assemble 入口——会**抹掉 bumper**。须先保证 bumper 仍在最终时间轴上（或脚本已支持单文件 burn，另 PR）。
-
-烧字这次**保留响度链**，不要加 `--no-loudness-fix`。
-
-## 职责 / 输入 / 输出
-
-| | |
-| --- | --- |
-| **职责** | 生成 ASS → `--ass` 烧字 → 抽烧字帧 → 清 `*-no-burn` → 可选 upload-ready 改名 |
-| **输入** | 定稿 `episodes/.../subtitles.srt`（及 txt）；已响度的成片 |
-| **输出** | 烧字最终片；`subtitles.ass`；`assets.md`：`burn: done` / `upload: ready` |
-| **实现（现状）** | `assemble_episode.py --ass ...`（全量重拼；**不要** `--no-loudness-fix`） |
-
-平台仍可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。不要把字幕轨 mux 进 mp4。
+**现状：** `--ass` 仍全量重拼（默认再走响度链）。烧字时**不要**加 `--no-loudness-fix`。冷开场 prepend 后不要无脑跑（会抹 bumper）。编码成本见 `p3-assemble`。
 
 ## 不要做的事
 
@@ -42,9 +19,8 @@ description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS�
 
 ## 前置
 
-- `p3-subs`：`subs: done`
+- `subs: done`
 - `loudness: done`（拼时带响度或已跑 `/p3-loudness`）
-- 缺哪条补哪条
 
 ## 步骤
 
@@ -67,17 +43,16 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
   --media-dir "$MEDIA" \
   --ass episodes/YYYY-MM-DD-slug/subtitles.ass \
   > "$MEDIA/burn.log" 2>&1 &
-# 保留响度链：不要 --no-loudness-fix
-# 注意：现状=全量重拼；有冷开场时先确认不会抹 bumper
+# 不要 --no-loudness-fix
 ```
 
 3. **抽烧字帧**核对：底中、Heavy 72、不挡左栏 HUD；再测最终片 I/TP（应仍约 −16 / ≤ −1.5）。
 
-4. **立刻处理 no-burn**【真源】：烧字成片定稿（或已按标题改名）后，把 `*-no-burn.mp4` **进废纸篓**（禁止 `rm`），永远不留，不必等抖音。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍保留。
+4. **立刻处理 no-burn**：烧字成片定稿（或已按标题改名）后，把 `*-no-burn.mp4` **进废纸篓**（禁止 `rm`），永远不留，不必等抖音。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍保留。
 
 5. `assets.md` 写 `burn: done`（附 ASS 样式与实测）。
 
-## 发布前改名（upload-ready）**【改名 / subtitles.srt 真源】**
+## 发布前改名（upload-ready）
 
 用户说可以发了、要准备上传时（通常烧字之后）：
 
@@ -85,9 +60,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 2. **不要改字幕文件名**；上传外挂始终 `subtitles.srt`。
 3. 文件名保留标题全部标点（含 `|`、`？`、空格）；不要把 `|` 换成 `-`。
 4. 备份（`*-pre-coldopen` 等）改名阶段保留原名；发布后清临时见 `p3-publish`。
-5. `assets.md` 加 `upload: ready`。`episode.md` 仍为 `edited`，双链齐了才 `published`（门闩见 `p3-publish`）。
-
-简介 / 抖音**文案怎么写**见 `p3-subs`；**写链接 / published / 合 PR / 清临时**见 `p3-publish`。
+5. `assets.md` 加 `upload: ready`。`episode.md` 仍为 `edited`，双链齐了才 `published`。
 
 ## 常见翻车
 
@@ -97,7 +70,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 | 字重不对（变细） | Fontname 未真选中 Heavy，只靠 fontsdir |
 | 烧完音量不对 | 误加了 `--no-loudness-fix` |
 | 字幕轴错位 | 冷开场/重拼后未 +offset 或未重对齐（回 `p3-subs`） |
-| 冷开场消失 | prepend 后又跑了全量 assemble（本步） |
+| 冷开场消失 | prepend 后又跑了全量 assemble |
 
 ## 完成后
 

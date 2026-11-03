@@ -1,24 +1,11 @@
 ---
 name: p3-publish
-description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode 发布栏、status=published、该期 episode PR squash 合 main；再列清临时 KEEP/DELETE（体积）→ 人确认 → 进废纸篓。抖音短链不挡 published，随后写入。用户说发布完毕、发完了、已发布、写链接、合 episode PR、清临时时用。不要替用户上传。上传清单与改名见 p3-burn；字幕定稿见 p3-subs；满 7 天整夹归档见 p3-archive。
+description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode 发布栏、status=published、该期 episode PR squash 合 main；再列清临时 KEEP/DELETE（体积）→ 人确认 → 进废纸篓。抖音短链不挡 published，随后写入。用户说发布完毕、发完了、已发布、写链接、合 episode PR、清临时时用。不要替用户上传。满 7 天整夹归档见 p3-archive。
 ---
 
 # 发布
 
-烧字 / upload-ready 之后的收尾：**写双链 → `published` → squash 合本期 episode PR → 清临时**。不要替用户上传成片。
-
-**总序真源：** `p3-episode`。本 skill 是 **published 门闩 / 抖音是否挡发布 / 清临时 KEEP·DELETE** 的真源。
-
-## 职责 / 输入 / 输出
-
-| | |
-| --- | --- |
-| **职责** | 上传清单提示（用户说可以发了）；写 B 站 / YouTube / 抖音链接；`status=published`；自动 squash merge 本期 episode PR；发布后清临时（KEEP/DELETE 真源） |
-| **输入** | 用户已上传（或说发完了）+ **B 站 BV/链接** + **YouTube 链接**；媒体目录成片与 sidecar |
-| **输出** | `episode.md` 发布栏与 `published`；PR 合进 `main`；确认后临时文件进废纸篓 |
-| **不负责** | 替用户上传；烧字/改名（`p3-burn`）；字幕对齐（`p3-subs`）；整夹归档（`p3-archive`） |
-
-**真源：** 清临时 KEEP/DELETE 只写在本 skill。其它 skill / 文档只引用这里，不要另写一份清单。
+烧字 / upload-ready 之后：**写双链 → `published` → squash 合本期 episode PR → 清临时**。不要替用户上传成片。
 
 ## 不要做的事
 
@@ -30,11 +17,11 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 ## 前置
 
-通常已走完 `/p3-burn`（烧字最终片；可选 upload-ready 改名）。用户说「没问题了 / 可以发了」时可先给上传清单；真正写链接与清临时要等双链到手。
+通常已走完 `/p3-burn`。用户说「没问题了 / 可以发了」时可先给上传清单；真正写链接与清临时要等双链到手。
 
 ## 上传清单（用户说可以发了时给；不要替传）
 
-从 `plan.md` 抄标题、封面句、简介。**改名 / 外挂文件名 / no-burn：`p3-burn`。** 抖音文案怎么写：`p3-subs`。
+从 `plan.md` 抄标题、封面句、简介。成片改名与外挂文件名见 `p3-burn`。
 
 1. 上传成片（标题名烧字 `.mp4`）→ 换封面 → 挂 `subtitles.srt` → 先不公开、开 CC → 再公开。
 2. `status` 在 **B 站 + YouTube 双链齐**之前仍为 `edited`。
@@ -45,11 +32,10 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 | 封面 | `cover-*.jpg` / `cover.jpg` |
 | 外挂 | `subtitles.srt` |
 
-**抖音（第三平台，不挡 `published`）**【门闩真源在本 skill】
+**抖音（第三平台，不挡 `published`）**
 
-- 成片：已烧字幕的标题名 `.mp4`（不依赖外挂 SRT）。
+- 成片：已烧字幕的标题名 `.mp4`。
 - 上传：从 `plan.md`「抖音」栏抄正文；话题在发布页点选变蓝（≤5）。短链随后写入 `episode.md`「抖音：」。
-- `*-no-burn` 清理见 `p3-burn`（不必等抖音）。
 
 还要短视频才提 `/p3-jianying`。
 
@@ -74,7 +60,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 | 保留 | 说明 |
 | --- | --- |
 | 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
-| 成片 | **仅一份**：以标题命名的最终烧字幕 `.mp4`；勿留 `*-no-burn` / 额外 `run-final`（烧字定稿后即可扔，不等抖音） |
+| 成片 | **仅一份**：以标题命名的最终烧字幕 `.mp4`；勿留 `*-no-burn` / 额外 `run-final` |
 | 字幕 | `subtitles.srt`（制作期可选的 `YYYY-MM-DD-run-final.srt` 可留）；烧字源 `subtitles.ass` 可留 |
 | 封面 | `cover.jpg`、`cover-1920x1080.jpg`、`cover-4x3-1920x1440.jpg`、`cover-1080x1440.jpg` |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
@@ -89,8 +75,8 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 | 删 | 说明 |
 | --- | --- |
 | `*-no-burn.mp4` | 无字幕备份；**永远不留**。烧字成片定稿/改名后立刻进废纸篓，不必等抖音 |
-| 多余 `YYYY-MM-DD-run-final.mp4` | 已有标题烧字成片时的旧名/无字幕备份；一并进废纸篓 |
-| `*-run-final-pre-*.mp4` | 拼片备份（冷开场前、修剪前等）；发布后不再需要回退 |
+| 多余 `YYYY-MM-DD-run-final.mp4` | 已有标题烧字成片时的旧名/无字幕备份 |
+| `*-run-final-pre-*.mp4` | 拼片备份（冷开场前、修剪前等） |
 | `close-stats` 等渲染中间件 | 叠了数据的 close 中间件、其它可再生成的渲染产物 |
 | 剪过的 `open` / `close` | **仅当**已有对应 `open-raw` / `close-raw` 时删；没有 `-raw` 则上面 KEEP 已要求保留 |
 | `hud-renders/` | HUD preview / 透明层；可再跑 `p3-hud` |
@@ -103,7 +89,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 ### 流程（PROCESS）
 
 1. **先列清单再动手。** 用 `du -sh` / `ls -lh` 列出拟删项与拟留项及体积，报给用户确认。用户没明确同意前不要删。
-2. **进废纸篓，禁止 `rm`。** 在 macOS 上把确认要删的路径 **move 进废纸篓**（`mv … ~/.Trash/`，或已安装的 `trash` CLI）。不要用 `rm` / `rm -rf`。同名冲突时先改名再移入。
+2. **进废纸篓，禁止 `rm`。** 在 macOS 上把确认要删的路径 **move 进废纸篓**（`mv … ~/.Trash/`，或已安装的 `trash` CLI）。同名冲突时先改名再移入。
 3. 清完把实际移入废纸篓的路径与腾出的体积报给用户。
 4. 这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。
 

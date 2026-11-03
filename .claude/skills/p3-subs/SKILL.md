@@ -1,37 +1,22 @@
 ---
 name: p3-subs
-description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句；人改字后 force_align → check_subs，确认后 subs: done；再写简介与抖音文案进 plan.md。可与响度并行。烧字走 p3-burn；发布走 p3-publish。默认只调 tools/subs 脚本。用户说字幕、转写、whisper、对口型、改字幕时用。没有成片先走 p3-assemble。总序见 p3-episode。
+description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句；人改字后 force_align → check_subs，确认后 subs: done；再写简介与抖音文案进 plan.md。可与响度并行。默认只调 tools/subs 脚本。用户说字幕、转写、whisper、对口型、改字幕时用。没有成片先走 p3-assemble。
 ---
 
 # 字幕（忠于原句）
 
-识别稿只提供时间和草稿。**校正不是润色。** 字必须跟嘴里说的走；切条只断开，不改字。
+识别稿只提供时间和草稿。**校正不是润色。** 字必须跟嘴里说的走；切条只断开，不改字。切条/对齐/质检算法在 `tools/subs/`；本 skill 管编排、人改字门、切条易错扫、简介/抖音文案。
 
-**总序真源：** `p3-episode`。推荐上游：`p3-assemble` **拼时带响度**（见该 skill「编码成本」）；本支路与补跑响度可并行。烧字走 `p3-burn`。
-
-## 职责 / 输入 / 输出
-
-| | |
-| --- | --- |
-| **职责** | 转写 → 人改字 → force_align → check_subs → `subs: done`；写简介 / 抖音文案进 `plan.md` |
-| **输入** | 成片 `YYYY-MM-DD-run-final.mp4`（`p3-assemble` 产出即可，**不必等响度**） |
-| **输出** | `subtitles.txt` / `.srt`（仓库+媒体）；`subs: done`；`plan.md` 简介 / 抖音栏 |
-| **不负责** | 响度（`p3-loudness`）、烧字/改名/`no-burn`（`p3-burn`）、发布门闩/清临时（`p3-publish`） |
-
-校对期外挂 SRT 给人改字。硬字幕由 `p3-burn` 在 `subs: done` **且** `loudness: done` 后做。
-
-**真源分工：** 切条/对齐/质检在 `tools/subs/`；本 skill 只管编排与人改字门、切条易错扫、简介/抖音**文案**。改名与 `subtitles.srt` 文件名见 `p3-burn`；published / 清临时见 `p3-publish`。
-
-**读源码门槛：** 跑本 skill 时**默认只调用脚本，看 stdout/stderr 与退出码**。**不要**为了执行流水线去 Read `.py`、docstring 或「先通读实现再动手」。只有改算法、排错、或解释「为什么这么切」时才打开对应脚本。
+**读源码门槛：** 默认只调脚本看退出码。只有改算法、排错、或解释「为什么这么切」时才打开 `.py`。
 
 ## 流水线
 
-1. 转写 + 初稿：跑 `tools/subs/draft_subs.py`（词级时间；专名表当提示）；看打印与产物即可，不必读源码。词级缓存和原始初稿留在媒体目录 `asr/`，不要覆盖
+1. 转写 + 初稿：`tools/subs/draft_subs.py`（词级时间；专名表当提示）。词级缓存和原始初稿留在媒体目录 `asr/`，不要覆盖
 2. **校正**：只做下面「可以做」，绝不做「不能做」；交稿前做同音字扫描
 3. **切条**：由 `draft_subs` 产出；agent **不重跑切条算法**。字一个都不改，**不对口型**
-4. **自检切条（必做，交用户前）**：对照下方「切条易错」**逐条**扫初稿，只改切分、不改嘴里说的字。用户到手后**只需抽听核对**，不要把第一轮切条扫漏推给用户
+4. **自检切条（必做，交用户前）**：对照「切条易错」逐条扫，只改切分、不改嘴里说的字
 5. 写 `subtitles.srt` + `subtitles.txt`，立刻停，等人手抽听改字
-6. 用户说改好了之后：**只改时间、不改字**。`txt_to_subs.py` → `force_align.py` → `check_subs.py` → 列出硬失败行给人听 → **用户确认「改好了 / 可以了」之后**才写 `subs: done`、回写 SRT。外挂拷到成片旁边。机器过门本身不够
+6. 用户说改好了之后：**只改时间、不改字**。`txt_to_subs.py` → `force_align.py` → `check_subs.py` → 列出硬失败行给人听 → **用户确认**后才写 `subs: done`、回写 SRT
 
 ## 校正：可以做
 
@@ -44,7 +29,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 1. **换一种表达。** 不要把口语改成更顺、更短、更书面的说法。不要用 `talk.md` / `script.md` 重写。
 2. **压缩语句信息。** 指代、限定、程度、口头禅只要是说出来的，都要留。包括但不限于：「这点」「一些」「什么」「完全」「其实」「倒是」「大概」「左右」「足够的」。
 3. **自己加括号注释。** agent 不要往字幕里加没说出口的（…）补充；要解释写进简介。
-   **但用户手改时加的括号是屏幕注释，必须原样保留**（如「去打魔兽世界（私服）」「行（忘记说啥了）」）：回写 SRT、重切条、force_align、同步外挂时都不许删、不许改成别的符号。`check_subs.py` 报「括号」时先看是不是用户写的；是就保留，回复里说明「括号为用户注释，已保留」。
+   **但用户手改时加的括号是屏幕注释，必须原样保留**（如「去打魔兽世界（私服）」「行（忘记说啥了）」）：回写 SRT、重切条、force_align、同步外挂时都不许删。`check_subs.py` 报「括号」时先看是不是用户写的；是就保留。
 
 不确定是不是错字，就保留原句。缺一句宁可空着等人手补，也不要为了通顺而改写。
 
@@ -60,15 +45,13 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 
 ## 前置
 
-需要 `YYYY-MM-DD-run-final.mp4`。没有则先 `/p3-assemble`（拼画面；默认可对字幕版）。**不要等响度**：响度走并行的 `/p3-loudness`，与本 skill 互不等待开工。转写听成片一条，时间就是成片轴。写完稿等人手改字，改好了再对口型。只改字不重转写。烧字在 `subs: done` 且响度就绪后走 `/p3-burn`。
+需要 `YYYY-MM-DD-run-final.mp4`。没有则先 `/p3-assemble`。**不要等响度。** 转写听成片一条，时间就是成片轴。只改字不重转写。
 
-依赖（一次）：`.venv/bin/pip install -r tools/subs/requirements.txt`。Apple Silicon 上 pip 直接装，CPU 跑。模型首次运行自动从 ModelScope 拉到 `~/Movies/running-content/.models/faster-whisper-large-v3-turbo/`（约 1.6 GB），不连 Hugging Face。耗时与进度看脚本打印即可，不必为跑流程去读源码。
+依赖（一次）：`.venv/bin/pip install -r tools/subs/requirements.txt`。Apple Silicon 上 pip 直接装，CPU 跑。模型首次运行自动从 ModelScope 拉到 `~/Movies/running-content/.models/faster-whisper-large-v3-turbo/`（约 1.6 GB），不连 Hugging Face。
 
-专名表：`episode.md` 里写一行 `专名：Personal Agent、HUD、……`（本期口播会说到的产品名、人名、英文术语）。它只当识别提示纠拼写，不能拿来改用词。`p3-topic` 建期时就该写好；转写时脚本自动读，不用再手抄。
+专名表：`episode.md` 里写一行 `专名：Personal Agent、HUD、……`。只当识别提示纠拼写，不能拿来改用词。`p3-topic` 建期时就该写好；转写时脚本自动读。
 
-## 成片路径
-
-制作期成片固定 `YYYY-MM-DD-run-final.mp4`；工作字幕 `subtitles.txt` / `subtitles.srt`（可另拷同名 `.srt` 方便 IINA）。**upload-ready 改名 / 外挂始终 `subtitles.srt`：真源见 `p3-burn`。**
+制作期成片固定 `YYYY-MM-DD-run-final.mp4`；工作字幕 `subtitles.txt` / `subtitles.srt`（可另拷同名 `.srt` 方便 IINA）。
 
 ## 不要做的事
 
@@ -77,10 +60,11 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 - 不要自造第二套切条/对齐规则；也不要为跑流程去 Read `tools/subs/` 源码（改算法 / 排错 / 解释切法除外）
 - 不要把一段识别的起止按字数均分给几条字幕，也不要手填等步长的时间。对不上的条留给 `force_align.py` 报出来，人听了再定
 - 不要用 tiny / small；只用 large-v3-turbo
+- 不要在这里烧字
 
 ## 转写 + 初稿
 
-`--audio` 直接给成片 mp4 即可（脚本抽 wav / 复用缓存）。不传 `--prompt` 时自动读 `--txt` 同目录 `episode.md` 的「专名：」一行。**先把专名表写进 `episode.md` 再转写**；临时不要提示用 `--prompt ""`。直接跑命令看输出即可，不要为跑初稿去 Read `draft_subs.py`。
+`--audio` 直接给成片 mp4 即可。不传 `--prompt` 时自动读 `--txt` 同目录 `episode.md` 的「专名：」一行。**先把专名表写进 `episode.md` 再转写**；临时不要提示用 `--prompt ""`。
 
 ```bash
 .venv/bin/python tools/subs/draft_subs.py \
@@ -90,7 +74,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 
 转写后脚本会按专名表统一英文专名大小写/空格并打印清单；中文同音字仍按上面「同音字扫描」人工过。
 
-产物：`asr/*.words.json`、`asr/*.draft.srt`（不要覆盖）、`subtitles.txt`。txt 已存在时脚本拒绝覆盖（防冲掉人改的字）；要重来加 `--force`。
+产物：`asr/*.words.json`、`asr/*.draft.srt`（不要覆盖）、`subtitles.txt`。txt 已存在时脚本拒绝覆盖；要重来加 `--force`。
 
 ## 写 SRT / txt
 
@@ -107,14 +91,14 @@ subtitles.txt   # 给人改的稿
 
 ## 切条易错（交用户前必扫）
 
-这是 **agent 人工职责**（脚本漏网或语义判断），不是复述 `draft_subs`。对照下面逐条改切分，不改嘴里说的字。改完切分后若已对过口型，再跑 `force_align`。
+这是 **agent 人工职责**（脚本漏网或语义判断）。对照下面逐条改切分，不改嘴里说的字。改完切分后若已对过口型，再跑 `force_align`。
 
 1. **不要把量词/后缀甩到下一行。** 「18-19」+「度了」→「18-19度了」；「2055」+「几」→「2055几」。单位、概数尾巴（度/几/公里/分/秒/% 等）跟它所修饰的数字同一条。
 2. **优先短语边界。** 「太能冲了刷新了自己的PB」→ 两条：「太能冲了」/「刷新了自己的PB」。一句里两个完整谓语，宁可拆开。
 3. **代词贴下一句主语。** 「之后的表现吧我 / 昨天…」错；对的是「看一下之后的表现吧」/「我昨天在看直播的时候」。
 4. **语义单元别拆开。** 「精神 / 图腾吧」应并成「精神图腾吧」；双音节词组、专名、固定搭配同一条。
-5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → 同步外挂：仓库与媒体目录的 `subtitles.srt`。制作审片阶段可另拷 `YYYY-MM-DD-run-final.srt` 方便 IINA；**不要**改成标题名。
-6. **冷开场 prepend：** 截取/硬切/备份以 `p3-assemble`「冷开场」为准。字幕侧：prepend 后 body 全部 +offset（或从新成片重抽 wav 再 `force_align`），文首补上冷开场几条；同步仓库与媒体 `subtitles.srt`。
+5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → 同步外挂：仓库与媒体目录的 `subtitles.srt`。制作审片阶段可另拷 `YYYY-MM-DD-run-final.srt` 方便 IINA。
+6. **冷开场 prepend：** 以 `p3-assemble`「冷开场」为准。字幕侧：body 全部 +offset（或重抽 wav 再 `force_align`），文首补冷开场几条；同步仓库与媒体 `subtitles.srt`。
 
 txt 一行一条，时间是成片轴：
 
@@ -128,19 +112,17 @@ txt 一行一条，时间是成片轴：
 
 自检切条做完、写完 SRT/txt 之后 **立刻停**。不要对口型、不要烧字幕、不要写简介。第一稿时间只是识别的词级时间，不是口型。
 
-把 txt 路径发给用户；用户在 Mac 上要看稿时用文本编辑打开（不要开播放器）：
-
 ```bash
 open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 ```
 
-- 切条已按「切条易错」自检过。这一轮用户**抽听核对、改错字**即可；优先改 `subtitles.txt`，时间不要动。保持单行。
+- 这一轮用户**抽听核对、改错字**即可；优先改 `subtitles.txt`，时间不要动。保持单行。
 
-没说改好之前，`assets.md` 制作状态写 `subs: waiting-review`。
+没说改好之前，`assets.md` 写 `subs: waiting-review`。
 
 ## 改好字之后：对口型
 
-用户说「改好了」之后，先回写 SRT，再对口型。下面只写编排：直接跑 `force_align.py` / `check_subs.py`，看打印与退出码；不要为跑对齐/质检去 Read 源码（改算法 / 排错除外）。
+用户说「改好了」之后：
 
 1. 若动了 txt：
 
@@ -148,8 +130,6 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
    .venv/bin/python tools/subs/txt_to_subs.py \
      --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto
    ```
-
-   覆盖同目录 `subtitles.srt`；`--media-dir auto` 顺手拷到媒体目录（成片还叫 `run-final.mp4` 时再拷一份同名 `.srt`；改名后不拷，外挂始终是 `subtitles.srt`）
 
 2. **对口型**（只改时间；口播用词不改）：
 
@@ -160,7 +140,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
    ```
 
    - 对齐前若发现切条问题，先按「切条易错」改切分，再对齐。
-   - 脚本列出的 `interp` / `unanchored`（及任何需人听的条）必须对着成片听，手改 txt 时间。
+   - 脚本列出的 `interp` / `unanchored` 必须对着成片听，手改 txt 时间。
    - **质检门：**
 
      ```bash
@@ -169,26 +149,21 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
        --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav
      ```
 
-     **机器过门 ≠ 可以写 `subs: done`**：脚本列出的硬失败行，agent 必须给人听；确认前不要写 `subs: done`。漏盖若是路人说话或删掉的磕巴，人听过确认后在回复里说明。用户写的括号注释保留；agent 自加的才删。
+     **机器过门 ≠ 可以写 `subs: done`**：硬失败行必须给人听。漏盖若是路人说话或删掉的磕巴，人听过确认后在回复里说明。用户写的括号注释保留。
    - 对完扫一遍：单行；用词跟口播；没有被改写成另一种说法。
    - 对着成片抽听，本地预览用 IINA；媒体目录放 `subtitles.srt`
-   - 不要为对齐改字。preview 时长变了（重渲 HUD），对着新成片重抽 wav、重跑这一步。
+   - preview 时长变了（重渲 HUD），对着新成片重抽 wav、重跑这一步。
    - 改完 txt 时间后跑 `txt_to_subs.py --media-dir auto` 回写并同步
 
 3. 外挂拷到成片旁边：最后一次 `txt_to_subs.py ... --media-dir auto` 已经拷好。
 
-4. **不要在这里烧字。** 机器过门与人听确认后只定稿 sidecar；烧字 / ASS / `--ass` / `*-no-burn` 一律走 `/p3-burn`（且须 `loudness: done`）。
-
-`check_subs.py` 机器过门之后，把硬失败行和需人听的条列给人；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。agent 不得自行写 `subs: done`。
-
-若响度已 `loudness: done`，下一步提示 `/p3-burn`；若响度还在跑，说明烧字闸门还差响度，不要在本 skill 里代烧。
+`check_subs.py` 机器过门之后，把硬失败行列给人；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。agent 不得自行写 `subs: done`。
 
 然后才写简介：读校准后的 `subtitles.txt`，短句总结本期实际说了什么，写入该期 `plan.md` 的简介栏。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。大多数期没有「参考」，只写摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI。视频优先用当前平台的地址：B 站简介用 B 站链接，YouTube 简介用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没念到的不列。摘要两个平台相同，有参考时参考按平台分开。
 
-**抖音作品描述（另栏，勿复用 B 站 / YouTube 长简介）** 写入该期 `plan.md`「抖音」栏（**文案真源在本 skill**；上传/挂话题/`published` 门闩见 `p3-publish`）：
+**抖音作品描述**写入该期 `plan.md`「抖音」栏：
 - **极致压缩**：两三短句说清本期在干嘛即可；不要 GitHub 行、不要分段长摘要、不要「参考」。
 - **话题（最多 5 个）**：写成「建议话题」清单（不要可粘贴的 `#xxx` 整行）。尽量贴合国内抖音跑步圈热门标签，再按本期换贴题词。禁止把「破三实验室」等频道名当话题。宁缺毋滥，**不超过 5 个**。
-
 
 ## 完成后
 
@@ -198,21 +173,17 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 立刻停。不要对口型、不要烧字幕、不要写简介。说明切条已自检。
 
-> 切条已按易错规则扫过。这一轮抽听核对、改错字即可。优先动 `episodes/YYYY-MM-DD-slug/subtitles.txt`（换成当前期路径）。时间先别动。改好了直接发：
+> 切条已按易错规则扫过。这一轮抽听核对、改错字即可。优先动 `episodes/YYYY-MM-DD-slug/subtitles.txt`。时间先别动。改好了直接发：
 >
 > `改好了`
 
 **用户说改好了**
 
-回写 SRT、对口型、拷到成片旁边，简介写入 `plan.md`。**不要在这里烧字**——响度齐了走 `/p3-burn`。IINA 审片（不要推荐 ffplay）。**不要自己执行这条命令**：发给用户，用户同意或自己开：
+回写 SRT、对口型、拷到成片旁边，简介写入 `plan.md`。IINA 审片（不要推荐 ffplay）。**不要自己执行这条命令**：发给用户，用户同意或自己开：
 
 ```bash
 iina --mpv-geometry=320x180-8+8 \
   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
 ```
 
-小窗贴右上角。制作阶段若有同名 `YYYY-MM-DD-run-final.srt` 会自动挂；改名后怎么挂字幕见 `p3-burn`。
-
-**先不要给完整发布流程。** 响度齐了走 `/p3-burn`；用户说可以发了走 `/p3-publish`。本 skill 到简介 / 抖音文案写入 `plan.md` 为止。
-
-还要 60–90 秒短视频才提 `/p3-jianying`。
+> 下一步：响度齐了走 `/p3-burn`。还要 60–90 秒短视频才提 `/p3-jianying`。

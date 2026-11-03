@@ -1,6 +1,6 @@
 ---
 name: p3-episode
-description: 一期跑步视频的调度入口。用户丢来未重命名的手机导出、VID_、FIT、跑鞋名和里程，或说做视频/成片/只做某一步时用。先盘点缺什么，向用户确认，再按需加载下一个 stage skill。不要一次加载全部 skill。总序与产物图真源在本 skill。
+description: 一期跑步视频的调度入口。用户丢来未重命名的手机导出、VID_、FIT、跑鞋名和里程，或说做视频/成片/只做某一步时用。先盘点缺什么，向用户确认，再按需加载下一个 stage skill。不要一次加载全部 skill。成片总序真源在本 skill。
 ---
 
 # 一期成片调度
@@ -8,8 +8,6 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
 用户典型输入只有：**未重命名的手机导出** + **跑鞋名和里程**。缺的信息逐步问，不要假设。一次只加载下一步 skill。还没有选题或 `talk.md` 时，先问要不要走 `p3-topic`，不要在成片流程里临场编观点。
 
 60–90 秒发布剪辑走 `p3-jianying`。本调度默认全长成片。
-
-**本 skill 是真源：** 成片 **总序** 与 **产物图**。其它 skill / README / `成片skills.md` 只引用或列短表，不要另写一套顺序。
 
 ## 不要做的事
 
@@ -19,7 +17,6 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
 - 不要用生涯总里程直接当 HUD `-sk`
 - 不要覆盖已有 `open/run-*/close`、HUD、成片，除非用户明确要重做
 - 不要在成片流程里自行搬盘或删原片；归档走 `p3-archive`；发布/清临时走 `p3-publish`
-- 改名与 `subtitles.srt` 文件名见 `p3-burn`，不要在这里另写一套
 
 ## 产物图（总序）
 
@@ -35,14 +32,13 @@ run-* + FIT + -sk
 
 hud-preview + open/close
   p3-assemble   → 拼画面（推荐拼时带响度）+ 抽帧核对
-                  编码成本：assemble/loudness/burn 现状都可能全量重拼，见 p3-assemble
 
-然后
+然后（可并行）
   p3-subs       → 转写→人改→force_align→subs: done + 简介/抖音文案
-  p3-loudness   → 仅当拼时关了响度才补跑（=再全量重拼，有成本；可与字幕并行）
+  p3-loudness   → 仅当拼时关了响度才补跑
 
 subs + loudness 都就绪
-  p3-burn       → ASS 烧字（现状仍全量重拼）→ 可选 upload-ready 改名
+  p3-burn       → ASS 烧字 → 可选 upload-ready 改名
 
 双链齐
   p3-publish    → 写链接 / published / 合 episode PR / 清临时
@@ -51,7 +47,7 @@ subs + loudness 都就绪
 再核对   → p3-qc（默认抽帧已在 assemble）
 ```
 
-**推荐墙钟路径：** `assemble`（带响度）→ `subs` → `burn` → `publish`。不要默认「关响度拼 + 单独 loudness + burn」编满 3 遍。
+**推荐墙钟：** `assemble`（带响度）→ `subs` → `burn` → `publish`。编码成本见 `p3-assemble`。
 
 ## 1. 先盘点，再问目标
 
@@ -68,7 +64,7 @@ python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
 | 只做 HUD | 已命名 `run-*` + FIT + `-sk` | `p3-shoes`（若还没有 `-sk`）→ `p3-hud` |
 | 只拼画面 | HUD preview | `p3-assemble`（推荐拼时带响度） |
 | 只做字幕 | 成片 `run-final` | `p3-subs` |
-| 只补响度 | 成片且尚未 loudness | `p3-loudness`（有全量重拼成本） |
+| 只补响度 | 成片且尚未 loudness | `p3-loudness` |
 | 只烧字 | `subs: done` + `loudness: done` | `p3-burn` |
 | 发布 / 清临时 | 双链或用户说发完了 | `p3-publish` |
 | 只换封面 | 自拍 + 封面句 | `p3-cover` |
@@ -105,7 +101,7 @@ python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
 | 没有 HUD preview | `/p3-hud`（封面并行走 `/p3-cover`） |
 | 没有成片 | `/p3-assemble`（推荐拼时带响度） |
 | 没有字幕稿 | `/p3-subs` |
-| 成片未修响度（拼时关了） | `/p3-loudness`（=再全量重拼） |
+| 成片未修响度（拼时关了） | `/p3-loudness` |
 | 字幕+响度都齐、未烧字 | `/p3-burn` |
 | 已烧字、要发 / 清临时 | `/p3-publish` |
 | 只要换封面 | `/p3-cover 封面句「<封面句>」` |
@@ -116,8 +112,6 @@ python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
 
 ## 3. 状态（短）
 
-- `episode.md` status：`shot`（ingest 后）→ `hud` → `edited`（字幕用户确认后，由 `p3-subs` 写）→ `published`（**双链门闩 / 合 PR / 清临时：`p3-publish`**；抖音不挡 published）。
-- `assets.md`：`assemble` / `qc` / `loudness` / `subs` / `burn` / `upload` 等键；拼时带响度则 assemble 时一并写 `loudness: done`。
-- 细则：抽帧 → `p3-assemble`；改名/`subtitles.srt`/`no-burn` → `p3-burn`；抖音文案 → `p3-subs`；链接与清临时 → `p3-publish`。
-
-改字幕：改 txt 后 `txt_to_subs.py`，一般不用重拼。改 `-sk`：重 HUD 再 assemble；preview 时长变了就重对口型。改封面句：只 `p3-cover`。
+- `episode.md`：`shot` → `hud` → `edited`（`p3-subs` 用户确认后）→ `published`（`p3-publish`；抖音不挡）。
+- `assets.md`：`assemble` / `qc` / `loudness` / `subs` / `burn` / `upload`；拼时带响度则一并写 `loudness: done`。
+- 改字幕：改 txt 后 `txt_to_subs.py`，一般不用重拼。改 `-sk`：重 HUD 再 assemble；preview 时长变了就重对口型。改封面句：只 `p3-cover`。
