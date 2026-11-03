@@ -1,8 +1,8 @@
-# 2026-11-04 素材索引
+# 2026-11-05 素材索引
 
 ## 本地素材目录
 
-`~/Movies/running-content/2026-11-04-ai-pipeline/`
+`~/Movies/running-content/2026-11-05-ai-pipeline/`
 
 ## 重命名结果
 
