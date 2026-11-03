@@ -81,13 +81,7 @@ preview 出完后，对 **preview** 做句间粗剪（原片 `run-*` 不剪，HU
 
 默认 dry-run。确认后 `--apply`。`--targets preview` 时**默认启用 `--keep-lead-silence`**（`start0=0`，开口前静默/呼吸/跑镜全部保留，用来表现强度课艰难）；整段无语音的 clip 本来就原样保留。需要裁掉 lead 时才加 `--no-keep-lead-silence`。工作文件仍是 `*-hud-preview.mp4`，未剪的 preview 改名为 `*-hud-preview-raw.mp4`。确认时看两件事：最后一句有没有被片尾保护段前面的空洞吃掉；强度课硬段不说话，那是课不是句间停顿，不要整段剪掉——**只在画面开始说话以后才剪句间停顿**。
 
-口播检测默认 **Silero VAD**（人声 vs 风/车，不是声纹）。模型：
-
-```text
-~/Movies/running-content/.models/ggml-silero-v5.1.2.bin
-```
-
-没有就从 `https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin` 拉到这个路径（约 864K）。ModelScope 没有这个模型；直连不通就把域名换成 `hf-mirror.com`。CLI 是 brew 的 `whisper-vad-speech-segments`，打印的时间是百分之一秒。只剪 `max(2×均值, 均值+1.2s)` 以上的停顿，收到均值 + 安全余量，左右留肩，片尾 3 秒不剪。对比旧能量门限加 `--speech-detect band`。
+口播检测与停顿门槛等**以 `tools/ingest/trim_talk_pauses.py` 为准**（默认 Silero VAD；模型路径与下载见该脚本 / 其依赖说明）。对比旧能量门限加 `--speech-detect band`。skill 不复述剪停顿算法。
 
 拼成片用粗剪后的 **preview**。`--preview` 会先渲透明层再叠回原片同档，alpha 是渲染中间件，不是成片交付。不走剪映可以不理 `*-hud-alpha.mov`。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
 
