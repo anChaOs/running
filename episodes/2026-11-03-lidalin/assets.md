@@ -47,8 +47,9 @@
 - cold-open: done（**完整三句**，不卡 12s；`hooks-bumper.mp4`≈33.27s → 60fps+loudnorm offset=**33.286s** prepend；备份短钩 `cold-open/backup-short-hooks/` + `2026-11-03-run-final-short-hooks-bak.mp4`；源见 `cold-open/HOOKS.md`；正文原句保留）
 - assemble: done（先 `--no-loudness-fix` 出可对字幕版，再 loudnorm；成片含完整冷开场 `2026-11-03-run-final.mp4` ≈1213.49s；旁路 `…-loudnorm-no-hooks.mp4` 1180.181s / `…-pre-loudnorm.mp4` / `…-pre-coldopen.mp4` / `…-short-hooks-bak.mp4`）
 - qc: done（抽帧 open/接缝/HUD/close；整片含钩子 loudnorm 复测见下；hooks-bumper 单独 loudnorm 后再 concat）
-- subs: waiting-review（361 条；含完整冷开场钩子；外挂已同步媒体目录；未 force_align；body 按 Δ=+21.253317s 平移）
-- upload: pending
+- subs: done（363 条定稿；force_align + 用户确认「可以了」；ASS Source Han Sans SC Heavy 72 / Outline 3 / MarginV=100；已烧入成片；无烧字备份 2026-11-03-run-final-no-burn.mp4）
+- upload: ready（成片=标题名「李大林，强的可怕.mp4」；外挂=subtitles.srt；ASS=subtitles.ass）
+- burn+rename: done（libass 烧 Source Han Sans SC Heavy→`李大林，强的可怕.mp4` ≈2.2G / 1213.49s；备份 `2026-11-03-run-final-no-burn.mp4`；音频 copy 保响度）
 
 ## 响度 / 冷开场
 

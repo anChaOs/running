@@ -2,7 +2,7 @@
 date: 2026-11-03
 slug: lidalin
 title: 李大林，强的可怕
-status: planned
+status: edited
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-03-lidalin/
 ---
