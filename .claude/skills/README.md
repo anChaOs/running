@@ -33,9 +33,12 @@
   p3-ingest       VID_ / FIT → open/run-*/close
   p3-shoes        training/logs/shoes.md，算出 -sk
   p3-hud          overlay + 同档 preview，并行封面
-  p3-subs         whisper large-v3-turbo + 忠于原句 SRT（外挂）
+  p3-assemble     拼画面（推荐拼时带响度）+ 抽帧核对
+  p3-subs         字幕（转写→人改→对齐）
+  p3-loudness     响度补跑（现状=全量重拼；拼时已带则跳过）
+  p3-burn         烧字 / 改名（现状 --ass 仍全量重拼）
+  p3-publish      发布：写双链 / published / 合 PR / 清临时
   p3-cover        只换封面 / 重抽
-  p3-assemble     叠化拼接（默认不烧字幕）+ 抽帧核对
   p3-qc           只再核对；默认已在 assemble 里做过
   p3-jianying     60–90 秒剪映，不走全长脚本
   p3-archive      满 7 天的素材搬到 Passport running-content/YYYYMM/
@@ -43,23 +46,18 @@
 
 ## 产物顺序
 
+**总序真源：`p3-episode`。** 这里只留短摘要，避免双源。
+
 ```text
-灵光一闪 / 还没拍摄日
-  → p3-library      topics/<slug>.md
-想法 / 一次训练（当天要拍）
-  → p3-topic        选题 + 分段口播卡
-  → p3-scaffold     episodes/YYYY-MM-DD-slug/
-
-手机导出 + FIT
-  → p3-ingest       ~/Movies/running-content/YYYY-MM-DD-slug/
-  → p3-shoes        -sn / -sk（跑完后累计 km）
-  → p3-hud          hud-renders/*-hud-preview.mp4 + cover-*.jpg
-  → p3-assemble     YYYY-MM-DD-run-final.mp4 + 抽帧核对
-  → p3-subs         对着成片 whisper，subtitles.srt / txt，手改后再对口型，status=edited
-  → （发布后）      用户说发布完毕并给齐 B 站 + YouTube 链接：记链接、status=published；清临时文件真源见 p3-subs「发布后清临时文件」（先确认清单，进废纸篓）
-
-满 7 天、要腾本机
-  → p3-archive      /Volumes/My Passport/running-content/YYYYMM/
+p3-library / p3-topic / p3-scaffold
+  → ingest → shoes → hud ∥ cover
+  → assemble（推荐拼时带响度；抽帧真源在 assemble）
+  → subs（∥ 仅当需要时的 loudness 补跑）
+  → burn（改名 / subtitles.srt / no-burn 真源）
+  → publish（published 门闩 / 清临时真源）
+  → archive（满 7 天）
 ```
+
+推荐墙钟：`assemble`（带响度）→ `subs` → `burn` → `publish`。assemble / loudness / burn 现状都可能全量重拼，详见 `p3-assemble`「编码成本」。
 
 任意一步都可以停。改字幕只改 sidecar，不用重拼。改 `-sk` 要重渲 HUD 再拼。

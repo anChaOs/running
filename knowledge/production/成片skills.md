@@ -1,6 +1,6 @@
 # 成片 skills
 
-文件在 `.claude/skills/<name>/SKILL.md`，目录说明见 `.claude/skills/README.md`。统一前缀 `p3-`（破三实验室），输入 `/p3` 可列出。按需加载，不要一次读完全部。入口是 `p3-episode`。用户可以只做到某一步。
+文件在 `.claude/skills/<name>/SKILL.md`，目录说明见 `.claude/skills/README.md`。统一前缀 `p3-`（破三实验室），输入 `/p3` 可列出。按需加载，不要一次读完全部。入口是 `p3-episode`（**总序真源**）。用户可以只做到某一步。推荐墙钟：拼时带响度 → 字幕 → 烧字 → 发布；编码成本见 `p3-assemble`。
 
 | skill | 做什么 | 典型输入 | 产物 |
 | --- | --- | --- | --- |
@@ -11,10 +11,13 @@
 | `p3-ingest` | 收素材、命名、校正 mtime | `VID_*.mp4`、FIT | `open/run-*/close`、`assets.md` |
 | `p3-shoes` | 算 HUD `-sk` | 鞋名 + 开跑前/跑完后/生涯总里程 | `training/logs/shoes.md` 更新 |
 | `p3-hud` | 同档 preview（出完 VAD 句间粗剪）+ 透明层中间件 | 已命名 run + FIT + `-sk` | `hud-renders/` |
-| `p3-subs` | 词级转写 + 忠于原句 SRT（只纠错、删显著卡顿）；校对期外挂；定稿后 ASS 烧进最终片；改字后强制对齐，质检门按比例过门；发布完毕记链接后清临时文件（真源见该 skill「发布后清临时文件」） | 成片音频 | `subtitles.srt` / `.txt` / `.ass`；发布后按 KEEP/DELETE 清单清理（确认后进废纸篓） |
+| `p3-assemble` | 拼画面 + 抽帧（推荐拼时带响度；总序见 `p3-episode`） | HUD preview | `*-run-final.mp4` + `qc/*.jpg`；`assemble/qc`（+常 `loudness`） |
+| `p3-subs` | 字幕：转写→人改→对齐；简介/抖音文案 | 成片 | `subtitles.*`；`subs: done`；`plan.md` |
+| `p3-loudness` | 响度补跑（现状=全量重拼；拼时已带则跳过） | 未响度成片 | `loudness: done` |
+| `p3-burn` | 烧字；改名/`subtitles.srt`/`no-burn` 真源（现状 `--ass` 仍全量重拼） | `subs`+`loudness` | 烧字片；`burn`/`upload` |
+| `p3-publish` | 发布门闩/清临时真源：双链、`published`、合 PR、KEEP/DELETE | 双链或发完了 | `published`；临时进废纸篓 |
 | `p3-cover` | 封面：拍摄单 → 自拍抠图 → 粗描边 → 设计底 → 三比例手排（与 HUD 并行） | 手持自拍 + 封面句 | `cover-*.jpg` |
-| `p3-assemble` | 叠化拼接（最终片默认烧 ASS，从 2026-10-29 起）+ 立刻抽帧核对 | HUD preview + 可选 `--ass` | `*-run-final.mp4` + `qc/*.jpg` |
-| `p3-qc` | 只再核对 / 重抽 | 成片 | `qc/*.jpg`；有校准字幕才 `edited` |
+| `p3-qc` | 只再核对 / 重抽 | 成片 | `qc/*.jpg`；`edited` 由字幕确认后写 |
 | `p3-jianying` | 60–90 秒发布剪辑 | 原片 + HUD alpha | 剪映工程 / 发布版 |
 | `p3-archive` | 满 7 天素材归档到 Passport | 本地 `YYYY-MM-DD-slug/` | `running-content/YYYYMM/`，核过再删本地 |
 

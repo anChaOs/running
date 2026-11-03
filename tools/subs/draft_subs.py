@@ -2,7 +2,7 @@
 """成片音频 → 字幕初稿（单行短条）。给人改字用，时间只是草稿。
 
 faster-whisper large-v3-turbo 词级时间（专名表当提示，只纠拼写）。
-切条顺序：停顿第一优先级——≥1.2s 必断，≥0.5s 自然断；强标点可断；≤2 字短条并到停顿更短的一侧；再确定性合并「数字+单位/概数尾巴」和少量固定搭配。
+切条顺序：停顿第一优先级——>0.75s 必断，≥0.5s 自然断；强标点可断；再确定性合并「数字+单位/概数尾巴」和少量固定搭配。
 繁体统一转简体。不删字、不改写；校正交给人和 p3-subs 的规则。
 
 产物：
@@ -21,8 +21,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import subs_core as sc  # noqa: E402
 
-HARD_CHARS = 20     # merge_short / merge_cut_fixes 合并上限
 MIN_DUR = 1.0
+HARD_PAUSE = 0.75  # 词间停顿 > 这个：必断
 NATURAL = 0.50      # 词间停顿 ≥ 这个且前面已够 MIN_SIDE 字：直接断（停顿第一优先级）
 MIN_SIDE = 4        # 自然停顿切断时左侧至少留的字数
 STRONG = re.compile(r"[。！？!?…]$")
@@ -112,7 +112,7 @@ def split_words(words) -> list[list]:
         if buf:
             gap = w.s - buf[-1].e
             # 长停顿一定断；自然停顿（≥NATURAL）且前面已够一句 → 也断
-            if gap > 1.2 or (gap >= NATURAL and nchars(buf) >= MIN_SIDE and not _forbidden(buf + [w], len(buf) - 1)):
+            if gap > HARD_PAUSE or (gap >= NATURAL and nchars(buf) >= MIN_SIDE and not _forbidden(buf + [w], len(buf) - 1)):
                 cues.append(buf)
                 buf = []
         buf.append(w)
@@ -123,38 +123,7 @@ def split_words(words) -> list[list]:
             continue
     if buf:
         cues.append(buf)
-    return merge_cut_fixes(merge_short(cues))
-
-
-def merge_short(cues: list[list]) -> list[list]:
-    """≤2 字的短条并到停顿更短的那一边（不是总并回上一条）：
-    「开表了 ⟨0.6s⟩ OK ⟨0.15s⟩ 我们」→ OK 归下一条。两边停顿都 ≥0.6s 就留着。"""
-    out = [list(c) for c in cues]
-    i = 0
-    while i < len(out):
-        c = out[i]
-        if nchars(c) > 2 or len(out) == 1:
-            i += 1
-            continue
-        gp = c[0].s - out[i - 1][-1].e if i > 0 else 9.0
-        gn = out[i + 1][0].s - c[-1].e if i + 1 < len(out) else 9.0
-        opts = []
-        if i > 0 and gp < 0.6 and nchars(out[i - 1]) + nchars(c) <= HARD_CHARS:
-            opts.append((gp, -1))
-        if i + 1 < len(out) and gn < 0.6 and nchars(out[i + 1]) + nchars(c) <= HARD_CHARS:
-            opts.append((gn, 1))
-        if not opts:
-            i += 1
-            continue
-        _, d = min(opts)
-        if d == 1:
-            out[i + 1] = c + out[i + 1]
-            del out[i]
-        else:
-            out[i - 1] = out[i - 1] + c
-            del out[i]
-            i -= 1
-    return out
+    return merge_cut_fixes(cues)
 
 
 def _ends_with_number(text: str) -> bool:
@@ -184,9 +153,7 @@ def merge_cut_fixes(groups: list[list]) -> list[list]:
             join = True
         elif _colloc_join(a, b):
             join = True
-        # 数字+单位允许略超 HARD_CHARS；搭配也给一点余量
-        limit = HARD_CHARS + (4 if join else 0)
-        if join and nchars(prev) + nchars(g) <= limit:
+        if join:
             out[-1] = prev + g
         else:
             out.append(g)

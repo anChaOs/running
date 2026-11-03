@@ -7,6 +7,8 @@
 
 混音后默认走响度链（dynaudnorm → compressor → loudnorm I=-16/TP=-1.5），
 whoosh 叠完再 leveling，避免整轨盲目抬增益把峰值顶满。--no-loudness-fix 可关。
+编排上：拼画面阶段用 --no-loudness-fix（见 p3-assemble）；响度并行支路勿加该开关（p3-loudness）；
+烧字收尾再加 --ass 且保留响度链（p3-burn）。不要把响度/烧字当成拼画面的串行捆绑。
 """
 
 from __future__ import annotations
@@ -705,7 +707,7 @@ def main() -> int:
     parser.add_argument("--close", help="Override close clip. Default: media-dir/*-close.mp4")
     parser.add_argument(
         "--ass",
-        help="Burn ASS into the video. Omit by default; upload SRT as sidecar instead.",
+        help="Burn ASS (p3-burn after subs+loudness). Omit for assemble/loudness stages.",
     )
     parser.add_argument("--out", help="Output mp4. Default: <media-dir>/<date>-run-final.mp4")
     parser.add_argument(
@@ -726,7 +728,7 @@ def main() -> int:
     parser.add_argument(
         "--no-loudness-fix",
         action="store_true",
-        help="Skip post-mix dynaudnorm+loudnorm (default ON: I=-16 LUFS, TP=-1.5 dBTP)",
+        help="Skip loudness chain (p3-assemble picture pass). Omit for p3-loudness / p3-burn.",
     )
     parser.add_argument(
         "--preview-joins",

@@ -61,7 +61,7 @@ MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间�
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
 ```
 
-默认 dry-run，列出要剪短的间隔。确认后加 `--apply`。原片改名为 `*-open-raw.mp4` / `*-close-raw.mp4`，工作文件仍是 `*-open.mp4` / `*-close.mp4`。只剪「明显长于句间均值」的停顿：门槛是 `max(2×均值, 均值+1.2s)` 且至少 1.2s，给思考停顿留空。剪的时候收到**均值 + 约 0.45s 安全余量**，不要收到均值；超长停顿左右都留肩，防止切到下一句开头。口播检测默认 **Silero VAD**（`whisper-vad-speech-segments` + `~/Movies/running-content/.models/ggml-silero-v5.1.2.bin`，约 864K）。这是人声 vs 风/车，不是声纹，路人说话也会留下。能量门限兜底才用 `--speech-detect band`（280–3500 Hz）。0.08s 以上的短音节当说话。片尾 **3 秒整段保留**。音画必须同一起止 trim 再 concat，不要用 `select`/`aselect` 分轨切（会漂）。不要剪 `run-*`，也不要动 `run-*` 的 mtime。不需要粗剪时，ingest 加 `--skip-pause-trim`。
+默认 dry-run，列出要剪短的间隔。确认后加 `--apply`。原片改名为 `*-open-raw.mp4` / `*-close-raw.mp4`，工作文件仍是 `*-open.mp4` / `*-close.mp4`。停顿门槛等实现在 `tools/ingest/trim_talk_pauses.py`；skill 不复述算法。**跑流程时只调用脚本看打印/退出码，不要为执行本步去 Read 源码**（改算法 / 排错除外）。音画必须同一起止 trim 再 concat，不要用 `select`/`aselect` 分轨切（会漂）。不要剪 `run-*`，也不要动 `run-*` 的 mtime。不需要粗剪时，ingest 加 `--skip-pause-trim`。
 
 ingest `--apply` 会直接跑粗剪 `--apply`。已经收过的素材，单独跑上面这条。
 
