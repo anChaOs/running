@@ -46,7 +46,7 @@
 
 - ingest: done（`--no-open`；close pause-trim done）
 - shoes: done（-sn SC Trainer -sk 2514.00）
-- hud: running（tmux p3-hud-2026-11-04；logs/hud-render.log）
+- hud: done（-sn SC Trainer -sk 2514.00；alpha+preview；preview pause-trim ~229.03s→~195.8s keep≈0.91s；raw 保留）
 - cover: done（主推：雨里跑，随便聊聊；16:9/4:3/3:4 + cover.jpg）
 - assemble: pending
 - qc: pending

@@ -2,7 +2,7 @@
 date: 2026-11-04
 slug: rain-feel
 title: 雨天｜随便聊聊体感
-status: shot
+status: hud
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-04-rain-feel/
 ---
