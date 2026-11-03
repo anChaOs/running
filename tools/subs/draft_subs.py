@@ -2,7 +2,7 @@
 """成片音频 → 字幕初稿（单行短条）。给人改字用，时间只是草稿。
 
 faster-whisper large-v3-turbo 词级时间（专名表当提示，只纠拼写）。
-切条顺序：停顿第一优先级——≥1.2s 必断，≥0.5s 自然断；超长非切不可时在整条里找最长停顿切（只在词组边界，停顿相近才看标点）；≤2 字短条并到停顿更短的一侧；再确定性合并「数字+单位/概数尾巴」和少量固定搭配。
+切条顺序：停顿第一优先级——≥1.2s 必断，≥0.5s 自然断；强标点可断；≤2 字短条并到停顿更短的一侧；再确定性合并「数字+单位/概数尾巴」和少量固定搭配。
 繁体统一转简体。不删字、不改写；校正交给人和 p3-subs 的规则。
 
 产物：
@@ -21,19 +21,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import subs_core as sc  # noqa: E402
 
-MAX_CHARS = 16      # 一行上限；宁可稍过也不拆词
-HARD_CHARS = 20
-MAX_DUR = 4.5
+HARD_CHARS = 20     # merge_short / merge_cut_fixes 合并上限
 MIN_DUR = 1.0
 NATURAL = 0.50      # 词间停顿 ≥ 这个且前面已够 MIN_SIDE 字：直接断（停顿第一优先级）
-MIN_SIDE = 4        # 超长切分时两边尽量各留的字数
-TIE = 0.10          # 停顿相差这么多以内才算「差不多」，用标点/挂词打平
+MIN_SIDE = 4        # 自然停顿切断时左侧至少留的字数
 STRONG = re.compile(r"[。！？!?…]$")
-WEAK = re.compile(r"[，,、；;：:]$")
-HANG_END = ("的", "一个", "一些", "了", "就", "比较", "和", "跟", "在", "把", "被", "给", "对", "很", "非常", "是")
-HANG_HEAD = ("的", "了", "里", "们", "着", "过", "中的", "呢", "吧", "啊", "嘛", "呀")
-# 这些词开头的下一条更自然：切在它们前面加分，停在它们上面减分
-OPENERS = ("但是", "但", "所以", "然后", "因为", "而且", "也", "就是", "那", "并且", "或者", "比如", "甚至", "包括", "当然")
 PUNCT_ONLY = re.compile(r"^[，,。.！？!?、；;：:…\-—]+$")
 # 数字后的单位 / 概数尾巴：不要拆到下一行（芝马期实踩：18-19|度了、2055|几）
 UNIT_TAIL_HEAD = re.compile(
@@ -103,32 +95,6 @@ def nchars(ws) -> int:
     return len(sc.norm("".join(w.w for w in ws)))
 
 
-def score_cut(ws, k) -> float:
-    """在 ws[k] 之后切的「文字」得分（标点 / 挂词 / 句首词）。停顿另算，这里只用于停顿相近时打平。"""
-    w = clean_word(ws[k].w)
-    nxt = clean_word(ws[k + 1].w) if k + 1 < len(ws) else ""
-    s = 0.0
-    if STRONG.search(w):
-        s += 3
-    elif WEAK.search(w):
-        s += 2
-    bare = sc.norm(w)
-    if bare.endswith(HANG_END) or sc.norm(nxt).startswith(HANG_HEAD):
-        s -= 4
-    if bare in OPENERS:
-        s -= 3
-    if sc.norm(nxt) in OPENERS:
-        s += 1.5
-    # 数字 | 单位/概数：强惩罚，避免「18-19 / 度了」「2055 / 几」
-    if re.search(r"\d$", bare) and nxt and UNIT_TAIL_HEAD.match(sc.norm(nxt)):
-        s -= 5
-    return s
-
-
-def gap_after(ws, k) -> float:
-    return (ws[k + 1].s - ws[k].e) if k + 1 < len(ws) else 1.0
-
-
 def _forbidden(ws, k) -> bool:
     """硬约束：数字+单位不拆；英文专名（连续英文词）不拆。"""
     a, b = sc.norm(clean_word(ws[k].w)), sc.norm(clean_word(ws[k + 1].w))
@@ -139,29 +105,13 @@ def _forbidden(ws, k) -> bool:
     return False
 
 
-def best_cut(buf):
-    """停顿第一优先级：在整个 buf 里找最长停顿切（只在词组边界）。
-    左侧尽量留 MIN_SIDE 字；停顿相差 TIE 以内才看标点/挂词/句首词打平。"""
-    ks = [k for k in range(len(buf) - 1) if not _forbidden(buf, k)]
-    if not ks:
-        return None
-    total = nchars(buf)
-    # 右侧会继续接后面的词，所以只要求左侧够字；右侧短也没关系（最后由 merge_short 兜底）
-    roomy = [k for k in ks if nchars(buf[: k + 1]) >= MIN_SIDE]
-    pool = roomy or [k for k in ks if nchars(buf[: k + 1]) >= 2 and total - nchars(buf[: k + 1]) >= 2] or ks
-    top = max(gap_after(buf, k) for k in pool)
-    tied = [k for k in pool if gap_after(buf, k) >= top - TIE]
-    # 打平：文字得分高者；再平则停顿更大者；再平取靠中间（两边更均衡）
-    return max(tied, key=lambda k: (score_cut(buf, k), gap_after(buf, k), -abs(total / 2 - nchars(buf[: k + 1]))))
-
-
 def split_words(words) -> list[list]:
     cues: list[list] = []
     buf: list = []
     for w in words:
         if buf:
             gap = w.s - buf[-1].e
-            # 长停顿一定断；自然停顿（≥NATURAL）且前面已够一句 → 也断，不等到超长
+            # 长停顿一定断；自然停顿（≥NATURAL）且前面已够一句 → 也断
             if gap > 1.2 or (gap >= NATURAL and nchars(buf) >= MIN_SIDE and not _forbidden(buf + [w], len(buf) - 1)):
                 cues.append(buf)
                 buf = []
@@ -171,12 +121,6 @@ def split_words(words) -> list[list]:
             cues.append(buf)
             buf = []
             continue
-        while buf and len(buf) > 1 and (nchars(buf) > MAX_CHARS or buf[-1].e - buf[0].s > MAX_DUR):
-            k = best_cut(buf)
-            if k is None:
-                break
-            cues.append(buf[: k + 1])
-            buf = buf[k + 1:]
     if buf:
         cues.append(buf)
     return merge_cut_fixes(merge_short(cues))

@@ -65,37 +65,12 @@ def test_colloc_merge():
     assert texts(out) == ["精神图腾吧"], texts(out)
 
 
-def test_score_cut_penalizes_number_unit():
-    ws = [W(0.0, 0.3, "2055"), W(0.4, 0.5, "几")]
-    # cutting after 2055 should be strongly discouraged
-    assert ds.score_cut(ws, 0) < 0, ds.score_cut(ws, 0)
-
-
-def chars_seq(text, t0, gaps, cd=0.18):
-    """按字造 token：gaps[i] 是第 i 个字前的停顿。"""
-    out, t = [], t0
-    for ch, g in zip(text, gaps):
-        t += g
-        out.append(W(t, t + cd, ch))
-        t += cd
-    return out
-
-
 def test_opener_goes_to_next_cue_ok():
     # 看看开表了 ⟨0.6s⟩ OK ⟨0.15s⟩ 我们开始了
     ws = [W(0.0, 0.8, "看看"), W(0.85, 1.6, "开表"), W(1.6, 1.8, "了"),
           W(2.4, 2.7, "OK"), W(2.85, 3.2, "我们"), W(3.25, 3.7, "开始"), W(3.7, 3.85, "了")]
     out = texts(ds.split_words(ws))
     assert out == ["看看开表了", "OK我们开始了"], out
-
-
-def test_opener_goes_to_next_cue_overlong():
-    # 超长 buffer，最长停顿在「周三」和「今天」之间（0.45s<NATURAL），不能只拆尾巴
-    ws = [W(0.0, 0.4, "我们"), W(0.42, 0.8, "这周"), W(0.82, 1.1, "已经"), W(1.12, 1.4, "跑了"),
-          W(1.42, 1.7, "三次"), W(1.72, 2.0, "周一"), W(2.02, 2.3, "周二"), W(2.32, 2.6, "周三"),
-          W(3.05, 3.35, "今天"), W(3.4, 3.7, "打算"), W(3.72, 4.0, "跑"), W(4.02, 4.3, "十公里")]
-    out = texts(ds.split_words(ws))
-    assert out[0].endswith("周三") and out[1].startswith("今天"), out
 
 
 def test_short_merge_prefers_smaller_gap():
@@ -117,12 +92,10 @@ def main() -> int:
     test_number_unit_merge()
     test_no_merge_without_number()
     test_colloc_merge()
-    test_score_cut_penalizes_number_unit()
     test_opener_goes_to_next_cue_ok()
-    test_opener_goes_to_next_cue_overlong()
     test_short_merge_prefers_smaller_gap()
     test_no_split_number_unit_or_english()
-    print("ok: 8 checks passed")
+    print("ok: 6 checks passed")
     return 0
 
 
