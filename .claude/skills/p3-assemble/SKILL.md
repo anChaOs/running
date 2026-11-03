@@ -58,7 +58,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 1. `assemble_episode.py --no-loudness-fix` → 写出 `YYYY-MM-DD-run-final.mp4`（画面+转场+whoosh 齐，响度未修、可不烧字）供 `p3-subs` 立刻开工
 2. `p3-subs` 做到 `waiting-review`（等人手改字；外挂 SRT）
 3. 校对期间另开一遍：对同一媒体目录再跑 `assemble_episode.py`（**不加** `--no-loudness-fix`，即默认响度链），覆盖/写出响度版；或保留预响度副本为 `YYYY-MM-DD-run-final-pre-loudnorm.mp4` 再覆盖 `run-final`
-4. 字校对 + force_align 定稿后：生成 `subtitles.ass`（Style 默认见 `p3-subs`：Source Han Sans SC Heavy、1080p Fontsize=72；Fontname 须系统真选中 Heavy，勿只靠 fontsdir），备份无烧字片为 `YYYY-MM-DD-run-final-no-burn.mp4`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链）→ **最终发布片**
+4. 字校对 + force_align 定稿后：生成 `subtitles.ass`（Style 默认见 `p3-subs`：Source Han Sans SC Heavy、1080p Fontsize=72；Fontname 须系统真选中 Heavy，勿只靠 fontsdir），烧字时可短暂把无烧字片挪成 `YYYY-MM-DD-run-final-no-burn.mp4`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链）→ **最终发布片**；**烧字定稿/改名后立刻把 `*-no-burn.mp4` 进废纸篓，永远不留，不必等抖音**（真源见 `p3-subs`）
 5. QC 峰值/LUFS 与烧字抽帧跟**最终片**（响度 + 烧字）
 
 不要等响度链跑完才开字幕。`--no-loudness-fix` 就是「可对字幕版」开关。最终片从 2026-10-29 起默认带 `--ass`。

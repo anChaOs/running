@@ -176,7 +176,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
    - 不要为对齐改字。只改 sidecar，不用重拼成片。preview 时长变了（重渲 HUD），对着新成片重抽 wav、重跑这一步。
    - 改完 txt 时间后跑 `txt_to_subs.py --media-dir auto` 回写 SRT 并同步媒体目录
 3. 外挂拷到成片旁边（IINA 自动挂）：最后一次 `txt_to_subs.py ... --media-dir auto` 已经拷好，不用再手动 `cp`。
-4. **烧字（最终片，从 2026-10-29 Fatmax 起默认）**：机器过门并把对齐后的 `subtitles.srt` 定稿后，从 SRT 生成 `episodes/.../subtitles.ass`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链，不要 `--no-loudness-fix`）。无烧字成片先备份为 `YYYY-MM-DD-run-final-no-burn.mp4`。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` / 制作期同名 `.srt` 仍保留供平台选用。可对字幕中间版（waiting-review）可以不烧；平台可另挂 SRT。
+4. **烧字（最终片，从 2026-10-29 Fatmax 起默认）**：机器过门并把对齐后的 `subtitles.srt` 定稿后，从 SRT 生成 `episodes/.../subtitles.ass`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链，不要 `--no-loudness-fix`）。烧字过程可短暂把无烧字片挪成 `YYYY-MM-DD-run-final-no-burn.mp4` 作中间态；**烧字成片定稿（或已按标题改名）后立刻把 `*-no-burn.mp4` 进废纸篓，永远不保留，不必等抖音短链**。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` / 制作期同名 `.srt` 仍保留供平台选用。可对字幕中间版（waiting-review）可以不烧；平台可另挂 SRT。
 
    **ASS Style（烧字默认，非 HUD）**
    - Font：`Source Han Sans SC Heavy`（文件 `SourceHanSansSC-Heavy.otf`；仓库有 `tools/hud/fonts/SourceHanSansSC-Heavy.otf` 可复用）
@@ -224,7 +224,7 @@ iina --mpv-geometry=320x180-8+8 \
 - 成片：用**已烧字幕**的标题名 `.mp4`（抖音不依赖外挂 SRT）。
 - 文案：从 `plan.md`「抖音」栏抄正文，再按「建议话题」清单（≤5）在发布页点选变蓝；封面可用 `cover-1080x1440.jpg`（竖封面）或平台裁切。
 - 用户发完后把分享短链（`https://v.douyin.com/…`）写入 `episode.md`「发布」栏「抖音：」。
-- **抖音链接齐之后**：媒体目录**只保留一份成片**（标题名烧字幕 `.mp4`）；无字幕备份（`*-no-burn.mp4`，或芝马期这类仍叫 `YYYY-MM-DD-run-final.mp4` 的备份）进废纸篓。B 站 / YouTube 已发但抖音未发时，可暂留备份。
+- **成片只留一份**：媒体目录**只保留**标题名烧字幕 `.mp4`。`*-no-burn.mp4` 与多余的 `YYYY-MM-DD-run-final.mp4` 备份，在烧字成片定稿/改名后**立刻**进废纸篓（禁止 `rm`）；**永远不保留 no-burn，不必等抖音短链**。
 
 
 | 用途 | 文件 |
@@ -252,7 +252,7 @@ iina --mpv-geometry=320x180-8+8 \
 | 保留 | 说明 |
 | --- | --- |
 | 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
-| 成片 | **仅一份**：以标题命名的最终烧字幕 `.mp4`；抖音发完后勿再留 `*-no-burn` / 额外 `run-final` |
+| 成片 | **仅一份**：以标题命名的最终烧字幕 `.mp4`；勿留 `*-no-burn` / 额外 `run-final`（烧字定稿后即可扔，不等抖音） |
 | 字幕 | `subtitles.srt`（制作期可选的 `YYYY-MM-DD-run-final.srt` 可留）；烧字源 `subtitles.ass` 可留 |
 | 封面 | `cover.jpg`、`cover-1920x1080.jpg`、`cover-4x3-1920x1440.jpg`、`cover-1080x1440.jpg` |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
@@ -266,6 +266,8 @@ iina --mpv-geometry=320x180-8+8 \
 
 | 删 | 说明 |
 | --- | --- |
+| `*-no-burn.mp4` | 无字幕备份；**永远不留**。烧字成片定稿/改名后立刻进废纸篓，不必等抖音 |
+| 多余 `YYYY-MM-DD-run-final.mp4` | 已有标题烧字成片时的旧名/无字幕备份；一并进废纸篓 |
 | `*-run-final-pre-*.mp4` | 拼片备份（冷开场前、修剪前等）；发布后不再需要回退 |
 | `close-stats` 等渲染中间件 | 叠了数据的 close 中间件、其它可再生成的渲染产物 |
 | 剪过的 `open` / `close` | **仅当**已有对应 `open-raw` / `close-raw` 时删；没有 `-raw` 则上面 KEEP 已要求保留 |
