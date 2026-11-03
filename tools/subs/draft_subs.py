@@ -2,7 +2,7 @@
 """成片音频 → 字幕初稿（单行短条）。给人改字用，时间只是草稿。
 
 faster-whisper large-v3-turbo 词级时间（专名表当提示，只纠拼写）。
-切条顺序：停顿第一优先级——≥1.2s 必断，≥0.5s 自然断；强标点可断；再确定性合并「数字+单位/概数尾巴」和少量固定搭配。
+切条顺序：停顿第一优先级——>0.75s 必断，≥0.5s 自然断；强标点可断；再确定性合并「数字+单位/概数尾巴」和少量固定搭配。
 繁体统一转简体。不删字、不改写；校正交给人和 p3-subs 的规则。
 
 产物：
@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import subs_core as sc  # noqa: E402
 
 MIN_DUR = 1.0
+HARD_PAUSE = 0.75  # 词间停顿 > 这个：必断
 NATURAL = 0.50      # 词间停顿 ≥ 这个且前面已够 MIN_SIDE 字：直接断（停顿第一优先级）
 MIN_SIDE = 4        # 自然停顿切断时左侧至少留的字数
 STRONG = re.compile(r"[。！？!?…]$")
@@ -111,7 +112,7 @@ def split_words(words) -> list[list]:
         if buf:
             gap = w.s - buf[-1].e
             # 长停顿一定断；自然停顿（≥NATURAL）且前面已够一句 → 也断
-            if gap > 1.2 or (gap >= NATURAL and nchars(buf) >= MIN_SIDE and not _forbidden(buf + [w], len(buf) - 1)):
+            if gap > HARD_PAUSE or (gap >= NATURAL and nchars(buf) >= MIN_SIDE and not _forbidden(buf + [w], len(buf) - 1)):
                 cues.append(buf)
                 buf = []
         buf.append(w)
