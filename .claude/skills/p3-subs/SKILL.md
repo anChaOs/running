@@ -1,15 +1,28 @@
 ---
 name: p3-subs
-description: 用 faster-whisper large-v3-turbo 对着成片转写口播，忠于原句写短条字幕；写完先停，等人手改字。改好后 force_align → check_subs，人听硬失败行确认后才写 subs: done；再烧 ASS、写简介。本 skill 只编排与人机关口；默认只调用 tools/subs 脚本看输出/退出码，不为跑流程去读源码。用户说字幕、转写、whisper、对口型、改字幕时用。不要用 talk.md 估时，不要整段均分时间，禁用 tiny/small。没有成片先走 p3-assemble。
+description: 字幕支路：用 faster-whisper large-v3-turbo 对着成片转写口播，忠于原句写短条字幕；写完先停，等人手改字。改好后 force_align → check_subs，人听硬失败行确认后才写 subs: done，再写简介。可与 p3-loudness 并行。烧字不在本 skill，走 p3-burn。本 skill 只编排与人机关口；默认只调用 tools/subs 脚本看输出/退出码，不为跑流程去读源码。用户说字幕、转写、whisper、对口型、改字幕时用。不要用 talk.md 估时，不要整段均分时间，禁用 tiny/small。没有成片先走 p3-assemble。
 ---
 
 # 字幕（忠于原句）
 
 识别稿只提供时间和草稿。**校正不是润色。** 字必须跟嘴里说的走；切条只断开，不改字。
 
-发布默认**烧进成片**：定稿后生成 `subtitles.ass`，由 `p3-assemble --ass` 烧入最终片。校对期（waiting-review）仍外挂 SRT 给人改字/审片。平台可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。不要把字幕轨 mux 进 mp4（平台转码会丢掉）。
+```text
+总序：拼画面 p3-assemble →（字幕 本 skill ∥ 响度 p3-loudness）→ 烧字 p3-burn
+```
 
-**真源分工：** 切条 / 对齐 / 质检实现在 `tools/subs/` 脚本里。本 skill 只写何时跑哪个脚本、人改字门、交用户前的切条易错扫、烧字发布与清临时。不要在本文件再抄一套算法。
+## 职责 / 输入 / 输出
+
+| | |
+| --- | --- |
+| **职责** | 转写 → 人改字 → force_align → check_subs → `subs: done`；写简介 / 抖音文案；发布后清临时真源 |
+| **输入** | 可对字幕成片 `YYYY-MM-DD-run-final.mp4`（`p3-assemble` 产出即可，**不必等响度**） |
+| **输出** | `subtitles.txt` / `.srt`（仓库+媒体）；`subs: done`；`plan.md` 简介；清临时 KEEP/DELETE |
+| **不负责** | 响度（`p3-loudness`）、烧字/ASS/`--ass`（`p3-burn`）、拼画面转场 |
+
+校对期（waiting-review）外挂 SRT 给人改字/审片。平台可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。硬字幕烧进成片由 `p3-burn` 在字幕定稿 **且** 响度就绪后做。
+
+**真源分工：** 切条 / 对齐 / 质检实现在 `tools/subs/` 脚本里。本 skill 只写何时跑哪个脚本、人改字门、交用户前的切条易错扫、简介与清临时。不要在本文件再抄一套算法。
 
 **读源码门槛：** 跑本 skill 时**默认只调用脚本，看 stdout/stderr 与退出码**。**不要**为了执行流水线去 Read `.py`、docstring 或「先通读实现再动手」。只有改算法、排错、或解释「为什么这么切」时才打开对应脚本。
 
@@ -49,7 +62,7 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播，忠于
 
 ## 前置
 
-需要 `YYYY-MM-DD-run-final.mp4`。没有则先 `/p3-assemble`（**可先 `--no-loudness-fix` 出可对字幕版**；响度链放到本 skill 停在 waiting-review 之后，与用户校对并行，见 `p3-assemble`「流程顺序」）。转写听成片一条，时间就是成片轴。写完稿等人手改字，改好了再对口型。只改字不重转写。
+需要 `YYYY-MM-DD-run-final.mp4`。没有则先 `/p3-assemble`（拼画面；默认可对字幕版）。**不要等响度**：响度走并行的 `/p3-loudness`，与本 skill 互不等待开工。转写听成片一条，时间就是成片轴。写完稿等人手改字，改好了再对口型。只改字不重转写。烧字在 `subs: done` 且响度就绪后走 `/p3-burn`。
 
 依赖（一次）：`.venv/bin/pip install -r tools/subs/requirements.txt`。Apple Silicon 上 pip 直接装，CPU 跑。模型首次运行自动从 ModelScope 拉到 `~/Movies/running-content/.models/faster-whisper-large-v3-turbo/`（约 1.6 GB），不连 Hugging Face。耗时与进度看脚本打印即可，不必为跑流程去读源码。
 
@@ -168,15 +181,11 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 3. 外挂拷到成片旁边：最后一次 `txt_to_subs.py ... --media-dir auto` 已经拷好。
 
-4. **烧字（最终片）**：机器过门并把对齐后的 `subtitles.srt` 定稿后，从 SRT 生成 `episodes/.../subtitles.ass`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链，不要 `--no-loudness-fix`）。烧字过程可短暂把无烧字片挪成 `YYYY-MM-DD-run-final-no-burn.mp4` 作中间态；**烧字成片定稿（或已按标题改名）后立刻把 `*-no-burn.mp4` 进废纸篓，永远不保留，不必等抖音短链**。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍保留供平台选用。可对字幕中间版（waiting-review）可以不烧。
+4. **不要在这里烧字。** 机器过门与人听确认后只定稿 sidecar；烧字 / ASS / `--ass` / `*-no-burn` 一律走 `/p3-burn`（且须 `loudness: done`）。
 
-   **ASS Style（烧字默认，非 HUD）**
-   - Font：`Source Han Sans SC Heavy`（文件 `SourceHanSansSC-Heavy.otf`；仓库有 `tools/hud/fonts/SourceHanSansSC-Heavy.otf` 可复用）
-   - 1080p：`Fontsize=72`、`Outline=3`、`MarginV≈100`；单行底中，避开左栏 HUD
-   - ASS `Fontname` 必须让 ffmpeg/libass **真选中** Heavy：Mac 把 otf **装入 `~/Library/Fonts`**（或配 FONTCONFIG）；**勿只靠 `fontsdir`**——CoreText 常落到 PingFang SC Regular
-   - 校对期仍外挂 SRT；烧字是最终发布片默认，与 HUD 字体规则无关
+`check_subs.py` 机器过门之后，把硬失败行和需人听的条列给人；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。agent 不得自行写 `subs: done`。
 
-`check_subs.py` 机器过门之后，把硬失败行和需人听的条列给人；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。agent 不得自行写 `subs: done`。烧字可在人听确认前后做，但最终发布片必须已烧。
+若响度已 `loudness: done`，下一步提示 `/p3-burn`；若响度还在跑，说明烧字闸门还差响度，不要在本 skill 里代烧。
 
 然后才写简介：读校准后的 `subtitles.txt`，短句总结本期实际说了什么，写入该期 `plan.md` 的简介栏。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。大多数期没有「参考」，只写摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI。视频优先用当前平台的地址：B 站简介用 B 站链接，YouTube 简介用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没念到的不列。摘要两个平台相同，有参考时参考按平台分开。
 
@@ -201,7 +210,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 **用户说改好了**
 
-回写 SRT、对口型、拷到成片旁边，简介写入 `plan.md`。IINA 审片（不要推荐 ffplay）。**不要自己执行这条命令**：发给用户，用户同意或自己开：
+回写 SRT、对口型、拷到成片旁边，简介写入 `plan.md`。**不要在这里烧字**——响度齐了走 `/p3-burn`。IINA 审片（不要推荐 ffplay）。**不要自己执行这条命令**：发给用户，用户同意或自己开：
 
 ```bash
 iina --mpv-geometry=320x180-8+8 \
@@ -210,13 +219,13 @@ iina --mpv-geometry=320x180-8+8 \
 
 小窗贴右上角。制作阶段若有同名 `YYYY-MM-DD-run-final.srt` 会自动挂；成片已按标题改名后，视频是标题名 `.mp4`，字幕仍用 `subtitles.srt`（`iina --mpv-sub-file=.../subtitles.srt` 或上传时手挂）。不要去找与标题同名的 `.srt`。
 
-**先不要给发布流程。** 用户说「没问题了 / 可以发了」再给：从 `plan.md` 抄标题、封面句、简介。把生产成片 `YYYY-MM-DD-run-final.mp4` **原地改名**为标题原文 + `.mp4`。**只改成片名，不要改 SRT 文件名**；上传外挂始终用 `subtitles.srt`。**保留标题全部标点**，包括 `|`、`？`、空格等；**不要**把 `|` 换成 `-`，也不要另留一份 `run-final` 副本。上传成片 → 换封面 → 挂 `subtitles.srt`（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。不要替用户上传。`assets.md` 记 `upload: ready`；`episode.md` 的 `status` 仍为 `edited`，真正发完、两边链接齐了才改 `published`。
+**先不要给发布流程。** 用户说「没问题了 / 可以发了」再给（且通常已走完 `/p3-burn`）：从 `plan.md` 抄标题、封面句、简介。成片改名规则见 `p3-burn`「发布前改名」。上传成片 → 换封面 → 挂 `subtitles.srt`（B 站创作中心只收 SRT）→ 先不公开、开 CC → 再公开。不要替用户上传。`episode.md` 的 `status` 仍为 `edited`，真正发完、两边链接齐了才改 `published`。
 
 **抖音（第三平台，不挡 `published`）**
-- 成片：用**已烧字幕**的标题名 `.mp4`（抖音不依赖外挂 SRT）。
+- 成片：用**已烧字幕**的标题名 `.mp4`（由 `p3-burn` 产出；抖音不依赖外挂 SRT）。
 - 文案：从 `plan.md`「抖音」栏抄正文，再按「建议话题」清单（≤5）在发布页点选变蓝；封面可用 `cover-1080x1440.jpg`（竖封面）或平台裁切。
 - 用户发完后把分享短链（`https://v.douyin.com/…`）写入 `episode.md`「发布」栏「抖音：」。
-- **成片只留一份**：媒体目录**只保留**标题名烧字幕 `.mp4`。`*-no-burn.mp4` 与多余的 `YYYY-MM-DD-run-final.mp4` 备份，在烧字成片定稿/改名后**立刻**进废纸篓（禁止 `rm`）；**永远不保留 no-burn，不必等抖音短链**。
+- **成片只留一份**：媒体目录**只保留**标题名烧字幕 `.mp4`。`*-no-burn` 清理规则真源见 `p3-burn`（烧字定稿后立刻进废纸篓，不必等抖音）。
 
 
 | 用途 | 文件 |

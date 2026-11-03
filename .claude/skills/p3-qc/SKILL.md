@@ -9,7 +9,7 @@ description: 只再核对一次成片。默认成片流程里抽帧核对已在 
 
 ## 前置
 
-制作期成片：`YYYY-MM-DD-run-final.mp4`（默认无烧字幕）。已 upload-ready 改名后，成片是标题原文 + `.mp4`，外挂仍是 `subtitles.srt`（不要找与成片同名的 `.srt`）。时间轴见 `p3-assemble`。外挂源稿在 `episodes/YYYY-MM-DD-slug/subtitles.srt`。
+制作期成片：`YYYY-MM-DD-run-final.mp4`（拼画面后默认无烧字幕；烧字后见 `p3-burn`）。已 upload-ready 改名后，成片是标题原文 + `.mp4`，外挂仍是 `subtitles.srt`（不要找与成片同名的 `.srt`）。时间轴见 `p3-assemble`。外挂源稿在 `episodes/YYYY-MM-DD-slug/subtitles.srt`。
 
 ## 不要做的事
 
@@ -69,4 +69,4 @@ SRT 贴底栏，可能压 HUD。公开前用私密/不公开稿在网页播放�
 
 ## 完成后
 
-还没有字幕：`/p3-subs`。已有校准字幕：不要再推荐制作 skill，发布按 `p3-subs`。
+还没有字幕：`/p3-subs`（可与 `/p3-loudness` 并行）。字幕+响度都齐未烧字：`/p3-burn`。已烧字：发布与清临时按 `p3-subs`。

@@ -78,6 +78,8 @@ cover-candidates/            # 仅在主推/备选需要并排时用
 
 > `/p3-assemble`
 
-成片齐了、还缺字幕：
+成片齐了：字幕与响度可并行——
 
 > `/p3-subs`
+>
+> `/p3-loudness`
