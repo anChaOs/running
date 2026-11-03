@@ -7,7 +7,7 @@ description: 用 faster-whisper large-v3-turbo 对着成片转写口播，忠于
 
 识别稿只提供时间和草稿。**校正不是润色。** 字必须跟嘴里说的走；切条只断开，不改字。
 
-发布默认**烧进成片**（从 2026-10-29 Fatmax 期起）：定稿后生成 `subtitles.ass`，由 `p3-assemble --ass` 烧入最终片。校对期（waiting-review）仍外挂 SRT 给人改字/审片。平台可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。不要把字幕轨 mux 进 mp4（平台转码会丢掉）。
+发布默认**烧进成片**：定稿后生成 `subtitles.ass`，由 `p3-assemble --ass` 烧入最终片。校对期（waiting-review）仍外挂 SRT 给人改字/审片。平台可另挂 `subtitles.srt`（B 站创作中心只收 SRT）。不要把字幕轨 mux 进 mp4（平台转码会丢掉）。
 
 **真源分工：** 切条 / 对齐 / 质检实现在 `tools/subs/` 脚本里。本 skill 只写何时跑哪个脚本、人改字门、交用户前的切条易错扫、烧字发布与清临时。不要在本文件再抄一套算法。
 
@@ -168,7 +168,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 3. 外挂拷到成片旁边：最后一次 `txt_to_subs.py ... --media-dir auto` 已经拷好。
 
-4. **烧字（最终片，从 2026-10-29 Fatmax 起默认）**：机器过门并把对齐后的 `subtitles.srt` 定稿后，从 SRT 生成 `episodes/.../subtitles.ass`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链，不要 `--no-loudness-fix`）。烧字过程可短暂把无烧字片挪成 `YYYY-MM-DD-run-final-no-burn.mp4` 作中间态；**烧字成片定稿（或已按标题改名）后立刻把 `*-no-burn.mp4` 进废纸篓，永远不保留，不必等抖音短链**。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍保留供平台选用。可对字幕中间版（waiting-review）可以不烧。
+4. **烧字（最终片）**：机器过门并把对齐后的 `subtitles.srt` 定稿后，从 SRT 生成 `episodes/.../subtitles.ass`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链，不要 `--no-loudness-fix`）。烧字过程可短暂把无烧字片挪成 `YYYY-MM-DD-run-final-no-burn.mp4` 作中间态；**烧字成片定稿（或已按标题改名）后立刻把 `*-no-burn.mp4` 进废纸篓，永远不保留，不必等抖音短链**。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍保留供平台选用。可对字幕中间版（waiting-review）可以不烧。
 
    **ASS Style（烧字默认，非 HUD）**
    - Font：`Source Han Sans SC Heavy`（文件 `SourceHanSansSC-Heavy.otf`；仓库有 `tools/hud/fonts/SourceHanSansSC-Heavy.otf` 可复用）

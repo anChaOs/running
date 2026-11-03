@@ -1,6 +1,6 @@
 ---
 name: p3-assemble
-description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。混音后默认 dynaudnorm+loudnorm 到约 −16 LUFS（峰值 ≤ −1.5 dBTP）；拼完仍测 LUFS/峰值。从 2026-10-29 起最终片默认传 `--ass` 烧字幕；可对字幕中间版可不烧。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
+description: 把 open + HUD preview + close 拼成全长成片，拼完立刻抽帧核对。两端 0.2s 叠化、run 默认一阵风刮过+风声。混音后默认 dynaudnorm+loudnorm 到约 −16 LUFS（峰值 ≤ −1.5 dBTP）；拼完仍测 LUFS/峰值。最终片默认传 `--ass` 烧硬字幕；可对字幕中间版可不烧。用户说拼接、转场、assemble、成片导出时用。不要在这里渲染 HUD 或写字幕稿。只再核对一次走 p3-qc。
 ---
 
 # 拼接 + 核对
@@ -16,7 +16,7 @@ HUD 走 `p3-hud`，封面走 `p3-cover`（二者并行），字幕走 `p3-subs`�
 ## 不要做的事
 
 - 不要在这里渲 HUD 或从口播卡写字幕
-- **最终片（从 2026-10-29 起）传 `--ass episodes/.../subtitles.ass` 烧硬字幕。** 可对字幕中间版（`--no-loudness-fix` / waiting-review）可不烧；平台仍可另挂 `subtitles.srt`
+- **最终片默认传 `--ass episodes/.../subtitles.ass` 烧硬字幕。** 可对字幕中间版（`--no-loudness-fix` / waiting-review）可不烧；平台仍可另挂 `subtitles.srt`
 - 不要把字幕轨 mux 进 mp4（平台转码会丢掉）；烧字用滤镜，不是 mux
 - 不要用 alpha 层当主轨，主轨是 `*-hud-preview.mp4`
 - 不要降码
@@ -51,7 +51,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 # 等待期间去做封面 / 鞋账本；结束后看 assemble.log 末尾再核对
 ```
 
-## 流程顺序（从 2026-10-29 起）
+## 流程顺序
 
 **先出可对字幕成片，响度链后置。** 用户校对字幕期间再跑音频优化，提高并行效率：
 
@@ -61,7 +61,7 @@ nohup .venv/bin/python tools/assemble/assemble_episode.py \
 4. 字校对 + force_align 定稿后：生成 `subtitles.ass`（Style 默认见 `p3-subs`：Source Han Sans SC Heavy、1080p Fontsize=72；Fontname 须系统真选中 Heavy，勿只靠 fontsdir），烧字时可短暂把无烧字片挪成 `YYYY-MM-DD-run-final-no-burn.mp4`，再跑 `assemble_episode.py --ass episodes/.../subtitles.ass`（保留响度链）→ **最终发布片**；**烧字定稿/改名后立刻把 `*-no-burn.mp4` 进废纸篓，永远不留，不必等抖音**（真源见 `p3-subs`）
 5. QC 峰值/LUFS 与烧字抽帧跟**最终片**（响度 + 烧字）
 
-不要等响度链跑完才开字幕。`--no-loudness-fix` 就是「可对字幕版」开关。最终片从 2026-10-29 起默认带 `--ass`。
+不要等响度链跑完才开字幕。`--no-loudness-fix` 就是「可对字幕版」开关。最终片默认带 `--ass`。
 
 已有字幕时（重拼后）脚本不会拷 SRT，跑一次同步：
 
@@ -139,7 +139,7 @@ ffmpeg -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
 - 超出成片的 `hold_until` 会截到片尾并警告；`start` 超出直接报错
 - 写进 `overlays.json` 让 assemble 一次拼完，不要拼完再二次压。核对时在每层起点、停住中段、撤掉后各抽一帧
 
-最终片（从 2026-10-29 起）加 `--ass episodes/.../subtitles.ass`；可对字幕中间版省略。
+最终片默认加 `--ass episodes/.../subtitles.ass`；可对字幕中间版省略。
 
 先看接缝小样（不拼全片）：
 
