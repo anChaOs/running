@@ -149,6 +149,48 @@ def mid_gaps(
     return gaps
 
 
+def parse_protect(specs: list[str]) -> list[tuple[float, float]]:
+    """Parse --protect values: repeatable and/or comma-separated START-END seconds."""
+    ranges: list[tuple[float, float]] = []
+    for spec in specs:
+        for part in spec.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            if "-" not in part:
+                raise SystemExit(
+                    f"bad --protect {part!r}: want START-END seconds, e.g. 12.0-18.5"
+                )
+            left, right = part.split("-", 1)
+            try:
+                start = float(left.strip())
+                end = float(right.strip())
+            except ValueError as exc:
+                raise SystemExit(
+                    f"bad --protect {part!r}: want START-END seconds, e.g. 12.0-18.5"
+                ) from exc
+            if end <= start:
+                raise SystemExit(f"bad --protect {part!r}: end must be > start")
+            if start < 0:
+                raise SystemExit(f"bad --protect {part!r}: start must be >= 0")
+            ranges.append((start, end))
+    ranges.sort()
+    return ranges
+
+
+def gap_intersects_protect(
+    gap: tuple[float, float], protect: list[tuple[float, float]]
+) -> bool:
+    """True if mid-gap overlaps any protect range (half-open intersection)."""
+    if not protect:
+        return False
+    a, b = gap
+    for p0, p1 in protect:
+        if a < p1 and b > p0:
+            return True
+    return False
+
+
 def is_outlier(length: float, mean: float) -> bool:
     if mean <= 0:
         return length >= 1.2
@@ -347,7 +389,9 @@ def plan_clip(
     speech_detect: str = "vad",
     vad_model: Path | None = None,
     keep_lead_silence: bool = False,
+    protect: list[tuple[float, float]] | None = None,
 ) -> dict:
+    protect = list(protect or [])
     duration = probe_duration(path)
     if speech_detect == "vad":
         model = vad_model or DEFAULT_VAD_MODEL
@@ -368,10 +412,13 @@ def plan_clip(
             wav.unlink(missing_ok=True)
         speech = drop_micro_speech(invert_to_speech(silences, duration), MIN_SPEECH)
     gaps = mid_gaps(speech)
-    lengths = [b - a for a, b in gaps]
+    # Gaps overlapping --protect are kept in full and excluded from mean/outlier.
+    scored = [g for g in gaps if not gap_intersects_protect(g, protect)]
+    protected_gaps = [g for g in gaps if gap_intersects_protect(g, protect)]
+    lengths = [b - a for a, b in scored]
     mean = statistics.mean(lengths) if lengths else 0.0
     keep_gap = max(MIN_KEEP_GAP, mean + GAP_SAFETY) if mean else MIN_KEEP_GAP
-    outliers = [(a, b) for a, b in gaps if is_outlier(b - a, mean)]
+    outliers = [(a, b) for a, b in scored if is_outlier(b - a, mean)]
     windows = keep_windows(
         speech, duration, keep_gap, outliers, keep_lead_silence=keep_lead_silence
     )
@@ -380,6 +427,8 @@ def plan_clip(
         "path": path,
         "duration": duration,
         "gap_count": len(gaps),
+        "scored_gap_count": len(scored),
+        "protected_gap_count": len(protected_gaps),
         "mean": mean,
         "keep_gap": keep_gap,
         "outliers": outliers,
@@ -389,6 +438,7 @@ def plan_clip(
         "speech_detect": speech_detect,
         "speech_count": len(speech),
         "keep_lead_silence": keep_lead_silence,
+        "protect": protect,
     }
 
 
@@ -437,11 +487,20 @@ def apply_clip(plan: dict, dry_run: bool) -> None:
             shutil.copy2(raw, clip)
             print(f"  已从 {raw.name} 恢复")
         return
+    protect = plan.get("protect") or []
+    protect_note = ""
+    if protect:
+        ranges = ",".join(f"{a:.2f}-{b:.2f}" for a, b in protect)
+        protect_note = (
+            f"，protect {ranges}"
+            f"（护住句间 {plan.get('protected_gap_count', 0)} 个）"
+        )
     print(
         f"{clip.name}: 检测 {plan.get('speech_detect', '?')}，"
         f"时长 {plan['duration']:.2f}s，"
         f"句间 {plan['gap_count']} 个，均值 {plan['mean']:.2f}s，"
         f"超长 {len(outliers)} 个，约省 {plan['saved']:.2f}s"
+        f"{protect_note}"
     )
     for a, b in outliers:
         print(f"  剪 {a:.2f}-{b:.2f}s ({b - a:.2f}s -> {plan['keep_gap']:.2f}s)")
@@ -488,6 +547,18 @@ def main() -> int:
         action="store_true",
         help="Force trimming lead silence even for preview targets.",
     )
+    parser.add_argument(
+        "--protect",
+        action="append",
+        default=[],
+        metavar="START-END",
+        help=(
+            "Protect mid-gaps that intersect START-END (seconds). "
+            "Repeatable, or comma-separated (e.g. 12.0-18.5 or 12-18,40-55). "
+            "Intersecting gaps are excluded from mean/outlier scoring and never shortened; "
+            "they stay fully in the keep windows."
+        ),
+    )
     args = parser.parse_args()
     media_dir = Path(args.media_dir).expanduser().resolve()
     targets = {part.strip() for part in args.targets.split(",") if part.strip()}
@@ -509,6 +580,13 @@ def main() -> int:
         f"keep_lead_silence={keep_lead}"
     )
     vad_model = Path(args.vad_model).expanduser()
+    protect = parse_protect(args.protect)
+    if protect:
+        print(
+            "protect: "
+            + ", ".join(f"{a:.3f}-{b:.3f}" for a, b in protect)
+            + " (intersecting mid-gaps skipped for mean/outlier, kept in full)"
+        )
     for clip in clips:
         source = raw_path(clip) if raw_path(clip).exists() else clip
         plan = plan_clip(
@@ -516,6 +594,7 @@ def main() -> int:
             speech_detect=args.speech_detect,
             vad_model=vad_model,
             keep_lead_silence=keep_lead,
+            protect=protect,
         )
         plan["path"] = clip
         apply_clip(plan, dry_run=dry_run)
