@@ -2,7 +2,7 @@
 date: 2026-11-04
 slug: rain-feel
 title: 今天体感不错？
-status: hud
+status: edited
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-04-rain-feel/
 ---

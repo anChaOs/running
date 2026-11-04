@@ -53,9 +53,13 @@ close 一开始贴总览；念到「我会把我的心率贴在…」时（ASR c
 - assemble: done（restore 08:31；`2026-11-04-run-final.mp4` **288.300s≈4:48**；无 open；hud-preview 195.933 + close-stats 92.519；响度 ON）
 - qc: done（restore 帧：close 片头「完了」+总览、cue@32.86 切每公里；final qc/restore-final-*）
 - loudness: done（restore 成片 I=-16.07 LUFS TP=-0.55 dBTP LRA=4.60；TP soft ⚠）
-- subs: waiting-review（人改字完成；7 长句按空格拆；补「完了」；force_align+check_subs 机器过门；硬失败 0；interp 条与晚进提醒待人听；**未** done）
-- burn: pending
-- upload: pending
+- subs: done（用户确认仅改「完了」→「跑完了」；时间 0:03:16.33–0:03:17.80；txt_to_subs 同步；未重跑 force_align）
+- burn: done（Source Han Sans SC Heavy 72 / Outline=3 / MarginV=100；fontselect→~/Library/Fonts/SourceHanSansSC-Heavy.otf；-c:a copy；out 今天体感不错？.mp4 547M / 288.300s）
+- upload: ready（成片名已改；外挂 subtitles.srt；封面 cover-*.jpg；等双链）
 
 ## 事故（2026-11-04）
 close 句间粗剪默认 `keep_lead_silence=False` + VAD 漏检短句「完了」→ 片头被裁 ~2.27s。已 keep_lead 重 trim 并默认改为保留片头。详情：媒体目录 `logs/failures.md` / `logs/timeline.txt`。
+
+## 字幕定稿备注（2026-11-04 08:45+）
+
+- 用户确认 close 片头口播是 **「跑完了」**，不是「完了」。事故日志里仍写作「完了」的是当时 ASR/补字幕误写；成片轴 cue 已改为「跑完了」。
