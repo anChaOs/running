@@ -25,6 +25,6 @@ media: ~/Movies/running-content/2026-11-04-rain-feel/
 
 ## 发布
 
-- YouTube：
-- Bilibili：
-- 抖音：
+- YouTube：（上传中）
+- Bilibili：https://www.bilibili.com/video/BV1yHxD6nE52
+- 抖音：（定时发布，短链待补）

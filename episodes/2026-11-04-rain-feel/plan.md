@@ -54,4 +54,4 @@
 - 外挂：`subtitles.srt`（ASS 源 `subtitles.ass`）
 - 封面：`cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg`
 - 账号：B 站 mid 3687100；YouTube @anChaOs天天写bug
-- 状态：upload-ready（`status: edited`）；等用户回传 B 站 + YouTube 双链后再写 published / 合 PR
+- 状态：upload-ready（`status: edited`）；B 站已发 BV1yHxD6nE52；抖音定时待短链；YouTube 上传中；双链齐后再 published / 合 PR
