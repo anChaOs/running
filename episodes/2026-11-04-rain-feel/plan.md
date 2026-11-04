@@ -52,6 +52,6 @@
 
 - 成片：`~/Movies/running-content/2026-11-04-rain-feel/今天体感不错？.mp4`（由 `2026-11-04-run-final.mp4` 烧字后原地改名；硬字幕 Source Han Sans SC Heavy 72）
 - 外挂：`subtitles.srt`（ASS 源 `subtitles.ass`）
-- 封面：`cover-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-1080x1440.jpg` / `cover.jpg`
+- 封面（认这三张）：`cover-16x9-1920x1080.jpg`（16:9）/ `cover-4x3-1920x1440.jpg`（4:3）/ `cover-3x4-1080x1440.jpg`（3:4）；旧名 `cover-1920x1080.jpg` / `cover-1080x1440.jpg` / `cover.jpg` 仍保留
 - 账号：B 站 mid 3687100；YouTube @anChaOs天天写bug
 - 状态：upload-ready（`status: edited`）；B 站已发 BV1yHxD6nE52；抖音定时待短链；YouTube 上传中；双链齐后再 published / 合 PR
