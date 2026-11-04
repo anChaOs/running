@@ -26,6 +26,6 @@ media: ~/Movies/running-content/2026-10-29-fatmax/
 
 ## 发布
 
-- 抖音：已设定期发布，短链待定时放出后补
+- 抖音：https://v.douyin.com/-WwOM4GRL3M/
 - YouTube: https://youtu.be/vwc129Z3RHE
 - Bilibili: https://www.bilibili.com/video/BV1ausZ6UEkW
