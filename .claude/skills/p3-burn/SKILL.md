@@ -57,8 +57,16 @@ nohup .venv/bin/python tools/assemble/burn_ass.py \
 1. **只改成片名**：`YYYY-MM-DD-run-final.mp4` 原地改为 `plan.md` / `episode.md` 标题原文 + `.mp4`。
 2. **不要改字幕文件名**；上传外挂始终 `subtitles.srt`。
 3. 文件名保留标题全部标点（含 `|`、`？`、空格）；不要把 `|` 换成 `-`。
-4. 备份（`*-pre-coldopen` 等）改名阶段保留原名；发布后清临时见 `p3-publish`。
-5. `assets.md` 加 `upload: ready`。`episode.md` 仍为 `edited`，双链齐了才 `published`。
+4. **打包 `upload/`**：改名后立刻跑 pack（标题成片 **move** 进 `upload/`，禁止 copy；封面与 `subtitles.srt` 硬链，失败才 copy 小文件）：
+
+```bash
+MEDIA=~/Movies/running-content/YYYY-MM-DD-slug
+.venv/bin/python tools/publish/pack_upload.py --media-dir "$MEDIA"
+# 缺文件或认不出标题 mp4 时非 0；可加 --title-mp4 "标题.mp4"
+```
+
+5. 备份（`*-pre-coldopen` 等）改名阶段保留原名；发布后清临时见 `p3-publish`。
+6. `assets.md` 加 `upload: ready`（`upload/` 已齐）。`episode.md` 仍为 `edited`，双链齐了才 `published`。
 
 ## 常见翻车
 

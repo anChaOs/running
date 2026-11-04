@@ -26,16 +26,9 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 1. 上传成片（标题名烧字 `.mp4`）→ 换封面 → 挂 `subtitles.srt` → **公开**（YouTube privacy=public；不要默认 unlisted/private）。
 2. `status` 在 **B 站 + YouTube 双链齐**之前仍为 `edited`。
 
-| 用途 | 文件 |
-| --- | --- |
-| 成片 | 标题名烧字 `.mp4` |
-| 封面 | `cover-4x3-*.jpg` / `cover-3x4-*.jpg` / `cover-16x9-*.jpg` |
-| 外挂 | `subtitles.srt` |
+上传只开媒体目录 **`upload/`**（`p3-burn` 改名后 `pack_upload.py` 打好）：标题烧字 `.mp4`、三封面（4:3→3:4→16:9）、`subtitles.srt`。
 
-**抖音（第三平台，不挡 `published`）**
-
-- 成片：已烧字幕的标题名 `.mp4`。
-- 上传：从 `plan.md`「抖音」栏抄正文；话题在发布页点选变蓝（≤5）。短链随后写入 `episode.md`「抖音：」。
+**抖音（第三平台，不挡 `published`）**：成片用 `upload/` 里那份；正文从 `plan.md`「抖音」栏抄，话题在发布页点选（≤5）。短链随后写 `episode.md`「抖音：」。
 
 还要短视频才提 `/p3-jianying`。
 
@@ -60,9 +53,9 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 | 保留 | 说明 |
 | --- | --- |
 | 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
-| 成片 | **仅一份**：以标题命名的最终烧字幕 `.mp4`；勿留 `*-no-burn` / 额外 `run-final` |
-| 字幕 | `subtitles.srt`（制作期可选的 `YYYY-MM-DD-run-final.srt` 可留）；烧字源 `subtitles.ass` 可留 |
-| 封面 | 仅三张：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg` |
+| 成片 | **仅一份**：`upload/<标题>.mp4`；根目录不要再留同名成片；勿留 `*-no-burn` / 额外 `run-final` |
+| 封面 / 外挂 | `upload/` 内三封面（4:3→3:4→16:9）+ `subtitles.srt`；根目录若仍有同名，须为硬链（同 inode），勿再 copy 一份 |
+| 字幕源 | 制作期 `YYYY-MM-DD-run-final.srt`、烧字源 `subtitles.ass` 可留在根目录 |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
 | 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
 
