@@ -26,10 +26,12 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 1. 上传成片（标题名烧字 `.mp4`）→ 换封面 → 挂 `subtitles.srt` → **公开**（YouTube privacy=public；不要默认 unlisted/private）。
 2. `status` 在 **B 站 + YouTube 双链齐**之前仍为 `edited`。
 
-| 用途 | 文件 |
+上传时打开媒体目录下的 **`upload/`**（`p3-burn` 改名后由 `tools/publish/pack_upload.py` 打好），不要在根目录里翻：
+
+| 用途 | 文件（均在 `upload/`） |
 | --- | --- |
 | 成片 | 标题名烧字 `.mp4` |
-| 封面 | `cover-4x3-*.jpg` / `cover-3x4-*.jpg` / `cover-16x9-*.jpg` |
+| 封面 | `cover-4x3-1920x1440.jpg` → `cover-3x4-1080x1440.jpg` → `cover-16x9-1920x1080.jpg` |
 | 外挂 | `subtitles.srt` |
 
 **抖音（第三平台，不挡 `published`）**
@@ -60,9 +62,10 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 | 保留 | 说明 |
 | --- | --- |
 | 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
-| 成片 | **仅一份**：以标题命名的最终烧字幕 `.mp4`；勿留 `*-no-burn` / 额外 `run-final` |
+| 成片 | **仅一份**：以标题命名的最终烧字幕 `.mp4`（媒体根目录）；勿留 `*-no-burn` / 额外 `run-final` |
 | 字幕 | `subtitles.srt`（制作期可选的 `YYYY-MM-DD-run-final.srt` 可留）；烧字源 `subtitles.ass` 可留 |
-| 封面 | 仅三张：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg` |
+| 封面 | 仅三张：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`（媒体根目录） |
+| 上传夹 | `upload/`：上述成片 + 三封面 + `subtitles.srt` 的硬链/拷贝，给 Finder 上传用；根目录原件仍 KEEP |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
 | 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
 
