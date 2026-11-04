@@ -36,8 +36,8 @@
 
 ## assemble 提示（close 叠图）
 
-说到「我会把我的心率贴在屏幕的左边还有右边」时切截图（ASR cue @ close **30.15s**）。
-内容顺序：先总览再每公里。注意文件名与内容相反：`stats-02.jpg`=总览卡，`stats-01.jpg`=每公里表；close-stats 已按 总览→每公里 排。
+close 一开始贴总览；念到「我会把我的心率贴在…」时（ASR cue @ close **30.15s**）切到每公里。
+文件名已与内容对齐：`stats-01.jpg`=总览，`stats-02.jpg`=每公里。holds=`30.15,60.096`。
 
 ## 鞋
 
@@ -49,10 +49,10 @@
 - shoes: done（-sn SC Trainer -sk 2514.00）
 - hud: done（-sn SC Trainer -sk 2514.00；alpha+preview；preview pause-trim ~229.03s→~195.93s；raw 保留）
 - cover: done（主推：今天体感不错？；16:9/4:3/3:4 + cover.jpg；2026-11-04 08:06 换句重排）
-- close-stats: done（cue @ close 30.15s；0–30.15 无图 → stats-02 总览 30.15–60.20 → stats-01 每公里 60.20–90.25；lavfi 透明垫，因 PNG 垫片 ffmpeg 失败）
-- assemble: done（`2026-11-04-run-final.mp4` 286.0s≈4:46；无 open；hud-preview + close-stats；响度链默认 ON）
-- qc: done（抽帧 run 起/中 HUD、run→close 接缝、cue 总览、每公里、close 末；鞋 SC Trainer；气温 16°）
-- loudness: done（拼时带；成片 I=-16.08 LUFS TP=-1.21 dBTP LRA=4.60；max_volume=-1.2 dB）
+- close-stats: done（fix 08:06：总览 0–30.15 → 每公里 30.15–90.25；cue 切点不变 @30.15；已交换文件名对齐内容）
+- assemble: done（reassemble 08:08；`2026-11-04-run-final.mp4` 286.0s≈4:46；无 open；hud-preview + close-stats；响度链默认 ON）
+- qc: done（fix 帧：close/final 早段总览、cue 前后切每公里；鞋 SC Trainer；气温 16°）
+- loudness: done（重拼带；成片 I=-16.08 LUFS TP=-1.21 dBTP LRA=4.60）
 - subs: draft（subtitles.txt/srt 已出；人手改字前停；切条已轻拆长句；未 force_align）
 - burn: pending
 - upload: pending
