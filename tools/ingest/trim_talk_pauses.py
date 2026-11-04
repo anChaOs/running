@@ -539,7 +539,7 @@ def main() -> int:
         "--keep-lead-silence",
         action="store_true",
         help="Keep silence/breathing before first speech (start0=0). "
-        "Default ON for --targets preview (intensity effort shots).",
+        "Default ON for all targets (open/close/preview). Use --no-keep-lead-silence to crop lead.",
     )
     parser.add_argument(
         "--no-keep-lead-silence",
@@ -565,13 +565,15 @@ def main() -> int:
     if not clips:
         print(f"No clips for targets {sorted(targets)} in {media_dir}")
         return 0
-    # preview 默认保留开口前静默；open/close 默认仍裁 lead
+    # 默认保留开口前静默/短句（open/close/preview  alike）。
+    # 事故 2026-11-04-rain-feel：VAD 漏检 close 片头「完了」+ open/close 旧默认
+    # keep_lead=False → start0=2.27s 把第一句裁掉。需要掐片头再用 --no-keep-lead-silence。
     if args.no_keep_lead_silence:
         keep_lead = False
     elif args.keep_lead_silence:
         keep_lead = True
     else:
-        keep_lead = "preview" in targets
+        keep_lead = True
     dry_run = not args.apply
     print(
         f"Mode: {'APPLY' if args.apply else 'DRY-RUN'}  "
