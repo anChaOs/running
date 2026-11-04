@@ -23,7 +23,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 从 `plan.md` 抄标题、封面句、简介。成片改名与外挂文件名见 `p3-burn`。
 
-1. 上传成片（标题名烧字 `.mp4`）→ 换封面 → 挂 `subtitles.srt` → 先不公开、开 CC → 再公开。
+1. 上传成片（标题名烧字 `.mp4`）→ 换封面 → 挂 `subtitles.srt` → **公开**（YouTube privacy=public；不要默认 unlisted/private）。
 2. `status` 在 **B 站 + YouTube 双链齐**之前仍为 `edited`。
 
 | 用途 | 文件 |
