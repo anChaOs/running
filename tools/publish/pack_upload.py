@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""把一期上传要用的文件硬链/拷进媒体目录 upload/，方便 Finder 一次打开。
+"""成片定稿后把上传文件收到媒体目录 upload/。
 
-不删、不挪媒体根目录原文件（KEEP / 清临时路径仍有效）。同卷优先 os.link，失败再 copy2。
-内容固定五件：标题名烧字 mp4、三张封面（4:3→3:4→16:9）、subtitles.srt。
+标题烧字 .mp4：move 进 upload/（禁止 copy；根目录不留第二份）。
+封面与 subtitles.srt：硬链进 upload/（失败才 copy 小文件）。
 """
 
 from __future__ import annotations
@@ -33,7 +33,6 @@ def is_excluded_mp4(name: str) -> bool:
         return True
     if "pre-coldopen" in lower or "pre-loudnorm" in lower:
         return True
-    # 剪过的 open / close（无 -raw 时仍可能留在根目录）
     stem = Path(name).stem.lower()
     if stem.endswith("-open") or stem.endswith("-close") or stem in {"open", "close"}:
         return True
@@ -42,34 +41,93 @@ def is_excluded_mp4(name: str) -> bool:
     return False
 
 
+def _title_candidates(directory: Path) -> list[Path]:
+    if not directory.is_dir():
+        return []
+    return sorted(
+        p
+        for p in directory.iterdir()
+        if p.is_file() and p.suffix.lower() == ".mp4" and not is_excluded_mp4(p.name)
+    )
+
+
 def find_title_mp4(media_dir: Path, explicit: Path | None = None) -> Path:
     if explicit is not None:
         p = explicit if explicit.is_absolute() else media_dir / explicit
         if not p.is_file():
+            # 已 pack 过时标题只在 upload/
+            alt = media_dir / UPLOAD_DIRNAME / Path(explicit).name
+            if alt.is_file():
+                return alt.resolve()
             raise SystemExit(f"title mp4 not found: {p}")
         return p.resolve()
 
-    cands = sorted(
-        p
-        for p in media_dir.iterdir()
-        if p.is_file() and p.suffix.lower() == ".mp4" and not is_excluded_mp4(p.name)
+    root_cands = _title_candidates(media_dir)
+    upload_cands = _title_candidates(media_dir / UPLOAD_DIRNAME)
+    if root_cands:
+        if len(root_cands) > 1:
+            raise SystemExit(
+                "Multiple title mp4 candidates: "
+                + ", ".join(p.name for p in root_cands)
+                + "; pass --title-mp4"
+            )
+        return root_cands[0]
+    if upload_cands:
+        if len(upload_cands) > 1:
+            raise SystemExit(
+                "Multiple title mp4 candidates in upload/: "
+                + ", ".join(p.name for p in upload_cands)
+                + "; pass --title-mp4"
+            )
+        return upload_cands[0]
+    raise SystemExit(
+        f"No titled final .mp4 in {media_dir} or {media_dir / UPLOAD_DIRNAME} "
+        "(expected renamed title.mp4; not *-run-*.mp4 / *raw* / *no-burn*). "
+        "Pass --title-mp4."
     )
-    if not cands:
-        raise SystemExit(
-            f"No titled final .mp4 in {media_dir} "
-            "(expected renamed title.mp4; not *-run-*.mp4 / *raw* / *no-burn*). "
-            "Pass --title-mp4."
-        )
-    if len(cands) > 1:
-        raise SystemExit(
-            "Multiple title mp4 candidates: "
-            + ", ".join(p.name for p in cands)
-            + "; pass --title-mp4"
-        )
-    return cands[0]
 
 
-def hardlink_or_copy(src: Path, dst: Path) -> str:
+def resolve_small(media_dir: Path, name: str) -> Path | None:
+    root = media_dir / name
+    if root.is_file():
+        return root
+    up = media_dir / UPLOAD_DIRNAME / name
+    if up.is_file():
+        return up
+    return None
+
+
+def same_file(a: Path, b: Path) -> bool:
+    try:
+        return a.exists() and b.exists() and os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
+def place_title_mp4(src: Path, dst: Path) -> str:
+    """Move titled final into upload/. Never copy. One physical file only."""
+    src = src.resolve()
+    dst = dst if dst.is_absolute() else dst.resolve()
+    if same_file(src, dst):
+        if src != dst.resolve():
+            src.unlink()
+            return "kept upload/ (dropped root link)"
+        return "already in upload/"
+    if dst.exists() or dst.is_symlink():
+        dst.unlink()
+    try:
+        os.rename(src, dst)
+        return "move"
+    except OSError as exc:
+        raise SystemExit(
+            f"Cannot move title mp4 into upload/ (copy forbidden): {src} → {dst}: {exc}"
+        ) from exc
+
+
+def hardlink_or_copy_small(src: Path, dst: Path) -> str:
+    src = src.resolve()
+    if same_file(src, dst) or src == dst.resolve():
+        return "already in place"
     if dst.exists() or dst.is_symlink():
         dst.unlink()
     try:
@@ -89,13 +147,13 @@ def pack(media_dir: Path, title_mp4: Path | None = None) -> Path:
     missing: list[str] = []
     cover_paths: list[Path] = []
     for name in COVERS:
-        p = media_dir / name
-        if not p.is_file():
+        p = resolve_small(media_dir, name)
+        if p is None:
             missing.append(name)
         else:
             cover_paths.append(p)
-    srt = media_dir / SRT_NAME
-    if not srt.is_file():
+    srt = resolve_small(media_dir, SRT_NAME)
+    if srt is None:
         missing.append(SRT_NAME)
     if missing:
         raise SystemExit(f"Missing required file(s) in {media_dir}: {', '.join(missing)}")
@@ -103,16 +161,14 @@ def pack(media_dir: Path, title_mp4: Path | None = None) -> Path:
     upload = media_dir / UPLOAD_DIRNAME
     upload.mkdir(parents=True, exist_ok=True)
 
-    members: list[tuple[Path, Path]] = [
-        (title, upload / title.name),
-        *((c, upload / c.name) for c in cover_paths),
-        (srt, upload / SRT_NAME),
-    ]
-
     print(f"pack → {upload}")
-    for src, dst in members:
-        how = hardlink_or_copy(src, dst)
-        print(f"  {dst.name}  ← {src}  [{how}]")
+    how = place_title_mp4(title, upload / title.name)
+    print(f"  {title.name}  [{how}]")
+    for c in cover_paths:
+        how = hardlink_or_copy_small(c, upload / c.name)
+        print(f"  {c.name}  ← {c}  [{how}]")
+    how = hardlink_or_copy_small(srt, upload / SRT_NAME)
+    print(f"  {SRT_NAME}  ← {srt}  [{how}]")
 
     return upload
 
@@ -129,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
         "--title-mp4",
         type=Path,
         default=None,
-        help="标题名烧字成片；默认同目录自动识别（排除 *-run-*.mp4 / *raw* / *no-burn*）",
+        help="标题名烧字成片；默认同目录或 upload/ 自动识别",
     )
     args = ap.parse_args(argv)
     pack(args.media_dir, args.title_mp4)

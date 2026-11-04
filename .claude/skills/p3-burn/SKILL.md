@@ -57,7 +57,7 @@ nohup .venv/bin/python tools/assemble/burn_ass.py \
 1. **只改成片名**：`YYYY-MM-DD-run-final.mp4` 原地改为 `plan.md` / `episode.md` 标题原文 + `.mp4`。
 2. **不要改字幕文件名**；上传外挂始终 `subtitles.srt`。
 3. 文件名保留标题全部标点（含 `|`、`？`、空格）；不要把 `|` 换成 `-`。
-4. **打包上传夹**：改名后立刻跑 `pack_upload.py`，把五件上传文件硬链进媒体目录 `upload/`（不挪原文件）：
+4. **打包 `upload/`**：改名后立刻跑 pack（标题成片 **move** 进 `upload/`，禁止 copy；封面与 `subtitles.srt` 硬链，失败才 copy 小文件）：
 
 ```bash
 MEDIA=~/Movies/running-content/YYYY-MM-DD-slug
@@ -65,9 +65,8 @@ MEDIA=~/Movies/running-content/YYYY-MM-DD-slug
 # 缺文件或认不出标题 mp4 时非 0；可加 --title-mp4 "标题.mp4"
 ```
 
-   `upload/` 内固定：标题名 `.mp4`、`cover-4x3-1920x1440.jpg`、`cover-3x4-1080x1440.jpg`、`cover-16x9-1920x1080.jpg`、`subtitles.srt`（封面顺序 4:3→3:4→16:9）。同卷优先硬链，失败再 copy。重跑会刷新这五件。
 5. 备份（`*-pre-coldopen` 等）改名阶段保留原名；发布后清临时见 `p3-publish`。
-6. `assets.md` 加 `upload: ready`（表示 `upload/` 五件已齐）。`episode.md` 仍为 `edited`，双链齐了才 `published`。
+6. `assets.md` 加 `upload: ready`（`upload/` 已齐）。`episode.md` 仍为 `edited`，双链齐了才 `published`。
 
 ## 常见翻车
 
