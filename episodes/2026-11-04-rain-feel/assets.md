@@ -53,6 +53,6 @@
 - assemble: done（`2026-11-04-run-final.mp4` 286.0s≈4:46；无 open；hud-preview + close-stats；响度链默认 ON）
 - qc: done（抽帧 run 起/中 HUD、run→close 接缝、cue 总览、每公里、close 末；鞋 SC Trainer；气温 16°）
 - loudness: done（拼时带；成片 I=-16.08 LUFS TP=-1.21 dBTP LRA=4.60；max_volume=-1.2 dB）
-- subs: pending
+- subs: draft（subtitles.txt/srt 已出；人手改字前停；切条已轻拆长句；未 force_align）
 - burn: pending
 - upload: pending
