@@ -48,7 +48,7 @@ close 一开始贴总览；念到「我会把我的心率贴在…」时（ASR c
 - ingest: done（`--no-open`；close pause-trim done）
 - shoes: done（-sn SC Trainer -sk 2514.00）
 - hud: done（-sn SC Trainer -sk 2514.00；alpha+preview；preview pause-trim ~229.03s→~195.93s；raw 保留）
-- cover: done（主推：今天体感不错？；16:9/4:3/3:4 + cover.jpg；2026-11-04 08:06 换句重排）
+- cover: done（主推：今天体感不错？；16:9/4:3/3:4 + cover.jpg；2026-11-04 08:06 换句重排；按 p3-cover 不进 run-final，片头仍是 run HUD）
 - close-stats: done（fix 08:06：总览 0–30.15 → 每公里 30.15–90.25；cue 切点不变 @30.15；已交换文件名对齐内容）
 - assemble: done（reassemble 08:08；`2026-11-04-run-final.mp4` 286.0s≈4:46；无 open；hud-preview + close-stats；响度链默认 ON）
 - qc: done（fix 帧：close/final 早段总览、cue 前后切每公里；鞋 SC Trainer；气温 16°）
