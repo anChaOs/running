@@ -29,7 +29,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 | 用途 | 文件 |
 | --- | --- |
 | 成片 | 标题名烧字 `.mp4` |
-| 封面 | `cover-*.jpg` / `cover.jpg` |
+| 封面 | `cover-16x9-*.jpg` / `cover-4x3-*.jpg` / `cover-3x4-*.jpg` |
 | 外挂 | `subtitles.srt` |
 
 **抖音（第三平台，不挡 `published`）**
@@ -62,7 +62,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 | 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
 | 成片 | **仅一份**：以标题命名的最终烧字幕 `.mp4`；勿留 `*-no-burn` / 额外 `run-final` |
 | 字幕 | `subtitles.srt`（制作期可选的 `YYYY-MM-DD-run-final.srt` 可留）；烧字源 `subtitles.ass` 可留 |
-| 封面 | `cover.jpg`、`cover-1920x1080.jpg`、`cover-4x3-1920x1440.jpg`、`cover-1080x1440.jpg` |
+| 封面 | 仅三张：`cover-16x9-1920x1080.jpg` / `cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
 | 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
 

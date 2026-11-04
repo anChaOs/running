@@ -15,7 +15,7 @@
     --out-dir ~/Movies/running-content/YYYY-MM-DD-slug
 
 封面句里用 `|` 手动断行；不写就按标点/字数自动断成 2～3 行。
-产出：cover-16x9-1920x1080.jpg、cover-4x3-1920x1440.jpg、cover-3x4-1080x1440.jpg；并写兼容别名 cover-1920x1080.jpg / cover-1080x1440.jpg / cover.jpg（=16:9），
+产出仅三张：cover-16x9-1920x1080.jpg、cover-4x3-1920x1440.jpg、cover-3x4-1080x1440.jpg，
 中间件 cover-work/person-outlined.png。每个比例打印「手机小图字高」自检。
 """
 from __future__ import annotations
@@ -280,11 +280,7 @@ def main() -> int:
         print(f"{dst.name}: 封面句 {size}px（{size / H:.0%} 画高）×{len(lines)} 行 {lines}；"
               f"系列名 {s_size}px；{THUMB_W}px 小图字高 {thumb:.0f}px [{flag}]")
     if not args.prefix:
-        # 兼容旧名：无比例前缀 + cover.jpg 定稿别名
-        shutil.copyfile(written[0], out / "cover-1920x1080.jpg")
-        shutil.copyfile(written[2], out / "cover-1080x1440.jpg")
-        shutil.copyfile(written[0], out / "cover.jpg")
-        print("aliases: cover-1920x1080.jpg / cover-1080x1440.jpg / cover.jpg(=16:9)")
+        # 只留三张比例命名，不再写 cover.jpg / 无比例旧名
     if not ok:
         print("有比例小图字高偏小：减字或改断行，不要接受。", file=sys.stderr)
         return 2
