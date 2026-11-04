@@ -52,9 +52,9 @@ description: 做封面、换封面句、重做封面时用。封面用真人抠�
 
 ```text
 # 只产这三张（比例在前）
-cover-16x9-1920x1080.jpg     # 16:9 横版  B 站 / YouTube / 视频号
 cover-4x3-1920x1440.jpg      # 4:3  横版  B 站首页推荐
 cover-3x4-1080x1440.jpg      # 3:4  竖版  小红书等
+cover-16x9-1920x1080.jpg     # 16:9 横版  B 站 / YouTube / 视频号
 cover-candidates/            # 仅在主推/备选需要并排时用
 ```
 
