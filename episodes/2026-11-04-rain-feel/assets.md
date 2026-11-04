@@ -48,7 +48,7 @@
 - ingest: done（`--no-open`；close pause-trim done）
 - shoes: done（-sn SC Trainer -sk 2514.00）
 - hud: done（-sn SC Trainer -sk 2514.00；alpha+preview；preview pause-trim ~229.03s→~195.93s；raw 保留）
-- cover: done（主推：雨里跑，随便聊聊；16:9/4:3/3:4 + cover.jpg）
+- cover: done（主推：今天体感不错？；16:9/4:3/3:4 + cover.jpg；2026-11-04 08:06 换句重排）
 - close-stats: done（cue @ close 30.15s；0–30.15 无图 → stats-02 总览 30.15–60.20 → stats-01 每公里 60.20–90.25；lavfi 透明垫，因 PNG 垫片 ffmpeg 失败）
 - assemble: done（`2026-11-04-run-final.mp4` 286.0s≈4:46；无 open；hud-preview + close-stats；响度链默认 ON）
 - qc: done（抽帧 run 起/中 HUD、run→close 接缝、cue 总览、每公里、close 末；鞋 SC Trainer；气温 16°）
