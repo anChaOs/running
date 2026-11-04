@@ -2,7 +2,7 @@
 date: 2026-11-04
 slug: rain-feel
 title: 今天体感不错？
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-04-rain-feel/
 ---
@@ -25,6 +25,6 @@ media: ~/Movies/running-content/2026-11-04-rain-feel/
 
 ## 发布
 
-- YouTube：（上传中）
+- YouTube：https://youtu.be/Who2bRwTDDQ
 - Bilibili：https://www.bilibili.com/video/BV1yHxD6nE52
 - 抖音：（定时发布，短链待补）
