@@ -1,5 +1,6 @@
 ---
 name: p3-bilibili
+description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/简介/4×3 封面/分区/标签）。用户说 B 站上传、biliup、投 B 站、自动发 B 站时用。独立于 p3-publish：本 skill 只负责投稿拿 BV；写双链 / published / 合 PR / 清临时仍走 p3-publish。
 ---
 
 # B 站自动投稿（biliup）
@@ -10,7 +11,6 @@ name: p3-bilibili
 
 - 不要缺成片 / 缺封面 / cookie 失效时硬传
 - 不要用 16:9 当投稿封面（接口只收一张时必须用 **4×3**）
-- 不要把某一期的 BV / 标题 / mid 写进本 skill 正文
 - 不要再推荐官方个人开放平台 / 企业入驻当默认投稿路径（死路）
 - 投稿成功后若要用创作中心 / member API 改封面：接口常回 **-400**，失败就请用户在创作中心手换，不要死磕自动化
 
