@@ -3,9 +3,9 @@ slug: vo2max
 captured: 2026-10-28
 kind: 聊跑步知识
 size: large
-status: wiki
+status: ready
 wiki: [knowledge/wiki/running/VO2max.md]
-episodes: []
+episodes: [2026-11-06-vo2max]
 ---
 
 # VO₂max｜最大摄氧量到底是什么？
@@ -62,3 +62,5 @@ VO₂max 是身体用氧的上限；百分比加在氧耗上，不是把配速�
 
 - 单独一期；勿塞进 Fatmax
 - 种类：聊跑步知识（可挂破三「能力上限」视拍摄日）
+
+- 拍摄日 2026-11-06；口播已定稿见 `episodes/2026-11-06-vo2max/talk.md`；主线：百分之几含义 + 阈值／经济性接上限；close 含手表估分（同配速心率％越低分越高）
