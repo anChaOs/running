@@ -142,7 +142,6 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 | --- | --- |
 | xfade 报 timebase mismatch | 没做 `fps=60,settb=1/60`，concat 后没再 settb |
 | 主轨没有 HUD | 拼了原片而不是 `*-hud-preview.mp4` |
-| 平台字幕压 HUD | SRT 没有位置信息，属预期；公开前在网页播放器开 CC |
 
 ## 冷开场（可选）
 
