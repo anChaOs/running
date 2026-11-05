@@ -97,7 +97,6 @@ biliup -u "$COOKIE" upload \
 > YouTube 仍空着时 `status` 保持 `edited`。双链齐了再 `/p3-publish`。  
 > 若还要自动传 YouTube，走 `/p3-youtube`（**不是**本 skill，也不经 `p3-publish`）。
 
-封面投错比例或想换图：优先请用户打开创作中心手换。投稿后 member/开放接口改封面曾多次 **-400**，不要当可靠自动化。
 
 ## 翻车记录
 
