@@ -39,6 +39,7 @@
   p3-burn         烧字 / 改名（burn_ass / 不重拼）
   p3-publish      发布：写双链 / published / 合 PR / 清临时
   p3-bilibili     可选：biliup 自动投 B 站（独立，不进主链）
+  p3-youtube      可选：Drive→box→YouTube Data API（独立，默认不用用户电脑）
   p3-cover        只换封面 / 重抽
   p3-qc           只再核对；默认已在 assemble 里做过
   p3-jianying     60–90 秒剪映，不走全长脚本
@@ -55,7 +56,7 @@ p3-library / p3-topic / p3-scaffold
   → assemble（推荐拼时带响度；抽帧真源在 assemble）
   → subs（∥ 仅当需要时的 loudness 补跑）
   → burn（改名 / subtitles.srt / no-burn 真源）
-  → （可选）p3-bilibili 自动投 B 站；不挡 publish
+  → （可选）p3-bilibili / p3-youtube 自动上传；均不挡、不嵌入 publish
   → publish（published 门闩 / 清临时真源）
   → archive（满 7 天）
 ```

@@ -17,6 +17,7 @@
 | `p3-burn` | 烧字（`burn_ass`）；改名/`subtitles.srt`/`no-burn` 真源 | `subs`+`loudness` | 烧字片；`burn`/`upload` |
 | `p3-publish` | 发布门闩/清临时真源：双链、`published`、合 PR、KEEP/DELETE | 双链或发完了 | `published`；临时进废纸篓 |
 | `p3-bilibili` | 可选：biliup-rs 自动投 B 站（4×3 封面）；独立于 publish | `upload/` + plan 文案 + cookie | BV；只写 B 站链，不改 published |
+| `p3-youtube` | 可选：Drive「跑步成片」→ box → YouTube Data API（public）；独立于 publish；默认禁止用户电脑上传 | `upload/` + plan 文案 + box token | youtu.be 链；只写 YT 链，不改 published |
 | `p3-cover` | 封面：拍摄单 → 自拍抠图 → 粗描边 → 设计底 → 三比例手排（与 HUD 并行） | 手持自拍 + 封面句 | `cover-*.jpg` |
 | `p3-qc` | 只再核对 / 重抽 | 成片 | `qc/*.jpg`；`edited` 由字幕确认后写 |
 | `p3-jianying` | 60–90 秒发布剪辑 | 原片 + HUD alpha | 剪映工程 / 发布版 |

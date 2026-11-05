@@ -13,12 +13,14 @@ description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/�
 - 不要缺成片 / 缺封面 / cookie 失效时硬传
 - 不要用 16:9 当投稿封面（接口只收一张时必须用 **4×3**）
 - 不要把某一期的 BV / 标题 / mid 写进本 skill 正文
+- 不要再推荐官方个人开放平台 / 企业入驻当默认投稿路径（死路）
+- 投稿成功后若要用创作中心 / member API 改封面：接口常回 **-400**，失败就请用户在创作中心手换，不要死磕自动化
 
 ## 前置
 
 1. 本期已 `upload: ready`（`p3-burn` 后）：媒体目录有 `upload/`  
    - 标题名烧字成片 `.mp4`（已 MOVE 进 `upload/`，根目录无第二份）  
-   - `cover-4x3-1920x1440.jpg`（另两张可并存，投稿只用这张）  
+   - `cover-4x3-1920x1440.jpg`（另两张可并存，**投稿只用这张**）  
    - 可选 `subtitles.srt`（biliup 本次不挂外挂；创作中心可后补）
 2. `plan.md` 已有标题 +「### B 站」简介
 3. Mac 上已装 `biliup`（`~/.local/bin/biliup`，PATH 含该目录）
@@ -52,7 +54,7 @@ biliup -u ~/Movies/running-content/.biliup/cookies.json renew
 | 分区 `--tid` | `238`（运动） |
 | 标签 `--tag` | `AI,跑步,马拉松,跑步日常,科技`（逗号分隔；当期若明确要求改标签则改） |
 | 版权 | `--copyright 1`（自制） |
-| 线路 `-l` | 优先 `bda2`；证书/超时再换 `bldsa` / `tx` / `qn` |
+| 线路 `-l` | 优先 `bda2`；证书/超时/SSL 再换 `bldsa` / `tx` / `qn` |
 | Cookie | `-u ~/Movies/running-content/.biliup/cookies.json`（全局选项，放在子命令前） |
 
 ## 命令模板
@@ -93,11 +95,14 @@ biliup -u "$COOKIE" upload \
 
 > B 站已投稿：`https://www.bilibili.com/video/BV…`（审核中则如实说）。  
 > YouTube 仍空着时 `status` 保持 `edited`。双链齐了再 `/p3-publish`。  
-> 若还要自动传 YouTube，按既定 Drive→云电脑→Data API 流程（**不是**本 skill）。
+> 若还要自动传 YouTube，走 `/p3-youtube`（**不是**本 skill，也不经 `p3-publish`）。
+
+封面投错比例或想换图：优先请用户打开创作中心手换。投稿后 member/开放接口改封面曾多次 **-400**，不要当可靠自动化。
 
 ## 翻车记录
 
 - 投稿接口通常只收 **一张**封面：必须传 `cover-4x3-1920x1440.jpg`，不要传 16:9
 - `bda2` 遇证书过期时可换线；曾用 `bda2` 约 1.9MB/s 传完 ~2.3G
 - 官方开放平台「个人开发者」未开，不要再试企业入驻链路当默认
+- 投稿后用创作中心 / member API 改封面常 **-400**；手换更稳
 - biliup 不替代 `p3-publish`：清临时 / squash 仍要双链 + 人确认 KEEP/DELETE
