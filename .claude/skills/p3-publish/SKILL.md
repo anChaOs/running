@@ -25,7 +25,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 核对：
 - `upload/` 已有：标题烧字 `.mp4`、三封面（4:3→3:4→16:9）、`subtitles.srt`（`pack_upload.py` 打好）
-- 自动上传走 `/p3-bilibili`、`/p3-youtube`（怎么传写在那两份 skill；不要在本清单复述平台步骤）
+- 自动上传走 `/p3-bilibili`、`/p3-youtube`
 - `status` 在 **B 站 + YouTube 双链齐**之前仍为 `edited`
 
 **抖音（第三平台，不挡 `published`）**：成片用 `upload/` 里那份；正文从 `plan.md`「抖音」栏抄，话题在发布页点选（≤5）。短链随后写 `episode.md`「抖音：」。
