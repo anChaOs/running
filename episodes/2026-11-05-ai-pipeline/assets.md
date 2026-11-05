@@ -65,6 +65,6 @@
 - cold-open: done（硬切；close trimmed 三句；offset 11.376s；详见上）
 - qc: done（`qc/00-coldopen`…`05-close-end.jpg`；open/close 无 HUD；跑中 HUD 鞋名惊碳Fly、气温 °C；close 左 stats-01→02 每 40s）
 - loudness: done（拼时两遍；成片实测 I=-16.03 LUFS / TP=-1.02 dBTP / LRA=4.10；bumper 单独 loudnorm I≈-15.9）
-- subs: waiting-review（draft_subs large-v3-turbo；成片含冷开场；262 条；切条易错已扫；SRT 已写；等人抽听改字；勿对口型/烧字）
-- burn: pending
-- upload: pending
+- subs: done（用户确认「可以了」；按空格重切；force_align + check_subs 过门；354 条；外挂已同步媒体目录）
+- burn: done（ASS Source Han Sans SC Heavy 72 / Outline 3 / MarginV=100；fontselect→SourceHanSansSC-Heavy；burn_ass.py；-c:a copy；成片 ≈1225.92s / 2.3G；无烧字备份已进废纸篓）
+- upload: ready（`upload/`：标题成片 MOVE + 三封面硬链 + subtitles.srt 硬链）
