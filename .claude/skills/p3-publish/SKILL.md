@@ -1,17 +1,17 @@
 ---
 name: p3-publish
-description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode 发布栏、status=published、该期 episode PR squash 合 main；再列清临时 KEEP/DELETE（体积）→ 人确认 → 进废纸篓。抖音短链不挡 published，随后写入。用户说发布完毕、发完了、已发布、写链接、合 episode PR、清临时时用。不要替用户上传。满 7 天整夹归档见 p3-archive。
+description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode 发布栏、status=published、该期 episode PR squash 合 main；再列清临时 KEEP/DELETE（体积）→ 人确认 → 进废纸篓。抖音短链不挡 published，随后写入。用户说发布完毕、发完了、已发布、写链接、合 episode PR、清临时时用。满 7 天整夹归档见 p3-archive。
 ---
 
 # 发布
 
-烧字 / upload-ready 之后：**写双链 → `published` → squash 合本期 episode PR → 清临时**。不要替用户上传成片。
+烧字 / upload-ready 之后：**写双链 → `published` → squash 合本期 episode PR → 清临时**。
 
 ## 不要做的事
 
 - 不要在缺 B 站或 YouTube 任一链接时写 `published` 或合 PR
 - 不要用抖音是否已发来挡 `published`（抖音短链随后补）
-- 不要替用户上传；不要在用户确认前删任何临时文件
+- 不要在用户确认前删任何临时文件
 - 清临时禁止 `rm` / `rm -rf`；只进废纸篓
 - 不要整夹删媒体目录；满 7 天搬盘走 `p3-archive`
 
@@ -19,7 +19,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 通常已走完 `/p3-burn`。用户说「没问题了 / 可以发了」时可先给上传清单；真正写链接与清临时要等双链到手。
 
-## 上传清单（用户说可以发了时给；不要替传）
+## 上传清单（用户说可以发了时给）
 
 从 `plan.md` 抄标题、封面句、简介。成片改名与外挂文件名见 `p3-burn`。
 
