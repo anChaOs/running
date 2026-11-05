@@ -2,7 +2,7 @@
 date: 2026-11-05
 slug: ai-pipeline
 title: Token越多越厉害？
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-05-ai-pipeline/
 ---
@@ -25,6 +25,6 @@ media: ~/Movies/running-content/2026-11-05-ai-pipeline/
 
 ## 发布
 
-- YouTube：
+- YouTube：https://youtu.be/_HgQNxkcXoM
 - Bilibili：https://www.bilibili.com/video/BV1BaxZ6oEAG
 - 抖音：
