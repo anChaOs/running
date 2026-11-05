@@ -31,6 +31,6 @@ bilibili_bvid: BV1GvxY6UEvV
 
 - YouTube：https://youtu.be/xtnJqtuIrPM
 - Bilibili：BV1GvxY6UEvV（https://www.bilibili.com/video/BV1GvxY6UEvV）
-- 抖音：定时发布（短链待补）
+- 抖音：https://v.douyin.com/lIbBDrjFY7M/
 - 成片：`~/Movies/running-content/2026-10-30-ai-change/AI，让我有点怕.mp4`
 - 外挂：`subtitles.srt`（不改成标题名）
