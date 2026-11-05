@@ -47,10 +47,13 @@
 - `close`：`2026-11-05-close.mp4`
 - FIT：`2026-11-05-run-data.fit`
 - close-stats：`stats-01`（分段）→`stats-02`（总览），每 40s
-- 冷开场钩子（用户口述，相对 **close-raw**；粗剪约省 7.6s，assemble 前在 trimmed close 复核）：
-  1. ~40s「到底在整个Agent循环扮演什么样的角色呢？」
-  2. ~3:10「是不是就是因为他的token特别多呢？」
-  3. ~3:47「token是不是越多越厉害呢？」
+- 冷开场钩子（已 prepend；源=`2026-11-05-close.mp4` trimmed，非 close-stats/HUD；硬切；ASR 复核）：
+  1. close `43.52`–`48.25`「到底在整个Agent循环扮演什么样的角色呢？」（ASR≈「到底在整个agent的循环当中…什么样的决策/角色」；raw≈40s）
+  2. close `188.52`–`192.40`「是不是就是因为它的token特别多呢」（raw≈3:10）
+  3. close `220.84`–`223.45`「token是不是越多越厉害呢？」（raw≈3:47；句首按用户 quote 从 token 起，略去前缀「再一个是」）
+  - bumper：`cold-open/hooks-bumper-60-loudnorm.mp4` offset **11.376s**
+  - 备份：`2026-11-05-run-final-pre-coldopen.mp4`
+  - 成片：`2026-11-05-run-final.mp4` ≈**1225.92s**（pre-coldopen 1214.681s）
 
 ## 制作状态
 
@@ -58,9 +61,10 @@
 - shoes: done（惊碳Fly；`-sn "惊碳Fly" -sk 1422.20`；跑完后；FIT 18.195）
 - hud: done（`-sn "惊碳Fly" -sk 1422.20`；`--jobs 2`；`--preview`；Open-Meteo archive 400→forecast fallback；preview 句间粗剪已 apply，`keep_lead_silence=True`；raw 备份 `*-hud-preview-raw.mp4`）
 - cover: done（句「Token越多越厉害？」三行 `Token|越多|越厉害？`；自拍 `1793834657970.jpg`；仅保留三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`；无 cover.jpg 别名）
-- assemble: pending
-- qc: pending
-- loudness: pending
+- assemble: done（open + 5 HUD preview + close-stats；风转场；拼时响度；成片含冷开场 `2026-11-05-run-final.mp4` ≈1225.92s；备份 `…-pre-coldopen.mp4`）
+- cold-open: done（硬切；close trimmed 三句；offset 11.376s；详见上）
+- qc: done（`qc/00-coldopen`…`05-close-end.jpg`；open/close 无 HUD；跑中 HUD 鞋名惊碳Fly、气温 °C；close 左 stats-01→02 每 40s）
+- loudness: done（拼时两遍；成片实测 I=-16.03 LUFS / TP=-1.02 dBTP / LRA=4.10；bumper 单独 loudnorm I≈-15.9）
 - subs: pending
 - burn: pending
 - upload: pending
