@@ -34,7 +34,7 @@ description: 把本期 upload/ 成片经 Google Drive「跑步成片」暂存到
 
 ## 上传顺序
 
-成片（标题名烧字 `.mp4`）→ 设 16:9 封面（`thumbnails.set`）→ 挂 `subtitles.srt`（可选；缺 scope 不挡）→ **`privacyStatus=public`**（不要默认 unlisted/private）。
+成片（标题名烧字 `.mp4`）→ 设 16:9 封面（`thumbnails.set`）→ **`privacyStatus=public`**（不要默认 unlisted/private）。硬字幕已烧进成片；`subtitles.srt` 外挂**可选**（方便关字幕/无障碍；缺 scope 失败不挡公开）。
 
 ## 传输路径（默认）
 
