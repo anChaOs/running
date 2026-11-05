@@ -1,6 +1,5 @@
 ---
 name: p3-bilibili
-description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/简介/4×3 封面/分区/标签）。用户说 B 站上传、biliup、投 B 站、自动发 B 站时用。独立于 p3-publish：本 skill 只负责投稿拿 BV；写双链 / published / 合 PR / 清临时仍走 p3-publish。不要改 p3-publish 来调用本 skill。
 ---
 
 # B 站自动投稿（biliup）
@@ -9,7 +8,6 @@ description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/�
 
 ## 不要做的事
 
-- 不要改 `p3-publish`、不要把本流程嵌进 publish 门闩
 - 不要缺成片 / 缺封面 / cookie 失效时硬传
 - 不要用 16:9 当投稿封面（接口只收一张时必须用 **4×3**）
 - 不要把某一期的 BV / 标题 / mid 写进本 skill 正文
@@ -96,7 +94,6 @@ biliup -u "$COOKIE" upload \
 > B 站已投稿：`https://www.bilibili.com/video/BV…`（审核中则如实说）。  
 > YouTube 仍空着时 `status` 保持 `edited`。双链齐了再 `/p3-publish`。  
 > 若还要自动传 YouTube，走 `/p3-youtube`（**不是**本 skill，也不经 `p3-publish`）。
-
 
 ## 翻车记录
 

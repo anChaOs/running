@@ -12,8 +12,7 @@ description: 把本期 upload/ 成片经 Google Drive「跑步成片」暂存到
 1. **默认禁止**从用户 Mac（或任何注册用户电脑）跑 YouTube Data API / Studio 上传。除非 **安超当场明确允许**「这次可以用我电脑传 YouTube」。
 2. **唯一默认路径：** Mac（或已有成片处）→ 暂存到 Google Drive 文件夹 **「跑步成片」** → bot 用 Drive 下载到 **box** → 在 box 上 YouTube Data API **resumable** 上传，`privacyStatus=public`。
 3. 上传成功后：**清空本期**在「跑步成片」里的暂存成片/封面（进废纸篓即可）；文件夹本身可留空给下期。
-4. 不要改 `p3-publish`、不要把本流程嵌进 publish 门闩。
-5. 不要把某一期的 videoId / 标题写进本 skill 正文。
+
 
 ## 不要做的事
 
