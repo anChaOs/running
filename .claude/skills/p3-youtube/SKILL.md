@@ -33,6 +33,10 @@ description: 把本期 upload/ 成片经 Google Drive「跑步成片」暂存到
    - 常见 scope：`youtube.upload` + `youtube`；挂 captions 还要 **`youtube.force-ssl`**（缺了视频仍可 public，字幕接口会 403）
 4. Google Drive 文件夹「跑步成片」可写（用户账号 / Drive 连接器）
 
+## 上传顺序
+
+成片（标题名烧字 `.mp4`）→ 设 16:9 封面（`thumbnails.set`）→ 挂 `subtitles.srt`（可选；缺 scope 不挡）→ **`privacyStatus=public`**（不要默认 unlisted/private）。
+
 ## 传输路径（默认）
 
 ```text

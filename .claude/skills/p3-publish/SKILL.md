@@ -23,10 +23,10 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 从 `plan.md` 抄标题、封面句、简介。成片改名与外挂文件名见 `p3-burn`。
 
-1. 上传成片（标题名烧字 `.mp4`）→ 换封面 → 挂 `subtitles.srt` → **公开**（YouTube privacy=public；不要默认 unlisted/private）。
-2. `status` 在 **B 站 + YouTube 双链齐**之前仍为 `edited`。
-
-上传只开媒体目录 **`upload/`**（`p3-burn` 改名后 `pack_upload.py` 打好）：标题烧字 `.mp4`、三封面（4:3→3:4→16:9）、`subtitles.srt`。
+核对：
+- `upload/` 已有：标题烧字 `.mp4`、三封面（4:3→3:4→16:9）、`subtitles.srt`（`pack_upload.py` 打好）
+- 自动上传走 `/p3-bilibili`、`/p3-youtube`（怎么传写在那两份 skill；不要在本清单复述平台步骤）
+- `status` 在 **B 站 + YouTube 双链齐**之前仍为 `edited`
 
 **抖音（第三平台，不挡 `published`）**：成片用 `upload/` 里那份；正文从 `plan.md`「抖音」栏抄，话题在发布页点选（≤5）。短链随后写 `episode.md`「抖音：」。
 
