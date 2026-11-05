@@ -2,7 +2,7 @@
 date: 2026-11-05
 slug: ai-pipeline
 title: Token越多越厉害？
-status: shot
+status: hud
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-05-ai-pipeline/
 ---

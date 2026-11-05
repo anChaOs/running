@@ -56,8 +56,8 @@
 
 - ingest: done
 - shoes: done（惊碳Fly；`-sn "惊碳Fly" -sk 1422.20`；跑完后；FIT 18.195）
-- hud: pending
-- cover: pending
+- hud: done（`-sn "惊碳Fly" -sk 1422.20`；`--jobs 2`；`--preview`；Open-Meteo archive 400→forecast fallback；preview 句间粗剪已 apply，`keep_lead_silence=True`；raw 备份 `*-hud-preview-raw.mp4`）
+- cover: done（句「Token越多越厉害？」三行 `Token|越多|越厉害？`；自拍 `1793834657970.jpg`；仅保留三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`；无 cover.jpg 别名）
 - assemble: pending
 - qc: pending
 - loudness: pending
