@@ -74,7 +74,7 @@ Mac upload/  →  Google Drive「跑步成片」/YYYY-MM-DD-slug/  （暂存 mp4
 | --- | --- |
 | 标题 | `plan.md`「发这个」 |
 | 简介 | `plan.md` YouTube / 通用简介 |
-| 标签 | 可与 B 站类似：`AI,跑步,马拉松,跑步日常,科技`（可加「破三实验室」等，按当期） |
+| 标签 | 从当期 `plan.md` 标签栏抄；**不要**在本 skill 写死一套默认标签 |
 | `categoryId` | `22`（People & Blogs）常见可用 |
 | `privacyStatus` | **`public`** |
 | 语言 | `zh-Hans`（defaultLanguage / defaultAudioLanguage） |

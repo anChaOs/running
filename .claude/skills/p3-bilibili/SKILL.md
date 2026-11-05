@@ -52,7 +52,7 @@ biliup -u ~/Movies/running-content/.biliup/cookies.json renew
 | 标题 | `plan.md`「发这个」那一行 |
 | 简介 | `plan.md`「### B 站」正文（可先写入临时文件再 `--desc`） |
 | 分区 `--tid` | `238`（运动） |
-| 标签 `--tag` | `AI,跑步,马拉松,跑步日常,科技`（逗号分隔；当期若明确要求改标签则改） |
+| 标签 `--tag` | 从当期 `plan.md` 标签栏抄（逗号分隔）；**不要**在本 skill 写死一套默认标签 |
 | 版权 | `--copyright 1`（自制） |
 | 线路 `-l` | 优先 `bda2`；证书/超时/SSL 再换 `bldsa` / `tx` / `qn` |
 | Cookie | `-u ~/Movies/running-content/.biliup/cookies.json`（全局选项，放在子命令前） |
@@ -72,7 +72,7 @@ biliup -u "$COOKIE" upload \
   -l bda2 \
   --copyright 1 \
   --tid 238 \
-  --tag "AI,跑步,马拉松,跑步日常,科技" \
+  --tag "〈plan.md 标签，逗号分隔〉" \
   --title "〈标题〉" \
   --desc "$(cat "$DESC_FILE")" \
   --cover "$MEDIA/cover-4x3-1920x1440.jpg" \
