@@ -47,5 +47,6 @@
 - assemble: done（open + 4 HUD preview + close-stats；风转场；拼时响度两遍；**成片已排除 run-a（cut not reassemble）**：backup `2026-11-06-run-final-with-run-a.mp4`；T0=55.141 T1=84.241 Δ=29.100s；新成片 `2026-11-06-run-final.mp4` ≈1246.91s / 2.29G；stream-copy concat）
 - qc: done（`qc/01-open-start`…`05-close-end` + `04b-close-after-xfade`；open/close 无 HUD；跑中 HUD 鞋名 SC Trainer、配速、AIR/FEEL °C；close 左 stats-01）
 - loudness: done（拼时两遍；成片实测 I=-16.03 LUFS / TP=-0.92 dBTP / LRA=4.40）
-- subs: waiting-review（draft 轴已随成片切掉 run-a：删 [55.141,84.241) 内 6 条，其后 −29.100s；现 311 条；等人抽听改字；未 burn）
-- upload: pending
+- subs: done（校准后 355 条；force_align + check_subs 机器过门；漏盖 6 处已人对片确认；外挂已同步媒体目录）
+- burn: done（ASS Source Han Sans SC Heavy 72 / Outline 3 / MarginV=100；fontselect→SourceHanSansSC-Heavy；burn_ass.py；-c:a copy；成片 ≈1246.91s / 2.3G；无烧字备份已进废纸篓）
+- upload: ready（`upload/`：标题成片 MOVE + 三封面硬链 + subtitles.srt 硬链）
