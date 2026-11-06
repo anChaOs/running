@@ -279,8 +279,7 @@ def main() -> int:
         ok &= thumb >= THUMB_MIN_PX
         print(f"{dst.name}: 封面句 {size}px（{size / H:.0%} 画高）×{len(lines)} 行 {lines}；"
               f"系列名 {s_size}px；{THUMB_W}px 小图字高 {thumb:.0f}px [{flag}]")
-    if not args.prefix:
-        # 只留三张比例命名，不再写 cover.jpg / 无比例旧名
+    # 只留三张比例命名，不再写 cover.jpg / 无比例旧名
     if not ok:
         print("有比例小图字高偏小：减字或改断行，不要接受。", file=sys.stderr)
         return 2

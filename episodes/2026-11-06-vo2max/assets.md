@@ -41,9 +41,9 @@
 ## 制作状态
 
 - ingest: done
-- shoes: done
-- hud: pending
-- cover: pending
+- shoes: done（SC Trainer；`-sn "SC Trainer" -sk 2536.20`；跑完后；FIT 22.191 km）
+- hud: done（`-sn "SC Trainer" -sk 2536.20`；`--jobs 2`；`--preview`；`--weather-city shanghai`；preview 句间粗剪已 apply，`keep_lead_silence=True`；raw 备份 `*-hud-preview-raw.mp4`）
+- cover: done（句「最大摄氧量｜百分之几是什么意思？」排版断行 `最大摄氧|百分之几|什么意思`；自拍 `1793922140517.jpg`；AI 创意底 `cover-work/bg.jpg`；仅三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`）
 - assemble: pending
 - qc: pending
 - subs: pending
