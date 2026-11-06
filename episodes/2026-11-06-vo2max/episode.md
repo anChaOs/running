@@ -15,7 +15,7 @@ media: ~/Movies/running-content/2026-11-06-vo2max/
 
 封面句：最大摄氧量｜百分之几是什么意思？
 
-专名：VO₂max、最大摄氧量、乳酸阈、跑步经济性、COROS、Garmin、Firstbeat、Apple Watch
+专名：VO₂max、VO2max、最大摄氧量、乳酸阈、跑步经济性、COROS、Garmin、Firstbeat、Apple Watch、HUD、破三、破三实验室
 
 ## 文件
 

@@ -47,5 +47,5 @@
 - assemble: done（open + 4 HUD preview + close-stats；风转场；拼时响度两遍；成片 `2026-11-06-run-final.mp4` ≈1275.98s / 2.3G；实测 I=-16.03 LUFS / TP=-0.92 dBTP / LRA=4.40；TP 略高于 −1.0 有 warn）
 - qc: done（`qc/01-open-start`…`05-close-end` + `04b-close-after-xfade`；open/close 无 HUD；跑中 HUD 鞋名 SC Trainer、配速、AIR/FEEL °C；close 左 stats-01）
 - loudness: done（拼时两遍；成片实测 I=-16.03 LUFS / TP=-0.92 dBTP / LRA=4.40）
-- subs: pending
+- subs: waiting-review（draft_subs large-v3-turbo；专名表生效 Vo2max→VO2max；轻校正同音/专名；切条易错已扫；等人抽听改字）
 - upload: pending
