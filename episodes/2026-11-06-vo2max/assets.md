@@ -44,8 +44,8 @@
 - shoes: done（SC Trainer；`-sn "SC Trainer" -sk 2536.20`；跑完后；FIT 22.191 km）
 - hud: done（`-sn "SC Trainer" -sk 2536.20`；`--jobs 2`；`--preview`；`--weather-city shanghai`；preview 句间粗剪已 apply，`keep_lead_silence=True`；raw 备份 `*-hud-preview-raw.mp4`）
 - cover: done（句「最大摄氧量｜百分之几是什么意思？」排版断行 `最大摄氧|百分之几|什么意思`；自拍 `1793922140517.jpg`；AI 创意底 `cover-work/bg.jpg`；仅三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`）
-- assemble: done（open + 4 HUD preview + close-stats；风转场；拼时响度两遍；成片 `2026-11-06-run-final.mp4` ≈1275.98s / 2.3G；实测 I=-16.03 LUFS / TP=-0.92 dBTP / LRA=4.40；TP 略高于 −1.0 有 warn）
+- assemble: done（open + 4 HUD preview + close-stats；风转场；拼时响度两遍；**成片已排除 run-a（cut not reassemble）**：backup `2026-11-06-run-final-with-run-a.mp4`；T0=55.141 T1=84.241 Δ=29.100s；新成片 `2026-11-06-run-final.mp4` ≈1246.91s / 2.29G；stream-copy concat）
 - qc: done（`qc/01-open-start`…`05-close-end` + `04b-close-after-xfade`；open/close 无 HUD；跑中 HUD 鞋名 SC Trainer、配速、AIR/FEEL °C；close 左 stats-01）
 - loudness: done（拼时两遍；成片实测 I=-16.03 LUFS / TP=-0.92 dBTP / LRA=4.40）
-- subs: waiting-review（draft_subs large-v3-turbo；专名表生效 Vo2max→VO2max；轻校正同音/专名；切条易错已扫；等人抽听改字）
+- subs: waiting-review（draft 轴已随成片切掉 run-a：删 [55.141,84.241) 内 6 条，其后 −29.100s；现 311 条；等人抽听改字；未 burn）
 - upload: pending
