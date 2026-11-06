@@ -26,4 +26,4 @@ media: ~/Movies/running-content/2026-11-06-vo2max/
 ## 发布
 
 - Bilibili：https://www.bilibili.com/video/BV1Lk4i6eEX8
-- YouTube：https://youtu.be/a7YRr9h1yIo
+- YouTube：https://youtu.be/bW6gLfXjHnM

@@ -80,5 +80,5 @@ YouTube 标签：
 - 外挂：`subtitles.srt`（ASS 源 `subtitles.ass`）
 - 封面：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`
 - 账号：B 站 mid 3687100；YouTube @anChaOs天天写bug
-- 状态：`subs: done`；`burn: done`；`upload: ready`；`status: edited`（双链齐了才 published）
+- 状态：`subs: done`；`burn: done`；`upload: ready`；`status: published`；B站 BV1Lk4i6eEX8；YouTube https://youtu.be/bW6gLfXjHnM
 - 上传夹：`~/Movies/running-content/2026-11-06-vo2max/upload/`（成片已 MOVE 进此夹）
