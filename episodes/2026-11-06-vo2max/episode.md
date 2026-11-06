@@ -2,7 +2,7 @@
 date: 2026-11-06
 slug: vo2max
 title: 最大摄氧量｜百分之几到底什么意思？
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-06-vo2max/
 ---
@@ -22,3 +22,8 @@ media: ~/Movies/running-content/2026-11-06-vo2max/
 - `talk.md`：边跑边说口播（用户定稿可念稿）
 - `plan.md`：发布计划（标题／封面句／简介占位）
 - `assets.md`：素材索引
+
+## 发布
+
+- Bilibili：https://www.bilibili.com/video/BV1Lk4i6eEX8
+- YouTube：https://youtu.be/a7YRr9h1yIo
