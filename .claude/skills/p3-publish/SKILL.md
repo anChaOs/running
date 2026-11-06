@@ -1,11 +1,11 @@
 ---
 name: p3-publish
-description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode 发布栏、status=published、该期 episode PR squash 合 main；再列清临时 KEEP/DELETE（体积）→ 人确认 → 进废纸篓。抖音短链不挡 published，随后写入。用户说发布完毕、发完了、已发布、写链接、合 episode PR、清临时时用。满 7 天整夹归档见 p3-archive。
+description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode 发布栏、status=published、该期 episode PR squash 合 main；接着把制作复盘日志 CopyToBox 到 bot 长期留存；再列清临时 KEEP/DELETE（体积）→ 人确认 → 进废纸篓。抖音短链不挡 published，随后写入。用户说发布完毕、发完了、已发布、写链接、合 episode PR、清临时时用。满 7 天整夹归档见 p3-archive。
 ---
 
 # 发布
 
-烧字 / upload-ready 之后：**写双链 → `published` → squash 合本期 episode PR → 清临时**。
+烧字 / upload-ready 之后：**写双链 → `published` → squash 合本期 episode PR → 复盘日志上 box → 清临时**。
 
 ## 不要做的事
 
@@ -14,6 +14,8 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 - 不要在用户确认前删任何临时文件
 - 清临时禁止 `rm` / `rm -rf`；只进废纸篓
 - 不要整夹删媒体目录；满 7 天搬盘走 `p3-archive`
+- `published` 之后必须把复盘日志拷上 box
+- 复盘目录不要放视频、FIT、封面、原片
 
 ## 前置
 
@@ -38,11 +40,36 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 1. 写两边链接进 `episode.md`「发布」栏，`status=published`
 2. **立刻合并该期 episode PR 进 `main`**（squash；可删远程分支）；不要等用户再点合
-3. 再按下文列清临时清单（体积）→ 用户确认 → 进废纸篓（禁止 `rm`）
+3. **复盘日志上 box**（下一节，必做；不要等清临时确认）
+4. 再按下文列清临时清单（体积）→ 用户确认 → 进废纸篓（禁止 `rm`）
 
 抖音短链不挡本步；有了再补写「抖音：」。
 
 合 PR：Cursor GitHub 插件若 403，改用本机 `gh pr merge --squash`（用户已登录）。**只自动合 episode 内容 PR**；skill / 工具类 PR 仍等用户合。
+
+## 复盘日志上 box（published 之后必做）
+
+双链和 `published` 写上之后马上做。episode PR 能合就先合完再拷；合不了也要拷，不要干等。清临时要等用户点头，这一步不要等。只留文本和小文件，方便以后在 box 上翻这期怎么做的。
+
+Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上传记录，在 box 本地拷，不要再从 Mac 传一遍。
+
+两处内容保持一致。先写长期目录，再镜像到浏览路径（本期目录 + 根上的 `INDEX.md`）。浏览路径若已是长期目录的链接，写一处即可。
+
+- 长期：`/cursor/stores/store-96d3cec6-b662-4113-b5c5-90eebd57a3c8/running-retrospect/<YYYY-MM-DD-slug>/`
+- 浏览：`/workspace/running-retrospect/<YYYY-MM-DD-slug>/`
+
+| 来源 | 放到 | 说明 |
+| --- | --- | --- |
+| 媒体 `logs/timeline.txt`、`logs/failures.md` | `<slug>/logs/` | 文件在就必拷 |
+| `logs/` 里其它小文件 | `<slug>/logs/` | 有用就带；跳过 `.pid` |
+| 本期 `episode.md`、`plan.md`；`assets.md` 不大也带 | `<slug>/episode-repo/` | 拷的是刚写上 `published` 的那份 |
+| box `/workspace/youtube-upload/` 的 `upload_result.json`，以及同目录 `upload_progress.json`、`upload_run*.log` | `<slug>/youtube-upload/` | 用结果里的 `url` / `title` 对一下本期；没有或不是本期就跳过 |
+
+没有 `logs/`：在 INDEX 记 missing，继续后面的清临时。`timeline.txt` / `failures.md` 或 `episode.md` / `plan.md` 明明在、却没传上：重试，并写进 `INDEX.md` 末尾 Copy failures；没成功不要当这步做完。
+
+两处 `INDEX.md` 按现有几行补本期：slug、标题、`published`、双链、logs 拷了什么或 missing、youtube-upload 有无、episode-repo 有哪些文件。顺手改顶部同步日期。
+
+清临时不要动 `logs/`。本地日志留着，满 7 天随整夹走 `p3-archive`。
 
 ## 发布后清临时文件
 
@@ -58,6 +85,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 | 字幕源 | 制作期 `YYYY-MM-DD-run-final.srt`、烧字源 `subtitles.ass` 可留在根目录 |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
 | 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
+| `logs/` | 制作日志。复盘已拷到 box；本地留到满 7 天归档，清临时不删 |
 
 仓库 `episodes/` 里的字幕源稿、跑鞋账本一律不动。
 
@@ -88,6 +116,6 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 ## 完成后
 
-> 双链已写、`published`、episode PR 已 squash 进 main。清临时清单如下，确认后进废纸篓。
+> 双链已写、`published`、episode PR 已 squash 进 main。复盘已在 box：`running-retrospect/<YYYY-MM-DD-slug>/`（logs / episode-repo / youtube-upload 有或无，如实说；传失败不要说成已同步）。清临时清单如下，确认后进废纸篓。
 >
 > （列出 KEEP / DELETE + 体积）

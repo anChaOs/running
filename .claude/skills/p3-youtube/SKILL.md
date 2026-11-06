@@ -1,11 +1,11 @@
 ---
 name: p3-youtube
-description: 把本期 upload/ 成片经 Google Drive「跑步成片」暂存到 bot 云电脑，再用 YouTube Data API 公开上传（16:9 封面）。用户说 YouTube 上传、自动发 YouTube、传 YT 时用。独立于 p3-publish：本 skill 只上传拿链接；写双链 / published / 合 PR / 清临时仍走 p3-publish。默认禁止从用户 Mac 调 YouTube API / Studio 上传。
+description: 把本期 upload/ 成片经 Google Drive「跑步成片」暂存到 bot 云电脑，再用 YouTube Data API 公开上传（16:9 封面）。用户说 YouTube 上传、自动发 YouTube、传 YT 时用。独立于 p3-publish：本 skill 只上传拿链接；写双链 / published / 合 PR / 复盘日志上 box / 清临时仍走 p3-publish。默认禁止从用户 Mac 调 YouTube API / Studio 上传。
 ---
 
 # YouTube 自动上传（Drive → box → Data API）
 
-本 skill **只上传**，不写 `published`、不合 PR、不清临时。成片必须能在 **用户 Mac 关机** 时仍传得上去：上传动作只发生在 **bot 云电脑（box）**。
+本 skill **只上传**，不写 `published`、不合 PR、不拷复盘日志、不清临时。成片必须能在 **用户 Mac 关机** 时仍传得上去：上传动作只发生在 **bot 云电脑（box）**。
 
 ## 硬规则（不要破）
 
@@ -103,7 +103,7 @@ Drive API `list` / `search` 仍没有稳定 item id，又确认失败或超时�
 1. 把 `https://youtu.be/…` 写入该期 `episode.md`「发布」栏「YouTube：」（B 站仍空则 **不要** 改 `published`）
 2. **立刻**把 Drive「跑步成片」里本期暂存的 mp4/封面/srt **进废纸篓**（文件夹可留空）
 3. 清理 box 上 `/workspace/yt-stage/YYYY-MM-DD-slug/` 大文件（可留结果 json 备查）
-4. 推当期 episode 分支；**只有 B+YT 双链都齐** 才轮到 `/p3-publish`（写齐、改 `published`、squash episode PR、清临时）——那是 publish 的事，本 skill 不做
+4. 推当期 episode 分支；**只有 B+YT 双链都齐** 才轮到 `/p3-publish`（写齐、改 `published`、squash episode PR、复盘日志上 box、清临时）——那是 publish 的事，本 skill 不做
 
 告诉用户：
 

@@ -1,11 +1,11 @@
 ---
 name: p3-bilibili
-description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/简介/4×3 封面/分区/标签）。用户说 B 站上传、biliup、投 B 站、自动发 B 站时用。独立于 p3-publish：本 skill 只负责投稿拿 BV；写双链 / published / 合 PR / 清临时仍走 p3-publish。
+description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/简介/4×3 封面/分区/标签）。用户说 B 站上传、biliup、投 B 站、自动发 B 站时用。独立于 p3-publish：本 skill 只负责投稿拿 BV；写双链 / published / 合 PR / 复盘日志上 box / 清临时仍走 p3-publish。
 ---
 
 # B 站自动投稿（biliup）
 
-官方开放平台个人号走不通；用 **biliup-rs** + 扫码 cookie 投稿。本 skill **只上传**，不写 `published`、不合 PR、不清临时。
+官方开放平台个人号走不通；用 **biliup-rs** + 扫码 cookie 投稿。本 skill **只上传**，不写 `published`、不合 PR、不拷复盘日志、不清临时。
 
 ## 不要做的事
 
