@@ -10,4 +10,4 @@
 |------|--------|------|------|------|
 | [berlin-marathon](berlin-marathon.md) | 柏林马拉松｜中国出征（2026-09-23） | 破三实验室 | large | used |
 | [body-weight](body-weight.md) | 半马 PB 时约 65kg，现约 68.5kg（+3.5kg）；单独一期聊体重 | 破三实验室 | small | seed |
-| [vo2max](vo2max.md) | VO₂max｜用氧上限、测法与训练用法；%VO₂max≠配速打折 | 聊跑步知识 | large | wiki |
+| [vo2max](vo2max.md) | 最大摄氧量｜百分之几到底什么意思？（2026-11-06） | 聊跑步知识 | large | ready |

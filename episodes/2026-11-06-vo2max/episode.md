@@ -1,0 +1,29 @@
+---
+date: 2026-11-06
+slug: vo2max
+title: 最大摄氧量｜百分之几到底什么意思？
+status: published
+series: 破三实验室
+media: ~/Movies/running-content/2026-11-06-vo2max/
+---
+
+# 2026-11-06 最大摄氧量｜百分之几到底什么意思？
+
+一句话：最大摄氧量是用氧上限（木桶最短板顶峰值）；百分之几对的是氧耗，不是配速换算。上限高不等于阈值高、全马快——肌肉用氧影响清除与阈值占比，经济性和有氧基础再决定同样氧耗能跑多快。
+
+当天训练：长距离轻松（早起约 30km；晚起尽量拉长）
+
+封面句：最大摄氧量｜百分之几是什么意思？
+
+专名：VO₂max、VO2max、最大摄氧量、乳酸阈、跑步经济性、COROS、Garmin、Firstbeat、Apple Watch、HUD、破三、破三实验室
+
+## 文件
+
+- `talk.md`：边跑边说口播（用户定稿可念稿）
+- `plan.md`：发布计划（标题／封面句／简介占位）
+- `assets.md`：素材索引
+
+## 发布
+
+- Bilibili：https://www.bilibili.com/video/BV1Lk4i6eEX8
+- YouTube：https://youtu.be/a7YRr9h1yIo
