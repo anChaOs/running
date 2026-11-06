@@ -41,7 +41,7 @@ subs + loudness 都就绪
   p3-burn       → burn_ass 烧字（不重拼）→ 可选 upload-ready 改名
 
 双链齐
-  p3-publish    → 写链接 / published / 合 episode PR / 清临时
+  p3-publish    → 写链接 / published / 合 episode PR / 复盘日志上 box / 清临时
 
 换封面句 → p3-cover
 再核对   → p3-qc（默认抽帧已在 assemble）
