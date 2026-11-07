@@ -2,7 +2,7 @@
 date: 2026-11-07
 slug: xtep-10k
 title: 湖边10km比赛 | 第二名？
-status: shot
+status: hud
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-07-xtep-10k/
 ---

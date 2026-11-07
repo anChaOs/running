@@ -25,9 +25,9 @@
 
 - COROS MCP `labelId=481584378242170883`（Outdoor Run / sportType 100）-> `2026-11-07-run-data.fit`（16:10:39→16:50:41 Asia/Shanghai）
 
-### 其他图片（未做 cover）
+### 其他图片
 
-- `1794049313024.jpg`：横屏自拍（赛事墙背景）——**封面源图**（用户指定；cover 尚未做）
+- `1794049313024.jpg`：横屏自拍（赛事墙背景）——**封面源图**（已翻转去镜像 + rembg；cover done）
 - `1794049615268.jpg`：奖牌平铺——close 插图/叠片素材，**不当封面**
 
 ## 时间顺序依据
@@ -58,8 +58,8 @@
 
 - ingest: done（open 两段先 `-c copy` 拼再句间粗剪；close 单段粗剪；vad + keep_lead_silence；open 约省 14.23s、close 约省 0.80s；`*-raw` / open-part*-raw 保留；**未动 run-***）
 - shoes: done（Pure 2.0 全天候；`-sn "Pure 2.0" -sk 176.68`；跑完后；FIT 9.369 km）
-- hud: pending
-- cover: pending（源图已定自拍 `1794049313024.jpg`）
+- hud: done（`-sn "Pure 2.0" -sk 176.68`；`--jobs 2`；`--preview`；`--weather-city shanghai`；preview 句间粗剪已 apply，`keep_lead_silence=True`；a/b/c/d 有剪、e 无剪；raw 备份 `*-hud-preview-raw.mp4`；run-* 原片未动；run-e 原片 4K）
+- cover: done（句「湖边10km比赛 | 第二名？」排版断行 `湖边|10km|第二名？`（字号硬性下限下省略「比赛」）；自拍 `1794049313024.jpg` 先水平翻转去镜像再 rembg；设计底 `cover-work/bg.jpg`；三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`；奖牌图不当封面）
 - assemble: pending
 - qc: pending
 - subs: pending
