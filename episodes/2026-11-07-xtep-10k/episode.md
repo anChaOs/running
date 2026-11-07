@@ -2,7 +2,7 @@
 date: 2026-11-07
 slug: xtep-10k
 title: 湖边10km比赛 | 第二名？
-status: planned
+status: shot
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-07-xtep-10k/
 ---
@@ -11,11 +11,11 @@ media: ~/Movies/running-content/2026-11-07-xtep-10k/
 
 一句话：湖边 10km 比赛现场；口播以素材为准，字幕校准后再回填。标题：湖边10km比赛 | 第二名？
 
-当天训练：特步 10 公里活动（明细待 FIT / COROS）。
+当天训练：特步湖边 10 公里活动（苏州）。COROS Outdoor Run 16:10–16:50 Asia/Shanghai；约 9.37 km / 40:01 / 均速 4:16 / 均心 185。FIT：`labelId=481584378242170883`。
 
 封面句：湖边10km比赛 | 第二名？
 
-专名：特步、Xtep
+专名：特步、Xtep、COROS
 
 ## 文件
 
