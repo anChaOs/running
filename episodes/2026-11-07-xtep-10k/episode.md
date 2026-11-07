@@ -15,7 +15,7 @@ media: ~/Movies/running-content/2026-11-07-xtep-10k/
 
 封面句：湖边10km比赛 | 第二名？
 
-专名：特步、Xtep、COROS
+专名：特步、Xtep、COROS、Pure 2.0
 
 ## 文件
 
