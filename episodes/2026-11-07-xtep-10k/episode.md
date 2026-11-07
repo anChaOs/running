@@ -26,5 +26,5 @@ media: ~/Movies/running-content/2026-11-07-xtep-10k/
 ## 发布
 
 - YouTube：
-- Bilibili：
+- Bilibili：https://www.bilibili.com/video/BV1Xf4J6mE5Q
 - 抖音：
