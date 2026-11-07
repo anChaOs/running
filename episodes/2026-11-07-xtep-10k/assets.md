@@ -64,5 +64,6 @@
 - qc: done（`qc/00-hook-text`…`06-close-end.jpg`；hook 文案在 OUTLETS 下；open/close 无 HUD；跑中 HUD 鞋名 Pure 2.0、气温 °C；close 左 stats + 右奖牌）
 - loudness: done（拼时两遍 loudnorm；成片实测 I=-16.07 LUFS / TP=-0.96 dBTP / LRA=5.40；脚本提示 TP 略超 -1.0）
 - open-hook: done（自拍静帧 `cover-work/selfie-flipped.jpg` + ASS 逐字「猜猜我第几名？」+ 合成打字机音；`open-hook/open-hook.mp4`≈2.72s；硬切拼进 `2026-11-07-open.mp4`；口播开场备份 `2026-11-07-open-body.mp4`）
-- subs: waiting-review
-- upload: pending
+- subs: done
+- burn: done（ASS Source Han Sans SC Heavy 72 / Outline 3 / MarginV=100；fontselect→SourceHanSansSC-Heavy；burn_ass.py；-c:a copy；成片 ≈237.40s / 454M；无烧字备份已进废纸篓）
+- upload: ready
