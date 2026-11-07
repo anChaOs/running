@@ -28,7 +28,7 @@
 ### 其他图片
 
 - `1794049313024.jpg`：横屏自拍（赛事墙背景）——**封面源图**（已翻转去镜像 + rembg；cover done）
-- `1794049615268.jpg`：奖牌平铺——**已**经 `overlays.json` 叠进 close 右侧（width=420，fade 0.35）；**不当封面**
+- `1794049615268.jpg`：奖牌平铺源图；合成 `medal-with-rank.jpg`（上半「第二名」）经 `overlays.json` 叠进 close 右侧（width=560，fade 0.35）；**不当封面**
 
 ## 时间顺序依据
 
