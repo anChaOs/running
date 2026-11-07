@@ -50,10 +50,14 @@
 - 封面源：`1794049313024.jpg`
 - 奖牌：`1794049615268.jpg`
 
+## 鞋
+
+- HUD：`-sn "Pure 2.0" -sk 176.68`（用户口述跑完后；FIT 本场 9.369 km；开跑前 167.31）
+
 ## 制作状态
 
 - ingest: done（open 两段先 `-c copy` 拼再句间粗剪；close 单段粗剪；vad + keep_lead_silence；open 约省 14.23s、close 约省 0.80s；`*-raw` / open-part*-raw 保留；**未动 run-***）
-- shoes: pending
+- shoes: done（Pure 2.0 全天候；`-sn "Pure 2.0" -sk 176.68`；跑完后；FIT 9.369 km）
 - hud: pending
 - cover: pending（源图已定自拍 `1794049313024.jpg`）
 - assemble: pending
