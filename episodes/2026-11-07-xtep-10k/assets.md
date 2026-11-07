@@ -28,7 +28,7 @@
 ### 其他图片
 
 - `1794049313024.jpg`：横屏自拍（赛事墙背景）——**封面源图**（已翻转去镜像 + rembg；cover done）
-- `1794049615268.jpg`：奖牌平铺——close 插图/叠片素材，**不当封面**
+- `1794049615268.jpg`：奖牌平铺——**已**经 `overlays.json` 叠进 close 右侧（width=420，fade 0.35）；**不当封面**
 
 ## 时间顺序依据
 
@@ -60,7 +60,9 @@
 - shoes: done（Pure 2.0 全天候；`-sn "Pure 2.0" -sk 176.68`；跑完后；FIT 9.369 km）
 - hud: done（`-sn "Pure 2.0" -sk 176.68`；`--jobs 2`；`--preview`；`--weather-city shanghai`；preview 句间粗剪已 apply，`keep_lead_silence=True`；a/b/c/d 有剪、e 无剪；raw 备份 `*-hud-preview-raw.mp4`；run-* 原片未动；run-e 原片 4K）
 - cover: done（句「湖边10km比赛 | 第二名？」排版断行 `湖边|10km|第二名？`（字号硬性下限下省略「比赛」）；自拍 `1794049313024.jpg` 先水平翻转去镜像再 rembg；设计底 `cover-work/bg.jpg`；三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`；奖牌图不当封面）
-- assemble: pending
-- qc: pending
+- assemble: done（片头 hook≈2.72s 硬切进 open-body；open+5 HUD preview+close-stats；风转场；奖牌 overlays.json anchor=close 右侧；拼时响度；成片 `2026-11-07-run-final.mp4` ≈**237.40s**；run-e preview 先 4K→1080p 再拼，4K 备份 `hud-renders/…-hud-preview-4k.mp4`）
+- qc: done（`qc/00-hook-text`…`06-close-end.jpg`；hook 文案在 OUTLETS 下；open/close 无 HUD；跑中 HUD 鞋名 Pure 2.0、气温 °C；close 左 stats + 右奖牌）
+- loudness: done（拼时两遍 loudnorm；成片实测 I=-16.07 LUFS / TP=-0.96 dBTP / LRA=5.40；脚本提示 TP 略超 -1.0）
+- open-hook: done（自拍静帧 `cover-work/selfie-flipped.jpg` + ASS 逐字「猜猜我第几名？」+ 合成打字机音；`open-hook/open-hook.mp4`≈2.72s；硬切拼进 `2026-11-07-open.mp4`；口播开场备份 `2026-11-07-open-body.mp4`）
 - subs: pending
 - upload: pending

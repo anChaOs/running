@@ -1,0 +1,16 @@
+{
+  "overlays": [
+    {
+      "file": "1794049615268.jpg",
+      "anchor": "close",
+      "start": 0.4,
+      "hold_until": 20.981,
+      "x": "W-w-48",
+      "y": "(H-h)/2",
+      "width": 420,
+      "fade_in": 0.35,
+      "fade_out": 0.35,
+      "opacity": 0.95
+    }
+  ]
+}
