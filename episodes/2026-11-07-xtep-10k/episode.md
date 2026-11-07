@@ -2,7 +2,7 @@
 date: 2026-11-07
 slug: xtep-10k
 title: 湖边10km比赛 | 第二名？
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-07-xtep-10k/
 ---
@@ -25,6 +25,6 @@ media: ~/Movies/running-content/2026-11-07-xtep-10k/
 
 ## 发布
 
-- YouTube：
+- YouTube：https://youtu.be/8rg1dx8xZzI
 - Bilibili：https://www.bilibili.com/video/BV1Xf4J6mE5Q
 - 抖音：https://v.douyin.com/qX9STIMrO-M/
