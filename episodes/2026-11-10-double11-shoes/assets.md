@@ -1,4 +1,4 @@
-# 2026-11-10 素材索引
+# 2026-11-10 double11-shoes 素材索引
 
 ## 本地素材目录
 
@@ -8,26 +8,49 @@
 
 ### 视频素材
 
-- `VID_...mp4` -> `2026-11-10-open.mp4`
+- `VID_20261110_053352_001.mp4` -> `2026-11-10-open.mp4`（粗剪后；原片 `2026-11-10-open-raw.mp4`）
+- `VID_20261110_053924_002.mp4` -> `2026-11-10-run-a.mp4`
+- `VID_20261110_054337_003.mp4` -> `2026-11-10-run-b.mp4`
+- `VID_20261110_061638_004.mp4` -> `2026-11-10-run-c.mp4`
+- `VID_20261110_070316_005.mp4` -> `2026-11-10-run-d.mp4`
+- `VID_20261110_072351_006.mp4` -> `2026-11-10-close.mp4`（粗剪后；原片 `2026-11-10-close-raw.mp4`）
+
+### 高驰截图（assemble 叠到 close 左侧）
+
+- `Screenshot_2026-11-10-07-30-25-199_com.yf.smart.coros.dist.jpg` -> `2026-11-10-stats-01.jpg`
 
 ### 跑步数据
 
-- `...fit` -> `2026-11-10-run-data.fit`
+- `2026-11-10-run-data.fit`（COROS；records 05:35:32 → 07:20:10 Asia/Shanghai；与视频重叠 570s）
+
+### 其他图片
+
+- `1794267046645.jpg`：自拍大图——**封面源图**（未改名）
 
 ## 时间顺序依据
 
-- HH:MM:SS：`open`
+- 05:33:52: `open`（raw mtime 05:35:32；工作时长 ≈93.57s，raw 98.77s）
+- 05:39:24: `run-a`（mtime 05:42:19）
+- 05:43:37: `run-b`（mtime 05:45:55）
+- 06:16:38: `run-c`（mtime 06:19:26）
+- 07:03:16: `run-d`（mtime 07:04:53）
+- 07:23:51: `close`（raw mtime 07:26:28；工作时长 ≈148.03s，raw 155.39s）
 
 ## 素材关联
 
-- 开场：`2026-11-10-open.mp4`
-- 跑中 A：`2026-11-10-run-a.mp4`
-- 收尾：`2026-11-10-close.mp4`
+- `open`：`2026-11-10-open.mp4`
+- `run-a`：`2026-11-10-run-a.mp4`
+- `run-b`：`2026-11-10-run-b.mp4`
+- `run-c`：`2026-11-10-run-c.mp4`
+- `run-d`：`2026-11-10-run-d.mp4`
+- `close`：`2026-11-10-close.mp4`
 - FIT：`2026-11-10-run-data.fit`
+- 截图：`2026-11-10-stats-01.jpg`
+- 封面源：`1794267046645.jpg`
 
 ## 制作状态
 
-- ingest: pending
+- ingest: done（角色 open=001 / run-a..d=002..005 / close=006；open+close 句间粗剪 vad + keep_lead_silence；open 约省 5.19s、close 约省 7.39s；`*-raw` 保留；**未动 run-***）
 - shoes: pending
 - hud: pending
 - cover: pending
