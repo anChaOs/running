@@ -32,4 +32,4 @@ bilibili_bvid: BV1Kypy6hEui
 - YouTube：https://youtu.be/Ms-rZwFUyaQ
 - Bilibili：BV1Kypy6hEui（https://www.bilibili.com/video/BV1Kypy6hEui）
 - 成片：`~/Movies/running-content/2026-10-14-weight/体重 | 减肥能帮我破三吗？.mp4`
-- 外挂：`subtitles.srt`（不改成标题名）
+- 外挂：媒体目录 `subtitles.srt`（不改成标题名）

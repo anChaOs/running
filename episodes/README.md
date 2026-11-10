@@ -13,7 +13,7 @@
 | `subtitles.txt` | 字幕源稿（忠于原句）。仓库只跟踪这一份 |
 | `script.md` | 可选，现在很少用 |
 
-`subtitles.srt` 和 `subtitles.ass` 由 `subtitles.txt` 生成，给烧字和媒体目录 `upload/` 用，不进 git。
+外挂 `subtitles.srt`（`txt_to_subs.py`）和烧字 `subtitles.ass`（`txt_to_ass.py`）由 `subtitles.txt` 生成，不进 git。
 
 `episode.md` 的 `status`：`idea` → `planned` → `shot` → `hud` → `edited` → `published`。
 

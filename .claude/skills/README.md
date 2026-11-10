@@ -63,4 +63,4 @@ p3-library / p3-topic / p3-scaffold
 
 推荐墙钟：`assemble`（带响度）→ `subs` → `burn` → `publish`。响度/烧字走单文件脚本，勿再全量 assemble；详见 `p3-assemble`「编码成本」。
 
-任意一步都可以停。改字幕只改 sidecar，不用重拼。改 `-sk` 要重渲 HUD 再拼。
+任意一步都可以停。改字幕只改 `subtitles.txt`，再生成媒体 SRT，不用重拼。改 `-sk` 要重渲 HUD 再拼。

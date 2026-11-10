@@ -22,7 +22,7 @@ media: ~/Movies/running-content/2026-10-29-fatmax/
 - `talk.md`：边跑边说口播（用户定稿可念稿）
 - `plan.md`：发布计划（标题／封面句／简介）
 - `assets.md`：素材索引
-- `subtitles.txt` / `subtitles.srt` / `subtitles.ass`：字幕定稿（ASS 已烧进成片）
+- `subtitles.txt`：字幕定稿（仓库只留这一份；ASS 已烧进成片）
 
 ## 发布
 

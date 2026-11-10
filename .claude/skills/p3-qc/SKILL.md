@@ -53,7 +53,7 @@ iina --mpv-geometry=320x180-8+8 \
 
 画面声音通过后：`assets.md` 写 `qc: done`。`episode.md` 的 `edited` 只由 `p3-subs` 在用户确认字幕后写，这里不改。
 
-失败：鞋错 → `p3-hud`；字幕错 → 改 txt/SRT，**不用重拼**；接缝错 → 查 open/close 是否被当成 run。
+失败：鞋错 → `p3-hud`；字幕错 → 改 `subtitles.txt`，再生成媒体目录 SRT，**不用重拼**；接缝错 → 查 open/close 是否被当成 run。
 
 ## 完成后
 

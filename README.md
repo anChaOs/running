@@ -35,7 +35,7 @@ AI 协作规则见 `CLAUDE.md`（`AGENT.md` 是它的软链）。
 - `plan.md` / `talk.md` / `assets.md`
 - `NOTES.md`：制作侧笔记（bot 用，不进成片）
 - `subtitles.txt`：字幕源稿（忠于原句）。git 只提交这一份
-- `subtitles.srt` / `subtitles.ass`：从 txt 生成的外挂和烧字稿，不进 git。上传用的 srt 在媒体目录 `upload/`
+- `subtitles.srt` / `subtitles.ass`：由 `subtitles.txt` 本地生成，不进 git。外挂走 `txt_to_subs.py`，烧字 ASS 走 `p3-burn` 的 `txt_to_ass.py`。上传用的 srt 在媒体目录 `upload/`
 - `script.md`：可选，现在很少用
 
 status：`idea` → `planned` → `shot` → `hud` → `edited` → `published`。

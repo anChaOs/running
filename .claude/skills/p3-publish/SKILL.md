@@ -82,12 +82,12 @@ Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上�
 | 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
 | 成片 | **仅一份**：`upload/<标题>.mp4`；根目录不要再留同名成片；勿留 `*-no-burn` / 额外 `run-final` |
 | 封面 / 外挂 | `upload/` 内三封面（4:3→3:4→16:9）+ `subtitles.srt`；根目录若仍有同名，须为硬链（同 inode），勿再 copy 一份 |
-| 字幕源 | 媒体目录可留制作期 `YYYY-MM-DD-run-final.srt`、烧字源 `subtitles.ass`（磁盘产物，不进 git） |
+| 媒体字幕产物 | 制作期 `YYYY-MM-DD-run-final.srt`、烧字 `subtitles.ass` |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
 | 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
 | `logs/` | 制作日志。复盘已拷到 box；本地留到满 7 天归档，清临时不删 |
 
-仓库 `episodes/` 里的字幕源稿只留 `subtitles.txt`（清临时时不要改它），跑鞋账本一律不动。`subtitles.srt` / `subtitles.ass` 不进 git。
+仓库只保留 `subtitles.txt`，清理媒体临时文件时不要改它。跑鞋账本一律不动。
 
 ### 删除（DELETE）
 

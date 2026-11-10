@@ -1,11 +1,11 @@
 ---
 name: p3-burn
-description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS，用 burn_ass.py 烧进最终片（不重拼）；处理 no-burn 备份与发布前改名。用户说烧字、硬字幕、--ass、最终片、upload-ready 改名时用。
+description: 烧字收尾：字幕定稿且响度就绪后，用 txt_to_ass.py 从 subtitles.txt 生成 ASS，再用 burn_ass.py 烧进最终片（不重拼）；处理 no-burn 备份与发布前改名。用户说烧字、硬字幕、--ass、最终片、upload-ready 改名时用。
 ---
 
 # 烧字
 
-**`subs: done` + `loudness: done` 之后**：生成 ASS → `burn_ass.py` 烧字 → 抽烧字帧 → 清 `*-no-burn` → 可选 upload-ready 改名。平台仍可另挂 `subtitles.srt`；不要把字幕轨 mux 进 mp4。
+**`subs: done` + `loudness: done` 之后**：`txt_to_ass.py` 生成 ASS → `burn_ass.py` 烧字 → 抽烧字帧 → 清 `*-no-burn` → 可选 upload-ready 改名。平台仍可另挂媒体目录 `subtitles.srt`；不要把字幕轨 mux 进 mp4。
 
 入口：`tools/assemble/burn_ass.py`（单文件进、单文件出；**`-c:a copy`**，视频重压一次）。不要为了烧字再跑 `assemble_episode.py --ass`（会全量重拼并抹冷开场）。
 
@@ -23,14 +23,16 @@ description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS�
 
 ## 步骤
 
-1. **生成 ASS**（Style 默认如下；Fontname 须系统真选中 Heavy，勿只靠 fontsdir）
+1. **生成 ASS**。`txt_to_ass.py` 按已烧进成片的样式写：Source Han Sans SC Heavy、1080p `Fontsize=72`、`Outline=3`、`MarginV=100`。不要另起一套。
 
-   **ASS Style（烧字默认，非 HUD）**
-   - Font：`Source Han Sans SC Heavy`（`SourceHanSansSC-Heavy.otf`；仓库 `tools/hud/fonts/` 可复用）
-   - 1080p：`Fontsize=72`、`Outline=3`、`MarginV≈100`；单行底中，避开左栏 HUD
-   - Mac：otf 装入 `~/Library/Fonts`（或配 FONTCONFIG）；CoreText 常因只靠 fontsdir 落到 PingFang SC Regular
+   Mac：otf 装入 `~/Library/Fonts`（或配 FONTCONFIG）。Fontname 须真选中 Heavy；只靠 fontsdir 常落到 PingFang SC Regular。
 
-   写出 `episodes/YYYY-MM-DD-slug/subtitles.ass`（本地导出，`.gitignore`，不要提交），并拷到媒体目录。git 里的字幕源仍是 `subtitles.txt`。
+```bash
+.venv/bin/python tools/subs/txt_to_ass.py \
+  --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto
+```
+
+默认写 `episodes/YYYY-MM-DD-slug/subtitles.ass`（不进 git），并拷到媒体目录。烧字读这一份。
 
 2. **烧字**（可短暂把无烧字片挪成 `YYYY-MM-DD-run-final-no-burn.mp4`）
 
@@ -46,7 +48,7 @@ nohup .venv/bin/python tools/assemble/burn_ass.py \
 
 3. **抽烧字帧**核对：底中、Heavy 72、不挡左栏 HUD；再听一遍（音轨应未改）。
 
-4. **立刻处理 no-burn**：烧字成片定稿（或已按标题改名）后，把 `*-no-burn.mp4` **进废纸篓**（禁止 `rm`）。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍留在媒体目录。这两份都不进 git。
+4. **立刻处理 no-burn**：烧字成片定稿（或已按标题改名）后，把 `*-no-burn.mp4` **进废纸篓**（禁止 `rm`）。媒体目录保留 `subtitles.ass` 和 `subtitles.srt`。
 
 5. `assets.md` 写 `burn: done`（附 ASS 样式）。
 

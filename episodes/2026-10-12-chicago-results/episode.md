@@ -33,4 +33,4 @@ bilibili_bvid: BV1nYpR6UEMv
 - YouTube：https://youtu.be/lB-BPp_CnaA
 - Bilibili：BV1nYpR6UEMv（https://www.bilibili.com/video/BV1nYpR6UEMv）
 - 成片：`~/Movies/running-content/2026-10-12-chicago-results/芝加哥马拉松 | 结果如何？.mp4`
-- 外挂：`subtitles.srt`（不改成标题名）
+- 外挂：媒体目录 `subtitles.srt`（不改成标题名）
