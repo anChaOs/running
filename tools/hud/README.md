@@ -146,11 +146,11 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-variant.xm
 - 在 `media-dir` 中寻找 `*-run-data.fit`
 - 自动处理 `*-run-*.mp4`（不处理 `open` / `close`）
 - 渲透明 HUD 层
-- 再按**原片同档**（编码 / 码率 / 分辨率，不降码）叠成可看的预览
+- 再按统一 preview 规格叠成可看的审片文件；它不是最终导出输入
 
 ```text
 hud-renders/YYYY-MM-DD-run-a-hud-alpha.mov      # ProRes 4444 透明层
-hud-renders/YYYY-MM-DD-run-a-hud-preview.mp4    # 跟原片同档的审片文件
+hud-renders/YYYY-MM-DD-run-a-hud-preview.mp4    # 统一 preview 规格的审片文件，最终导出不读取
 ```
 
 默认编码是 **ProRes 4444**（剪映专业版能认 alpha）。文件会比较大。若体积太大，可改：

@@ -2,20 +2,26 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import importlib.util
 import json
 import os
 import shutil
 import subprocess
+import sys
 import threading
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
-from datetime import timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
-import fitdecode
+try:
+    fitdecode = importlib.import_module("fitdecode")
+except ImportError:  # 运行时由仓库 .venv 提供；静态检查环境可能没有它。
+    fitdecode = None
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from export_spec import PREVIEW_SPEC, video_codec_args
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 HUD_DIR = Path(__file__).resolve().parent
@@ -113,6 +119,8 @@ def discover_clips(media_dir: Path) -> list[Path]:
 
 
 def resolve_total_distance_meters(fit_path: Path) -> int | None:
+    if fitdecode is None:
+        raise RuntimeError("fitdecode is required; run this script with the repository .venv Python")
     total_distance_m = None
 
     with fitdecode.FitReader(fit_path) as fit_reader:
@@ -134,7 +142,7 @@ def resolve_total_distance_meters(fit_path: Path) -> int | None:
     if total_distance_m is None:
         return None
 
-    return max(1, int(round(total_distance_m)))
+    return max(1, round(total_distance_m))
 
 
 def _remove_named_translate(root: ET.Element, target_name: str) -> None:
@@ -146,6 +154,8 @@ def _remove_named_translate(root: ET.Element, target_name: str) -> None:
 
 
 def resolve_fit_geo_time(fit_path: Path) -> tuple[float | None, float | None, datetime | None, datetime | None]:
+    if fitdecode is None:
+        raise RuntimeError("fitdecode is required; run this script with the repository .venv Python")
     lat = lon = None
     tmin = tmax = None
     with fitdecode.FitReader(fit_path) as fit_reader:
@@ -275,16 +285,8 @@ def bake_matched_preview(
     log_path: Path | None = None,
     label: str | None = None,
 ) -> None:
-    # 预览/审片跟原片同档：编码、码率、分辨率都不降
-    spec = probe_source_video(source)
-    bit_rate = int(spec["bit_rate"])
-    if bit_rate < 1_000_000:
-        bit_rate = 20_000_000
-    codec = str(spec["codec"])
-    if codec in {"hevc", "h265"}:
-        vcodec = ["-c:v", "hevc_videotoolbox", "-b:v", str(bit_rate), "-tag:v", "hvc1"]
-    else:
-        vcodec = ["-c:v", "h264_videotoolbox", "-b:v", str(bit_rate)]
+    # 单段 preview 使用统一轻量规格；整条审片预览不会再读取它重压。
+    vcodec = video_codec_args(PREVIEW_SPEC)
     cmd = [
         "ffmpeg",
         "-y",
@@ -451,7 +453,7 @@ def main() -> int:
     parser.add_argument(
         "--preview",
         action="store_true",
-        help="After overlay, bake a watchable mp4 matching the source codec/bitrate/size. Implies --overlay-only",
+        help="After overlay, bake a lightweight review mp4. Implies --overlay-only; final export reads the source clip and alpha layer instead",
     )
     parser.add_argument("--no-weather", action="store_true", help="Do not fetch Open-Meteo weather for the HUD")
     parser.add_argument(
@@ -536,7 +538,7 @@ def main() -> int:
         weather_ok = bool(payload.get("hours"))
         print(f"Weather hours: {len(payload.get('hours') or [])} from {weather_path}")
     else:
-        _fit_lat, _fit_lon, tmin, tmax = resolve_fit_geo_time(fit)
+        _, _, tmin, tmax = resolve_fit_geo_time(fit)
         if not args.weather_city:
             # 不把 FIT GPS 发给 Open-Meteo（CLAUDE.md / p3-hud 硬规则）；忘了 flag 就停，不偷偷用坐标
             raise SystemExit("天气需要 --weather-city shanghai（或 --weather-json / --no-weather）；不会用 FIT 经纬度查天气。")

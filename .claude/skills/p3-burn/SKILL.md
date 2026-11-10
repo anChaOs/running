@@ -1,84 +1,17 @@
 ---
 name: p3-burn
-description: 烧字收尾：字幕定稿且响度就绪后，用 txt_to_ass.py 从 subtitles.txt 生成 ASS，再用 burn_ass.py 烧进最终片（不重拼）；处理 no-burn 备份与发布前改名。用户说烧字、硬字幕、--ass、最终片、upload-ready 改名时用。
+description: 已废弃的旧烧字入口。最终字幕、响度和画面必须由 final_export.py 在一次最终导出中完成；不要对已有成片再烧字。
 ---
 
-# 烧字
+# 已废弃
 
-**`subs: done` + `loudness: done` 之后**：`txt_to_ass.py` 生成 ASS → `burn_ass.py` 烧字 → 抽烧字帧 → 清 `*-no-burn` → 可选 upload-ready 改名。平台仍可另挂媒体目录 `subtitles.srt`；不要把字幕轨 mux 进 mp4。
+正式流程不再使用 `burn_ass.py`。字幕源是 `episodes/YYYY-MM-DD-slug/subtitles.txt`，人工确认后由 `tools/assemble/final_export.py --confirmed` 临时生成 ASS，并在唯一最终编码中完成字幕和响度。
 
-入口：`tools/assemble/burn_ass.py`（单文件进、单文件出；**`-c:a copy`**，视频重压一次）。不要为了烧字再跑 `assemble_episode.py --ass`（会全量重拼并抹冷开场）。
+不要：
 
-## 不要做的事
+- 在 `waiting-review` 时导出；
+- 先生成无字幕 `run-final`，再用 `burn_ass.py` 重压；
+- 把 `*-hud-preview.mp4`、`*-close-stats.mp4` 当最终输入；
+- 修改 `.srt` / `.ass` 代替 `subtitles.txt`。
 
-- 不要在 `waiting-review` / 响度未完成时烧最终片
-- 不要为了烧字全量 assemble
-- 不要长期保留 `*-no-burn.mp4`：烧字定稿/改名后立刻进废纸篓，不必等抖音
-- 不要在这里重做切条或 force_align（回 `p3-subs`）
-
-## 前置
-
-- `subs: done`
-- `loudness: done`（拼时带响度或已跑 `/p3-loudness`）
-
-## 步骤
-
-1. **生成 ASS**。`txt_to_ass.py` 按已烧进成片的样式写：Source Han Sans SC Heavy、1080p `Fontsize=72`、`Outline=3`、`MarginV=100`。不要另起一套。
-
-   Mac：otf 装入 `~/Library/Fonts`（或配 FONTCONFIG）。Fontname 须真选中 Heavy；只靠 fontsdir 常落到 PingFang SC Regular。
-
-```bash
-.venv/bin/python tools/subs/txt_to_ass.py \
-  --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto
-```
-
-默认写 `episodes/YYYY-MM-DD-slug/subtitles.ass`（不进 git），并拷到媒体目录。烧字读这一份。
-
-2. **烧字**（可短暂把无烧字片挪成 `YYYY-MM-DD-run-final-no-burn.mp4`）
-
-```bash
-MEDIA=~/Movies/running-content/YYYY-MM-DD-slug
-# 可选：mv "$MEDIA/YYYY-MM-DD-run-final.mp4" "$MEDIA/YYYY-MM-DD-run-final-no-burn.mp4"
-
-nohup .venv/bin/python tools/assemble/burn_ass.py \
-  --media-dir "$MEDIA" \
-  --ass episodes/YYYY-MM-DD-slug/subtitles.ass \
-  > "$MEDIA/burn.log" 2>&1 &
-```
-
-3. **抽烧字帧**核对：底中、Heavy 72、不挡左栏 HUD；再听一遍（音轨应未改）。
-
-4. **立刻处理 no-burn**：烧字成片定稿（或已按标题改名）后，把 `*-no-burn.mp4` **进废纸篓**（禁止 `rm`）。媒体目录保留 `subtitles.ass` 和 `subtitles.srt`。
-
-5. `assets.md` 写 `burn: done`（附 ASS 样式）。
-
-## 发布前改名（upload-ready）
-
-用户说可以发了、要准备上传时（通常烧字之后）：
-
-1. **只改成片名**：`YYYY-MM-DD-run-final.mp4` 原地改为 `plan.md` / `episode.md` 标题原文 + `.mp4`。
-2. **不要改字幕文件名**；上传外挂始终 `subtitles.srt`。
-3. 文件名保留标题全部标点（含 `|`、`？`、空格）；不要把 `|` 换成 `-`。
-4. **打包 `upload/`**：改名后立刻跑 pack（标题成片 **move** 进 `upload/`，禁止 copy；封面与 `subtitles.srt` 硬链，失败才 copy 小文件）：
-
-```bash
-MEDIA=~/Movies/running-content/YYYY-MM-DD-slug
-.venv/bin/python tools/publish/pack_upload.py --media-dir "$MEDIA"
-# 缺文件或认不出标题 mp4 时非 0；可加 --title-mp4 "标题.mp4"
-```
-
-5. 备份（`*-pre-coldopen` 等）改名阶段保留原名；发布后清临时见 `p3-publish`。
-6. `assets.md` 加 `upload: ready`（`upload/` 已齐）。`episode.md` 仍为 `edited`，双链齐了才 `published`。
-
-## 常见翻车
-
-| 现象 | 原因 |
-| --- | --- |
-| 最终片没有字 | 漏传 `--ass`；或 ASS Style/MarginV 压 HUD |
-| 字重不对（变细） | Fontname 未真选中 Heavy，只靠 fontsdir |
-| 字幕轴错位 | 冷开场后未 +offset 或未重对齐（回 `p3-subs`） |
-| 冷开场消失 | prepend 后又跑了全量 assemble（烧字请用本脚本） |
-
-## 完成后
-
-> 用户说「没问题了 / 可以发了」走 `/p3-publish`。
+字幕写错后改 `subtitles.txt`，用户确认后重新执行 `final_export.py --confirmed`。旧脚本仅为历史素材维护保留，不属于本期成片管线。

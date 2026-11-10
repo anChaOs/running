@@ -12,26 +12,32 @@ import shutil
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from export_spec import FINAL_SPEC  # noqa: E402
 from txt_to_subs import parse_txt  # noqa: E402
 
 
-# 与 episodes/*/subtitles.ass（2026-10-11 起已烧字各期）文件头逐字相同。
-HEADER = """\
-[Script Info]
+# 字幕坐标和字面从统一成片规格读取，切到 4K 时只改 export-spec.json。
+def _header() -> str:
+    spec = FINAL_SPEC
+    return f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: 1920
-PlayResY: 1080
+PlayResX: {spec.timeline.width}
+PlayResY: {spec.timeline.height}
 WrapStyle: 2
 ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Source Han Sans SC Heavy,72,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,0,2,80,80,100,1
+Style: Default,Source Han Sans SC Heavy,{spec.subtitle.font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,0,2,80,80,{spec.subtitle.margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
+
+
+HEADER = _header()
 
 
 def escape_ass_text(text: str) -> str:

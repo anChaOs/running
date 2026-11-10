@@ -32,11 +32,12 @@
   p3-scaffold     建 episodes/YYYY-MM-DD-slug
   p3-ingest       VID_ / FIT → open/run-*/close
   p3-shoes        training/logs/shoes.md，算出 -sk
-  p3-hud          overlay + 同档 preview，并行封面
-  p3-assemble     拼画面（推荐拼时带响度）+ 抽帧核对
-  p3-subs         字幕（转写→人改→对齐）
-  p3-loudness     响度补跑（loudness_only / 不重拼；拼时已带则跳过）
-  p3-burn         烧字 / 改名（burn_ass / 不重拼）
+  p3-hud          overlay + 单段检查 preview，并行封面
+  p3-assemble     原片 + HUD alpha/stats 成整条审片预览 + 抽帧核对（不出最终片）
+  p3-subs         字幕（转写→人改→对齐→人工确认）
+  final_export.py  从原片一次叠 HUD/stats、拼接、烧字幕、响度并导出
+  p3-loudness     已废弃（响度随 final_export 一次编码）
+  p3-burn         已废弃（字幕随 final_export 一次编码）
   p3-publish      发布：写双链 / published / 合 PR / 复盘日志上 box / 清临时
   p3-bilibili     可选：biliup 自动投 B 站（独立，不进主链）
   p3-youtube      可选：Drive→box→YouTube Data API（独立，默认不用用户电脑）
@@ -53,14 +54,14 @@
 ```text
 p3-library / p3-topic / p3-scaffold
   → ingest → shoes → hud ∥ cover
-  → assemble（推荐拼时带响度；抽帧真源在 assemble）
-  → subs（∥ 仅当需要时的 loudness 补跑）
-  → burn（改名 / 媒体 subtitles.srt / no-burn 真源）
+  → assemble（一次生成整条预览；抽帧真源在 assemble）
+  → subs（转写与人工确认）
+  → final_export（字幕、响度、画面一次最终编码）
   → （可选）p3-bilibili / p3-youtube 自动上传；均不挡、不嵌入 publish
   → publish（published 门闩 / 复盘日志上 box / 清临时真源）
   → archive（满 7 天）
 ```
 
-推荐墙钟：`assemble`（带响度）→ `subs` → `burn` → `publish`。响度/烧字走单文件脚本，勿再全量 assemble；详见 `p3-assemble`「编码成本」。
+推荐墙钟：`assemble`（整条轻量预览）→ `subs` → `final_export` → `publish`。最终导出前不单独烧字或补响度；详见 `p3-assemble`。
 
 任意一步都可以停。改字幕只改 `subtitles.txt`，再生成媒体 SRT，不用重拼。改 `-sk` 要重渲 HUD 再拼。
