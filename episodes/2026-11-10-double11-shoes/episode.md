@@ -2,7 +2,7 @@
 date: 2026-11-10
 slug: double11-shoes
 title: 双十一买鞋 | GO Ultra & 1080v14
-status: shot
+status: hud
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-10-double11-shoes/
 ---
