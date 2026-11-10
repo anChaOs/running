@@ -2,7 +2,7 @@
 date: 2026-11-10
 slug: double11-shoes
 title: 装备升级 | Go Ultra
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-10-double11-shoes/
 ---
