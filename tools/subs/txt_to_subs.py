@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""把 subtitles.txt 收成 SRT（B 站 / YouTube 外挂）。只换时间和字。"""
+"""把 subtitles.txt 收成 SRT（B 站 / YouTube 外挂）。只换时间和字。
+
+仓库只跟踪 subtitles.txt。写出的 .srt 是生成文件，不要 git add。
+默认写在 txt 旁边（episodes/*/subtitles.srt 已被 .gitignore）；
+--media-dir 再拷到媒体目录，供 upload/ 和 IINA。
+"""
 
 from __future__ import annotations
 
@@ -49,7 +54,7 @@ def write_srt(path: Path, cues: list[tuple[str, str, str]]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Convert subtitles.txt into SRT for Bilibili and YouTube.")
     parser.add_argument("--txt", required=True, help="episodes/.../subtitles.txt")
-    parser.add_argument("--srt", help="Output SRT. Default: next to txt")
+    parser.add_argument("--srt", help="输出 SRT。默认写在 txt 旁边（本地导出，不进 git）")
     parser.add_argument("--media-dir", help="同时拷到媒体目录：subtitles.srt（上传用）+ 成片还叫 run-final 时另拷同名 .srt（IINA 自动挂）。"
                         "传 auto = ~/Movies/running-content/<期名>")
     args = parser.parse_args()

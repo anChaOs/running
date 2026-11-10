@@ -55,7 +55,7 @@ p3-library / p3-topic / p3-scaffold
   → ingest → shoes → hud ∥ cover
   → assemble（推荐拼时带响度；抽帧真源在 assemble）
   → subs（∥ 仅当需要时的 loudness 补跑）
-  → burn（改名 / subtitles.srt / no-burn 真源）
+  → burn（改名 / 媒体 subtitles.srt / no-burn 真源）
   → （可选）p3-bilibili / p3-youtube 自动上传；均不挡、不嵌入 publish
   → publish（published 门闩 / 复盘日志上 box / 清临时真源）
   → archive（满 7 天）

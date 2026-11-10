@@ -15,8 +15,8 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 2. **校正**：只做下面「可以做」，绝不做「不能做」；交稿前做同音字扫描
 3. **切条**：由 `draft_subs` 产出；agent **不重跑切条算法**。字一个都不改，**不对口型**
 4. **自检切条（必做，交用户前）**：对照「切条易错」逐条扫，只改切分、不改嘴里说的字
-5. 写 `subtitles.srt` + `subtitles.txt`，立刻停，等人手抽听改字
-6. 用户说改好了之后：**只改时间、不改字**。`txt_to_subs.py` → `force_align.py` → `check_subs.py` → 列出硬失败行给人听 → **用户确认**后才写 `subs: done`、回写 SRT
+5. 写 `subtitles.txt`（git 只提交这一份），立刻停，等人手抽听改字。外挂 SRT 用 `txt_to_subs.py` 生成到媒体目录，不进 git
+6. 用户说改好了之后：**只改时间、不改字**。`txt_to_subs.py` → `force_align.py` → `check_subs.py` → 列出硬失败行给人听 → **用户确认**后才写 `subs: done`，并把外挂 SRT 回写到媒体目录（不提交）
 
 ## 校正：可以做
 
@@ -29,7 +29,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 1. **换一种表达。** 不要把口语改成更顺、更短、更书面的说法。不要用 `talk.md` / `script.md` 重写。
 2. **压缩语句信息。** 指代、限定、程度、口头禅只要是说出来的，都要留。包括但不限于：「这点」「一些」「什么」「完全」「其实」「倒是」「大概」「左右」「足够的」。
 3. **自己加括号注释。** agent 不要往字幕里加没说出口的（…）补充；要解释写进简介。
-   **但用户手改时加的括号是屏幕注释，必须原样保留**（如「去打魔兽世界（私服）」「行（忘记说啥了）」）：回写 SRT、重切条、force_align、同步外挂时都不许删。`check_subs.py` 报「括号」时先看是不是用户写的；是就保留。
+   **但用户手改时加的括号是屏幕注释，必须原样保留**（如「去打魔兽世界（私服）」「行（忘记说啥了）」）：回写媒体目录的 SRT、重切条、force_align 时都不许删。`check_subs.py` 报「括号」时先看是不是用户写的；是就保留。
 
 不确定是不是错字，就保留原句。缺一句宁可空着等人手补，也不要为了通顺而改写。
 
@@ -51,7 +51,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 
 专名表：`episode.md` 里写一行 `专名：Personal Agent、HUD、……`。只当识别提示纠拼写，不能拿来改用词。`p3-topic` 建期时就该写好；转写时脚本自动读。
 
-制作期成片固定 `YYYY-MM-DD-run-final.mp4`；工作字幕 `subtitles.txt` / `subtitles.srt`（可另拷同名 `.srt` 方便 IINA）。
+制作期成片固定 `YYYY-MM-DD-run-final.mp4`。git 里的字幕只有 `subtitles.txt`。外挂 SRT 生成到媒体目录（可另拷同名 `.srt` 方便 IINA），不提交。
 
 ## 不要做的事
 
@@ -61,6 +61,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 - 不要把一段识别的起止按字数均分给几条字幕，也不要手填等步长的时间。对不上的条留给 `force_align.py` 报出来，人听了再定
 - 不要用 tiny / small；只用 large-v3-turbo
 - 不要在这里烧字
+- 不要把 `subtitles.srt` / `subtitles.ass` 提交进 git。仓库字幕源只有 `subtitles.txt`
 
 ## 转写 + 初稿
 
@@ -76,13 +77,19 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 
 产物：`asr/*.words.json`、`asr/*.draft.srt`（不要覆盖）、`subtitles.txt`。txt 已存在时脚本拒绝覆盖；要重来加 `--force`。
 
-## 写 SRT / txt
+## 写字幕稿
 
-写到 `episodes/YYYY-MM-DD-slug/`：
+git 只提交 `episodes/YYYY-MM-DD-slug/subtitles.txt`。`subtitles.srt` / `subtitles.ass` 从这份 txt 生成，给烧字和媒体目录 `upload/` 用，不进仓库（`.gitignore`）。不要 `git add` 它们。
 
 ```text
-subtitles.srt   # B 站 / YouTube 外挂
-subtitles.txt   # 给人改的稿
+subtitles.txt   # 给人改的稿，唯一进 git 的字幕
+```
+
+外挂需要时（写出媒体目录的 `subtitles.srt`；txt 旁边那份是本地导出，同样不提交）：
+
+```bash
+.venv/bin/python tools/subs/txt_to_subs.py \
+  --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto
 ```
 
 - **单行**，一条字幕不要写成两行显示。横屏底栏还有 HUD，两行会抢位置
@@ -96,8 +103,8 @@ subtitles.txt   # 给人改的稿
 2. **优先短语边界。** 「太能冲了刷新了自己的PB」→ 两条：「太能冲了」/「刷新了自己的PB」。一句里两个完整谓语，宁可拆开。
 3. **代词贴下一句主语。** 「之后的表现吧我 / 昨天…」错；对的是「看一下之后的表现吧」/「我昨天在看直播的时候」。
 4. **语义单元别拆开。** 「精神 / 图腾吧」应并成「精神图腾吧」；双音节词组、专名、固定搭配同一条。
-5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → 同步外挂：仓库与媒体目录的 `subtitles.srt`。制作审片阶段可另拷 `YYYY-MM-DD-run-final.srt` 方便 IINA。
-6. **冷开场 prepend：** 以 `p3-assemble`「冷开场」为准。字幕侧：body 全部 +offset（或重抽 wav 再 `force_align`），文首补冷开场几条；同步仓库与媒体 `subtitles.srt`。
+5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → 外挂只同步媒体目录的 `subtitles.srt`（不提交）。制作审片阶段可另拷 `YYYY-MM-DD-run-final.srt` 方便 IINA。
+6. **冷开场 prepend：** 以 `p3-assemble`「冷开场」为准。字幕侧：body 全部 +offset（或重抽 wav 再 `force_align`），文首补冷开场几条，改仓库里的 `subtitles.txt`；外挂只同步媒体目录的 `subtitles.srt`（不进 git）。
 
 txt 一行一条，时间是成片轴：
 
@@ -109,7 +116,7 @@ txt 一行一条，时间是成片轴：
 
 ## 停下来，等人手改字
 
-自检切条做完、写完 SRT/txt 之后 **立刻停**。不要对口型、不要烧字幕、不要写简介。第一稿时间只是识别的词级时间，不是口型。
+自检切条做完、写完 `subtitles.txt` 之后 **立刻停**。不要对口型、不要烧字幕、不要写简介。第一稿时间只是识别的词级时间，不是口型。
 
 ```bash
 open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
@@ -150,9 +157,9 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
      **机器过门 ≠ 可以写 `subs: done`**：硬失败行必须给人听。漏盖若是路人说话或删掉的磕巴，人听过确认后在回复里说明。用户写的括号注释保留。
    - 对完扫一遍：单行；用词跟口播；没有被改写成另一种说法。
-   - 对着成片抽听，本地预览用 IINA；媒体目录放 `subtitles.srt`
+   - 对着成片抽听，本地预览用 IINA；媒体目录放 `subtitles.srt`（不进 git）
    - preview 时长变了（重渲 HUD），对着新成片重抽 wav、重跑这一步。
-   - 改完 txt 时间后跑 `txt_to_subs.py --media-dir auto` 回写并同步
+   - 改完 txt 时间后跑 `txt_to_subs.py --media-dir auto` 回写媒体目录的外挂。不要提交生成的 srt/ass
 
 3. 外挂拷到成片旁边：最后一次 `txt_to_subs.py ... --media-dir auto` 已经拷好。
 
@@ -193,7 +200,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 **用户说改好了**
 
-回写 SRT、对口型、拷到成片旁边，简介 / 抖音文案 / 标签写入 `plan.md`。IINA 审片（不要推荐 ffplay）。**不要自己执行这条命令**：发给用户，用户同意或自己开：
+回写媒体目录的 SRT（不提交）、对口型、拷到成片旁边，简介 / 抖音文案 / 标签写入 `plan.md`。IINA 审片（不要推荐 ffplay）。**不要自己执行这条命令**：发给用户，用户同意或自己开：
 
 ```bash
 iina --mpv-geometry=320x180-8+8 \

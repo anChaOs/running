@@ -9,12 +9,12 @@ description: 只再核对一次成片。默认成片流程里抽帧核对已在 
 
 ## 前置
 
-制作期成片：`YYYY-MM-DD-run-final.mp4`。时间轴见 `p3-assemble`。外挂源稿在 `episodes/.../subtitles.srt`。
+制作期成片：`YYYY-MM-DD-run-final.mp4`。时间轴见 `p3-assemble`。字幕源稿在 `episodes/.../subtitles.txt`。外挂 SRT 在媒体目录，不进 git。
 
 ## 不要做的事
 
 - 不要为了再核对去重拼成片，除非接缝或 HUD 本身有问题
-- 字幕错只改 txt/SRT，不用重拼
+- 字幕错只改 `subtitles.txt`，再生成媒体目录的 SRT，不用重拼
 - 不要从成片画面里找字幕帧（默认没烧字）
 
 ## 抽帧

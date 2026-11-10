@@ -9,3 +9,8 @@ __pycache__/
 
 # 旧工具工作记忆，不是内容源
 .omx/
+
+# 期字幕导出。仓库只留 subtitles.txt；srt/ass 由 txt 生成，给烧字和媒体 upload/。
+# 只忽略这个文件名，其它 .srt / .ass 仍可跟踪。
+episodes/*/subtitles.srt
+episodes/*/subtitles.ass

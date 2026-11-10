@@ -151,7 +151,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 2. **切入点**按字幕轴找目标句，从该句**第一个字**起切到句末（多句则按用户指定顺序）。
 3. **转场默认硬切**。
 4. **prepend** 到已有 `run-final` 前；记下 bumper 时长 offset；备份旧成片（如 `*-pre-coldopen.mp4`）。
-5. 字幕：prepend 后 body 全部 +offset（或从新成片重抽 wav 再 `force_align`），文首补上冷开场几条；同步仓库与媒体 `subtitles.srt`。
+5. 字幕：prepend 后 body 全部 +offset（或从新成片重抽 wav 再 `force_align`），文首补上冷开场几条，改仓库里的 `subtitles.txt`。外挂 SRT 只同步媒体目录，不提交。
 6. `assets.md` 记：`cold-open: done`、来源片段与 offset。
 7. **prepend 之后**：不要再跑全量 assemble 覆盖 `run-final`；响度/烧字只用 `loudness_only` / `burn_ass`。
 

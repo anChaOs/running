@@ -30,7 +30,7 @@ description: 烧字收尾：字幕定稿且响度就绪后，从 SRT 生成 ASS�
    - 1080p：`Fontsize=72`、`Outline=3`、`MarginV≈100`；单行底中，避开左栏 HUD
    - Mac：otf 装入 `~/Library/Fonts`（或配 FONTCONFIG）；CoreText 常因只靠 fontsdir 落到 PingFang SC Regular
 
-   写出 `episodes/YYYY-MM-DD-slug/subtitles.ass`，并拷到媒体目录。
+   写出 `episodes/YYYY-MM-DD-slug/subtitles.ass`（本地导出，`.gitignore`，不要提交），并拷到媒体目录。git 里的字幕源仍是 `subtitles.txt`。
 
 2. **烧字**（可短暂把无烧字片挪成 `YYYY-MM-DD-run-final-no-burn.mp4`）
 
@@ -46,7 +46,7 @@ nohup .venv/bin/python tools/assemble/burn_ass.py \
 
 3. **抽烧字帧**核对：底中、Heavy 72、不挡左栏 HUD；再听一遍（音轨应未改）。
 
-4. **立刻处理 no-burn**：烧字成片定稿（或已按标题改名）后，把 `*-no-burn.mp4` **进废纸篓**（禁止 `rm`）。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍保留。
+4. **立刻处理 no-burn**：烧字成片定稿（或已按标题改名）后，把 `*-no-burn.mp4` **进废纸篓**（禁止 `rm`）。媒体目录同步 `subtitles.ass`；外挂 `subtitles.srt` 仍留在媒体目录。这两份都不进 git。
 
 5. `assets.md` 写 `burn: done`（附 ASS 样式）。
 

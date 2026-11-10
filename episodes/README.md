@@ -10,8 +10,10 @@
 | `talk.md` | 当天边跑边说提纲 |
 | `assets.md` | 素材索引，指向仓库外大文件 |
 | `NOTES.md` | 制作侧笔记（bot 用，不进成片） |
-| `subtitles.srt` / `subtitles.txt` | 外挂字幕（忠于原句） |
+| `subtitles.txt` | 字幕源稿（忠于原句）。仓库只跟踪这一份 |
 | `script.md` | 可选，现在很少用 |
+
+`subtitles.srt` 和 `subtitles.ass` 由 `subtitles.txt` 生成，给烧字和媒体目录 `upload/` 用，不进 git。
 
 `episode.md` 的 `status`：`idea` → `planned` → `shot` → `hud` → `edited` → `published`。
 
