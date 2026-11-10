@@ -59,4 +59,4 @@
 - cover: done（定稿句「Go Ultra 拍摄跑步画质会更好吗？」；字号硬性下限下排版断行减字 `Go Ultra|拍摄画质|更好吗？`；复用自拍 `1794267046645.jpg` rembg 抠图 `cover-work/person-cutout.png` + AI 底 `cover-work/bg.jpg`；三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`）
 - subs: done（用户校对后 force_align；237 条，整条 232 / 短窗重听 5 / interp 0 / unanchored 0；check_subs 机器过门；硬失败漏盖 1 处「90」10:51.40–10:51.93 已把后条入点提前盖住，复检硬失败 0；用户括号注释保留；未打开成片）
 - burn: done（ASS Source Han Sans SC Heavy 72 / Outline 3 / MarginV=100；fontselect→SourceHanSansSC-Heavy；burn_ass.py；-c:a copy；成片 ≈747.09s / 3.0G；抽帧 qc/burn-01..05 底中不挡左栏 HUD / close stats；无烧字备份已进废纸篓）
-- upload: pending
+- upload: ready（`upload/装备升级 | Go Ultra.mp4` move 自 run-final；三封面 + subtitles.srt 硬链）
