@@ -221,10 +221,13 @@ def overlay_filter(
             f"{''.join(piece_labels)}concat=n={len(playlist)}:v=1:a=0,fps=60,settb=1/60[slide]"
         )
     d = f"{close_dur:.6f}"
-    # slide 轨比 close 短时 shortest=1 会把 close 截短（10-14 截成 131s）：末帧定住垫到 close 时长
-    parts.append(f"[slide]tpad=stop_mode=clone:stop_duration={d},trim=duration={d},setpts=PTS-STARTPTS[st]")
+    # 不要 shortest=1：slide/tpad 任一算短都会把整段 close 截断（本期曾截成 ~67s）。
+    # 以 close 主画面时长为准；overlay 提前结束则末帧定住（eof_action=repeat）。
     parts.append(
-        f"[0:v][st]overlay=x={OVERLAY_X}:y=(H-h)/2:shortest=1,format=yuv420p[v]"
+        f"[slide]tpad=stop_mode=clone:stop_duration={d},trim=duration={d},setpts=PTS-STARTPTS[st]"
+    )
+    parts.append(
+        f"[0:v][st]overlay=x={OVERLAY_X}:y=(H-h)/2:eof_action=repeat:shortest=0,format=yuv420p[v]"
     )
     parts.append(
         f"[0:a]aformat=sample_rates=48000:channel_layouts=stereo,"
