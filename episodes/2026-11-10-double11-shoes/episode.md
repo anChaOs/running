@@ -15,7 +15,7 @@ media: ~/Movies/running-content/2026-11-10-double11-shoes/
 
 封面句：Go Ultra 拍摄跑步画质会更好吗？
 
-专名：GO Ultra、1080v14、New Balance、双十一
+专名：GO Ultra、1080v14、New Balance、双十一、Go Ultra
 
 ## 文件
 

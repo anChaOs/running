@@ -57,5 +57,5 @@
 - loudness: done（拼时带响度，跳过单独 p3-loudness）
 - qc: done（抽帧 qc/01-open-start、02-open-run-seam、03-hud-mid、04-run-close-seam、05-close-end；open/close 无 HUD；中段鞋名 1080v14、气温约 7°/体感 4°；接缝叠化正常；close 末 COROS stats 在左侧）
 - cover: done（定稿句「Go Ultra 拍摄跑步画质会更好吗？」；字号硬性下限下排版断行减字 `Go Ultra|拍摄画质|更好吗？`；复用自拍 `1794267046645.jpg` rembg 抠图 `cover-work/person-cutout.png` + AI 底 `cover-work/bg.jpg`；三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`）
-- subs: pending
+- subs: waiting-review（draft_subs large-v3-turbo；专名表已用；切条自检；未 force_align / 未 burn；口播未定稿按成片音频）
 - upload: pending
