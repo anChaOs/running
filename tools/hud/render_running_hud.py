@@ -275,16 +275,8 @@ def bake_matched_preview(
     log_path: Path | None = None,
     label: str | None = None,
 ) -> None:
-    # 预览/审片跟原片同档：编码、码率、分辨率都不降
-    spec = probe_source_video(source)
-    bit_rate = int(spec["bit_rate"])
-    if bit_rate < 1_000_000:
-        bit_rate = 20_000_000
-    codec = str(spec["codec"])
-    if codec in {"hevc", "h265"}:
-        vcodec = ["-c:v", "hevc_videotoolbox", "-b:v", str(bit_rate), "-tag:v", "hvc1"]
-    else:
-        vcodec = ["-c:v", "h264_videotoolbox", "-b:v", str(bit_rate)]
+    # 审片 preview 使用统一轻量规格；最终导出不会读取这个 mp4。
+    vcodec = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
     cmd = [
         "ffmpeg",
         "-y",
@@ -451,7 +443,7 @@ def main() -> int:
     parser.add_argument(
         "--preview",
         action="store_true",
-        help="After overlay, bake a watchable mp4 matching the source codec/bitrate/size. Implies --overlay-only",
+        help="After overlay, bake a lightweight review mp4. Implies --overlay-only; final export reads the source clip and alpha layer instead",
     )
     parser.add_argument("--no-weather", action="store_true", help="Do not fetch Open-Meteo weather for the HUD")
     parser.add_argument(

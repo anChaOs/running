@@ -16,7 +16,7 @@ description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/�
 
 ## 前置
 
-1. 本期已 `upload: ready`（`p3-burn` 后）：媒体目录有 `upload/`  
+1. 本期已 `upload: ready`（最终导出并打包后）：媒体目录有 `upload/`
    - 标题名烧字成片 `.mp4`（已 MOVE 进 `upload/`，根目录无第二份）  
    - `cover-4x3-1920x1440.jpg`（另两张可并存，**投稿只用这张**）  
    - 可选 `subtitles.srt`（biliup 本次不挂外挂；创作中心可后补）

@@ -1,0 +1,32 @@
+{
+  "timeline": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "pix_fmt": "yuv420p",
+    "sample_rate": 48000
+  },
+  "preview": {
+    "vcodec": "libx264",
+    "crf": 23,
+    "preset": "veryfast",
+    "acodec": "aac",
+    "abitrate": "128k"
+  },
+  "final": {
+    "vcodec": "hevc_videotoolbox",
+    "bitrate": "28M",
+    "tag": "hvc1",
+    "acodec": "aac",
+    "abitrate": "192k"
+  },
+  "subtitle": {
+    "font_size": 72,
+    "margin_v": 100
+  },
+  "loudness": {
+    "integrated_lufs": -16,
+    "true_peak_db": -1.5,
+    "lra": 7
+  }
+}

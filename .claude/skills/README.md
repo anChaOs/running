@@ -33,10 +33,11 @@
   p3-ingest       VID_ / FIT → open/run-*/close
   p3-shoes        training/logs/shoes.md，算出 -sk
   p3-hud          overlay + 同档 preview，并行封面
-  p3-assemble     拼画面（推荐拼时带响度）+ 抽帧核对
-  p3-subs         字幕（转写→人改→对齐）
-  p3-loudness     响度补跑（loudness_only / 不重拼；拼时已带则跳过）
-  p3-burn         烧字 / 改名（burn_ass / 不重拼）
+  p3-assemble     接 HUD preview 成审片预览 + 抽帧核对（不出最终片）
+  p3-subs         字幕（转写→人改→对齐→人工确认）
+  final_export.py  从原片一次叠 HUD/stats、拼接、烧字幕、响度并导出
+  p3-loudness     已废弃（响度随 final_export 一次编码）
+  p3-burn         已废弃（字幕随 final_export 一次编码）
   p3-publish      发布：写双链 / published / 合 PR / 复盘日志上 box / 清临时
   p3-bilibili     可选：biliup 自动投 B 站（独立，不进主链）
   p3-youtube      可选：Drive→box→YouTube Data API（独立，默认不用用户电脑）

@@ -1,60 +1,31 @@
 ---
 name: p3-qc
-description: 只再核对一次成片。默认成片流程里抽帧核对已在 p3-assemble 里拼完立刻做。用户说再核对、抽帧、QC、审片、接缝不对时用。只写 `qc: done`；episode status 的 `edited` 由 p3-subs 在用户确认字幕后写。
+description: 核对审片预览或最终成片。默认预览画面核对在 p3-assemble 完成；用户说再核对、抽帧、QC、审片、接缝不对时用。只写 qc: done；episode status 的 edited 由 p3-subs 在用户确认字幕后写。
 ---
 
-# 成片核对（补做 / 重做）
+# 成片核对
 
-默认核对跟拼接在 `p3-assemble` 里做完。本 skill 只在要再抽一轮、或成片已在但当时没核对时用。
+默认核对跟审片预览在 `p3-assemble` 里完成。本 skill 只在要再抽一轮、或当时没核对时用。
 
-## 前置
+## 两个阶段
 
-制作期成片：`YYYY-MM-DD-run-final.mp4`。时间轴见 `p3-assemble`。字幕源稿在 `episodes/.../subtitles.txt`。外挂 SRT 在媒体目录，不进 git。
-
-## 不要做的事
-
-- 不要为了再核对去重拼成片，除非接缝或 HUD 本身有问题
-- 字幕错只改 `subtitles.txt`，再生成媒体目录的 SRT，不用重拼
-- 不要从成片画面里找字幕帧（默认没烧字）
+- **预览核对**：检查 open/run/close 接缝、HUD、stats、音画和无明显花屏。预览没有硬字幕；通过后 `assets.md` 写 `preview: done`、`qc: done`。
+- **最终核对**：`final_export.py --confirmed` 写出最终片后，抽帧检查字幕、HUD、stats 和最终音量。失败应改 `subtitles.txt` 或配置，再重新执行最终导出，不能对最终片单独 burn/loudness 二次编码。
 
 ## 抽帧
 
-画面抽帧点与清单按 `p3-assemble`「核对」再抽一轮。
-
 ```bash
 mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug/qc
-ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
+ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4 \
   -frames:v 1 ~/Movies/running-content/YYYY-MM-DD-slug/qc/<label>.jpg
 ```
 
-## 字幕（外挂，叠上看）
+最终片需要检查字幕时，对 `YYYY-MM-DD-run-final.mp4` 抽帧；用户同意后才打开 IINA，agent 不自行打开播放器。
 
-下面的 IINA 命令发给用户，**用户同意才执行**，agent 不要自己打开播放器。不要推荐 ffplay。
+## 字幕门
 
-```bash
-# 制作期（旁边的 YYYY-MM-DD-run-final.srt 会自动挂上）：
-iina --mpv-geometry=320x180-8+8 \
-  ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4
-# 改名后显式挂 subtitles.srt：
-# iina --mpv-geometry=320x180-8+8 --mpv-sub-file=.../subtitles.srt \
-#   ~/Movies/running-content/YYYY-MM-DD-slug/<标题>.mp4
-```
-
-抽听：open 第一句、第一段 run 开头、各 run 接缝、close 第一句。出点跟说完：气口后的短人声不要当成下一句的整句；正词开口时条子不能已经没了。入点略早可以，早收不行。
-
-
-## 清单
-
-- **画面 / HUD / 接缝 / 鞋名 / 气温：** 按 `p3-assemble` 核对清单
-- 外挂时间以 `tools/subs/check_subs.py` 为准：早收 ≤3% 可核对条、漏盖累计 ≤1% 成片、挂静音 ≤3% 可核对条，且严重早收（>0.5s）为 0。机器过门后硬失败行仍须人听。本节抽听只看它报的噪声时段和接缝
-- 成片画面里没有烧进去的字幕（烧字后的核对见 `p3-burn`）
-- 外挂跟嘴、单行；没有 `\N` 两行；用词跟口播
-- 没有两条字幕叠在一起；词组不要切碎
-
-画面声音通过后：`assets.md` 写 `qc: done`。`episode.md` 的 `edited` 只由 `p3-subs` 在用户确认字幕后写，这里不改。
-
-失败：鞋错 → `p3-hud`；字幕错 → 改 `subtitles.txt`，再生成媒体目录 SRT，**不用重拼**；接缝错 → 查 open/close 是否被当成 run。
+字幕错误只改 `episodes/YYYY-MM-DD-slug/subtitles.txt`，重新 force_align / check_subs，并在用户确认后重新 `final_export.py --confirmed`。不要改生成的 SRT/ASS 当源稿。
 
 ## 完成后
 
-还没有字幕：`/p3-subs`。字幕+响度都齐未烧字：`/p3-burn`。已烧字：`/p3-publish`。
+还没有字幕：`/p3-subs`。字幕用户确认后：`final_export.py --confirmed`。已经导出并要上传：`/p3-publish`。

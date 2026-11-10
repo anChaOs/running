@@ -32,4 +32,4 @@ description: 60–90 秒发布剪辑走剪映，不走全长成片脚本。用�
 >
 > `/p3-assemble`
 >
-> 全长已经 QC 过、只差上传：停在这里，按 `p3-burn`「发布前改名」把成片原地改成标题名，外挂仍挂媒体目录的 `subtitles.srt`；写链接与清临时走 `/p3-publish`。
+> 全长已经 QC 过、只差上传：停在这里，把 `final_export.py` 输出的成片按 upload 规则打包，外挂仍用媒体目录的 `subtitles.srt`；写链接与清临时走 `/p3-publish`。

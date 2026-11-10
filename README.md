@@ -35,7 +35,7 @@ AI 协作规则见 `CLAUDE.md`（`AGENT.md` 是它的软链）。
 - `plan.md` / `talk.md` / `assets.md`
 - `NOTES.md`：制作侧笔记（bot 用，不进成片）
 - `subtitles.txt`：字幕源稿（忠于原句）。git 只提交这一份
-- `subtitles.srt` / `subtitles.ass`：由 `subtitles.txt` 本地生成，不进 git。外挂走 `txt_to_subs.py`，烧字 ASS 走 `p3-burn` 的 `txt_to_ass.py`。上传用的 srt 在媒体目录 `upload/`
+- `subtitles.srt` / `subtitles.ass`：由 `subtitles.txt` 本地生成，不进 git。外挂走 `txt_to_subs.py`；最终导出由 `final_export.py` 临时生成 ASS 并一次烧入。上传用的 srt 在媒体目录 `upload/`
 - `script.md`：可选，现在很少用
 
 status：`idea` → `planned` → `shot` → `hud` → `edited` → `published`。
@@ -47,7 +47,7 @@ status：`idea` → `planned` → `shot` → `hud` → `edited` → `published`�
 3. 新建 `episodes/YYYY-MM-DD-slug/`，用 `templates/episode.md`。
 4. 当天用 `talk.md` 边跑边说。
 5. 素材收进 `~/Movies/running-content/YYYY-MM-DD-slug/`，按 `open` / `run-*` / `close` 命名。
-6. 用 `tools/hud/` 给跑中段加 HUD；全长成片再拼成片、写外挂字幕，双发 YouTube / B 站。剪映只做短视频，不是主路径。
+6. 用 `tools/hud/` 给跑中段加 HUD；先生成审片预览并人工校对字幕，用户确认后由 `tools/assemble/final_export.py` 从原片一次导出最终片，再双发 YouTube / B 站。剪映只做短视频，不是主路径。
 7. 有长期价值的写进 `knowledge/`；周期结束做 `training/reviews/`。
 
 ## HUD
