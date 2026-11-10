@@ -21,8 +21,7 @@ from txt_to_subs import parse_txt  # noqa: E402
 # 字幕坐标和字面从统一成片规格读取，切到 4K 时只改 export-spec.json。
 def _header() -> str:
     spec = FINAL_SPEC
-    return f"""\\
-[Script Info]
+    return f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {spec.timeline.width}
 PlayResY: {spec.timeline.height}

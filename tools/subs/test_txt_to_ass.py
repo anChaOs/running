@@ -47,6 +47,13 @@ def test_cli_writes_beside_txt_and_media_copy():
         assert "注释" not in ass
 
 
+
+
+def test_header_starts_with_script_info():
+    text = ta.render_ass([("0:00:00.00", "0:00:01.00", "hi")])
+    assert text.startswith("[Script Info]\n"), text[:40]
+    assert not text.startswith("\\"), text[:20]
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

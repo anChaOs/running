@@ -155,6 +155,23 @@ def test_hud_preview_uses_export_profile() -> None:
         assert "-crf" in cmd and "23" in cmd
 
 
+
+
+def test_audio_graph_uses_asetpts() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        sources = _sources(root)
+        durations = [2.0, 3.0, 3.0]
+        plan = final.build_input_plan(sources, durations, PREVIEW_SPEC)
+        graph = final.build_filter_graph(
+            sources, durations, plan, ass=None, spec=PREVIEW_SPEC, apply_loudness=False
+        )
+        assert "asetpts=PTS-STARTPTS" in graph
+        assert "atrim=0:" in graph
+        for part in graph.split(";"):
+            if "atrim=" in part:
+                assert ",setpts=" not in part, part
+
 if __name__ == "__main__":
     test_specs()
     test_4k_timeline_loads_from_config()
@@ -162,4 +179,5 @@ if __name__ == "__main__":
     test_final_discovery_rejects_legacy_close_stats()
     test_final_and_preview_share_transitions_and_stats_source()
     test_hud_preview_uses_export_profile()
+    test_audio_graph_uses_asetpts()
     print("ok test_export_spec")

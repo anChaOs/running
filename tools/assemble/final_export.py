@@ -337,7 +337,7 @@ def build_filter_graph(
         )
         parts.append(
             f"[{i}:a]aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo,"
-            f"aresample=async=1:first_pts=0,apad=whole_dur={duration:.6f},atrim=0:{duration:.6f},setpts=PTS-STARTPTS[{a}]"
+            f"aresample=async=1:first_pts=0,apad=whole_dur={duration:.6f},atrim=0:{duration:.6f},asetpts=PTS-STARTPTS[{a}]"
         )
         video_labels.append(v)
         audio_labels.append(a)
