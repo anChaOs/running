@@ -5,6 +5,6 @@
 - `subs/`：字幕初稿（`draft_subs.py`）、改字后强制对齐（`force_align.py`）、质检门（`check_subs.py`）、txt 收成 SRT（`txt_to_subs.py`）。依赖 `pip install -r tools/subs/requirements.txt`。
 - `assemble/`：把 `open` + HUD preview + `close` 拼成全长成片（叠化、字幕、封面）。不替代 60–90 秒发布剪辑。
 - `cover/`：三比例封面排版（4:3 / 3:4 / 16:9）。
-- `publish/`：上传打包（`pack_upload.py` → 媒体目录 `upload/`）。
+- `publish/`：上传打包（`pack_upload.py` → 媒体目录 `upload/`）；把成片切成亚 100MB 块并拷进 Google Drive 桌面版目录（`stage_drive_chunks.py`）。
 
 按需加载的流程入口是 skill `p3-episode`，阶段表见 `knowledge/production/成片skills.md`。
