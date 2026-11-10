@@ -31,7 +31,10 @@
 - shoes: pending
 - hud: pending
 - cover: pending
-- assemble: pending
+- preview: pending
 - qc: pending
 - subs: pending
+- loudness: pending
+- burn: deprecated
+- final: pending
 - upload: pending

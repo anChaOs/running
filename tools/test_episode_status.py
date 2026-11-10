@@ -34,8 +34,17 @@ def main() -> None:
         assert "> `/p3-hud`" in run(repo, media)
         (m / "hud-renders/2026-01-02-run-a-hud-preview.mp4").touch()
         assert "/p3-assemble" in run(repo, media)
-        (m / "2026-01-02-run-final.mp4").touch()
+        (ep / "assets.md").write_text(
+            "## 制作状态\n\n- ingest: done\n- shoes: done\n- preview: done\n- qc: done\n",
+            encoding="utf-8",
+        )
         assert "/p3-subs" in run(repo, media)
+        (ep / "subtitles.txt").write_text("0:00:00.00–0:00:01.00  测试\n", encoding="utf-8")
+        (ep / "assets.md").write_text(
+            "## 制作状态\n\n- ingest: done\n- shoes: done\n- preview: done\n- qc: done\n- subs: done\n",
+            encoding="utf-8",
+        )
+        assert "final_export.py" in run(repo, media)
         (ep / "episode.md").write_text("---\nstatus: published\n---\n", encoding="utf-8")
         assert "/p3-archive" in run(repo, media)
     print("ok test_episode_status")
