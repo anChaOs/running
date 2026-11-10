@@ -2,13 +2,13 @@
 
 ## 编码边界
 
-- `p3-hud --preview`、`preview_episode.py` 只生成审片预览；预览可以轻量编码，不是最终输入。
-- 最终导出唯一入口是 `tools/assemble/final_export.py`。它直接读取 `open`、原始 `run-*`、`close`、HUD alpha、stats 图片和 `subtitles.txt`，在同一张 FFmpeg filter graph 内完成叠加、拼接、字幕和响度，最后只编码一次 HEVC 成片。
-- `loudnorm` 第一遍只输出到 `null` 做测量，不写媒体；第二遍才写最终文件。`assemble_episode.py`、`burn_ass.py`、`loudness_only.py` 和 `close-stats.mp4` 不再是正式成片路径。
+- `p3-hud --preview` 只生成单段检查用的轻量文件；`preview_episode.py` 从原片、HUD alpha 和 stats 图片生成整条审片预览，整条只编码一次，不把单段 preview 再压一遍。
+- 最终导出唯一入口是 `tools/assemble/final_export.py`。它直接读取 `open`、原始 `run-*`、`close`、HUD alpha、stats 图片和 `subtitles.txt`，在同一张 FFmpeg filter graph 内完成叠加、转场、拼接、字幕和响度，最后只编码一次 HEVC 成片。
+- `loudnorm` 第一遍只输出到 `null` 做测量，不写媒体；第二遍才写最终文件。`assemble_episode.py`、`burn_ass.py`、`loudness_only.py` 和 `close-stats.mp4` 不再是新期正式成片路径；旧期可保留 close-stats 供兼容，但不参与新期预览。
 
 ## 字幕门闩
 
-预览用于人工看画面、接缝和校对字幕。`subtitles.txt` 是唯一字幕源稿；用户确认后由 `p3-subs` 写 `subs: done`。最终导出还要求 `qc: done` 和命令行 `--confirmed`，缺任一门闩都不生成成片。改字后重新执行最终导出，不先生成无字幕成片再烧第二遍。
+预览用于人工看画面、转场、stats 和校对字幕。`subtitles.txt` 是唯一字幕源稿；用户确认后由 `p3-subs` 写 `subs: done`。最终导出还要求 `preview: done`、`qc: done` 和命令行 `--confirmed`，缺任一门闩都不生成成片。改字后重新执行最终导出，不先生成无字幕成片再烧第二遍。
 
 ## 规格配置
 

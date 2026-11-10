@@ -1,18 +1,18 @@
 ---
 name: p3-assemble
-description: 生成 open + HUD preview + close 的整条审片预览，拼完抽帧核对；不生成最终成片。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py，不能在这里烧字或修响度。
+description: 从原片 + HUD alpha + stats 图片一次生成整条审片预览，拼完抽帧核对；不生成最终成片。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py，不能在这里烧字或修响度。
 ---
 
 # 画面预览
 
-把已有 HUD preview 接成一条审片预览，**预览不是最终成片，也不能作为最终导出输入**。拼完立刻抽帧核对画面；这不是 60–90 秒发布剪辑。
+从原片、HUD alpha 和 stats 图片生成一条审片预览，**预览不是最终成片，也不能作为最终导出输入**。整条预览只编码一次；拼完立刻抽帧核对画面。这不是 60–90 秒发布剪辑。
 
 产物：`~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4`
 
 ## 前置
 
-- `hud-renders/*-hud-preview.mp4` 齐；它们只用于人工检查。
-- `open` / `close` 可缺。`close-stats.mp4` 只作为旧期预览兼容输入；最终导出直接读取原 `close` 和 stats 图片。
+- 原始 `run-*`、对应 `hud-renders/*-hud-alpha.mov` 已齐；单段 `*-hud-preview.mp4` 只用于单段检查，不作为整条预览输入。
+- `open` / `close` 可缺；有 close 时 stats 图片会直接在预览滤镜图里叠加。`close-stats.mp4` 不是新期必经步骤，最终导出和预览都读取原 `close` + stats 图片。旧期若仅有 close-stats，按旧流程兼容处理。
 - 不要使用或覆盖 `*-run-final.mp4`，不要写 `upload/`。
 
 ## 步骤
@@ -27,7 +27,7 @@ description: 生成 open + HUD preview + close 的整条审片预览，拼完抽
   --out ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4
 ```
 
-预览可以轻量转码以统一播放规格，不能按最终成片替代最终输入。预览阶段不烧字幕、不做最终响度；字幕校对时外挂字幕或直接对照音频检查。
+预览只做一次轻量编码以统一播放规格，不能按最终成片替代最终输入。预览阶段不烧字幕、不做最终响度；字幕校对时外挂字幕或直接对照音频检查。
 
 ## 核对
 

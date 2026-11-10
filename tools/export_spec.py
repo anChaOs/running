@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
-
 
 SPEC_PATH = Path(__file__).with_name("export-spec.json")
 
@@ -53,60 +53,110 @@ def _object(value: Any, label: str) -> dict[str, Any]:
     return cast(dict[str, Any], value)
 
 
+def _required(root: dict[str, Any], key: str, label: str) -> Any:
+    if key not in root:
+        raise ValueError(f"Export spec {label} is missing {key}")
+    return root[key]
+
+
+def _positive_int(value: Any, label: str) -> int:
+    if isinstance(value, bool):
+        raise TypeError(f"Export spec {label} must be a positive integer")
+    if isinstance(value, int):
+        number = value
+    elif isinstance(value, str) and value.strip().lstrip("+").isdigit():
+        number = int(value)
+    else:
+        raise ValueError(f"Export spec {label} must be a positive integer")
+    if number <= 0:
+        raise ValueError(f"Export spec {label} must be a positive integer")
+    return number
+
+
+def _finite_float(value: Any, label: str) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Export spec {label} must be a finite number") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"Export spec {label} must be a finite number")
+    return number
+
+
 def load_export_specs(path: Path = SPEC_PATH) -> dict[str, ExportSpec]:
     root = _object(json.loads(path.read_text(encoding="utf-8")), "root")
-    timeline_raw = _object(root["timeline"], "timeline")
-    loudness_raw = _object(root["loudness"], "loudness")
-    subtitle_raw = _object(root["subtitle"], "subtitle")
+    timeline_raw = _object(_required(root, "timeline", "root"), "timeline")
+    loudness_raw = _object(_required(root, "loudness", "root"), "loudness")
+    subtitle_raw = _object(_required(root, "subtitle", "root"), "subtitle")
     timeline = TimelineSpec(
-        width=int(timeline_raw["width"]),
-        height=int(timeline_raw["height"]),
-        fps=int(timeline_raw["fps"]),
-        pix_fmt=str(timeline_raw["pix_fmt"]),
-        sample_rate=int(timeline_raw["sample_rate"]),
+        width=_positive_int(_required(timeline_raw, "width", "timeline"), "timeline.width"),
+        height=_positive_int(_required(timeline_raw, "height", "timeline"), "timeline.height"),
+        fps=_positive_int(_required(timeline_raw, "fps", "timeline"), "timeline.fps"),
+        pix_fmt=str(_required(timeline_raw, "pix_fmt", "timeline")),
+        sample_rate=_positive_int(_required(timeline_raw, "sample_rate", "timeline"), "timeline.sample_rate"),
     )
     loudness = LoudnessSpec(
-        integrated_lufs=float(loudness_raw["integrated_lufs"]),
-        true_peak_db=float(loudness_raw["true_peak_db"]),
-        lra=float(loudness_raw["lra"]),
+        integrated_lufs=_finite_float(_required(loudness_raw, "integrated_lufs", "loudness"), "loudness.integrated_lufs"),
+        true_peak_db=_finite_float(_required(loudness_raw, "true_peak_db", "loudness"), "loudness.true_peak_db"),
+        lra=_finite_float(_required(loudness_raw, "lra", "loudness"), "loudness.lra"),
     )
+    if loudness.lra <= 0:
+        raise ValueError("Export spec loudness.lra must be positive")
     subtitle = SubtitleSpec(
-        font_size=int(subtitle_raw["font_size"]),
-        margin_v=int(subtitle_raw["margin_v"]),
+        font_size=_positive_int(_required(subtitle_raw, "font_size", "subtitle"), "subtitle.font_size"),
+        margin_v=_positive_int(_required(subtitle_raw, "margin_v", "subtitle"), "subtitle.margin_v"),
     )
     specs: dict[str, ExportSpec] = {}
     for name in ("preview", "final"):
-        raw = _object(root[name], name)
+        raw = _object(_required(root, name, "root"), name)
         specs[name] = ExportSpec(
             timeline=timeline,
-            vcodec=str(raw["vcodec"]),
+            vcodec=str(_required(raw, "vcodec", name)),
             bitrate=str(raw["bitrate"]) if raw.get("bitrate") is not None else None,
-            crf=int(raw["crf"]) if raw.get("crf") is not None else None,
+            crf=_positive_int(raw["crf"], f"{name}.crf") if raw.get("crf") is not None else None,
             preset=str(raw["preset"]) if raw.get("preset") is not None else None,
             tag=str(raw["tag"]) if raw.get("tag") is not None else None,
-            acodec=str(raw["acodec"]),
-            abitrate=str(raw["abitrate"]),
+            acodec=str(_required(raw, "acodec", name)),
+            abitrate=str(_required(raw, "abitrate", name)),
             subtitle=subtitle,
             loudness=loudness,
         )
+    validate_final_spec(specs["final"], preview_spec=specs["preview"])
     return specs
 
 
-def validate_final_spec(spec: ExportSpec) -> None:
-    if (spec.timeline.width, spec.timeline.height, spec.timeline.fps) != (1920, 1080, 30):
-        raise ValueError("Final export must use 1920x1080 at 30 fps")
-    if spec.timeline.pix_fmt != "yuv420p":
+def _validate_profile(spec: ExportSpec, name: str) -> None:
+    if not spec.vcodec or not spec.acodec or not spec.abitrate:
+        raise ValueError(f"Export spec {name} must define video and audio profiles")
+    if spec.vcodec == "libx264" and (spec.crf is None or not spec.preset):
+        raise ValueError(f"Export spec {name} libx264 profile needs crf and preset")
+    if spec.vcodec != "libx264" and spec.bitrate is None:
+        raise ValueError(f"Export spec {name} needs bitrate for {spec.vcodec}")
+
+
+def validate_final_spec(spec: ExportSpec, *, preview_spec: ExportSpec | None = None) -> None:
+    """校验配置自身，不把当前 1080p 默认值当成唯一合法时间轴。"""
+    timeline = spec.timeline
+    if min(timeline.width, timeline.height, timeline.fps, timeline.sample_rate) <= 0:
+        raise ValueError("Export timeline dimensions, fps, and sample rate must be positive")
+    if timeline.pix_fmt != "yuv420p":
         raise ValueError("Final export must use yuv420p")
     if spec.vcodec != "hevc_videotoolbox" or spec.tag != "hvc1":
         raise ValueError("Final export must use hevc_videotoolbox with hvc1")
     if spec.acodec != "aac" or spec.abitrate != "192k":
         raise ValueError("Final export must use AAC 192k")
+    if not spec.bitrate:
+        raise ValueError("Final export must define a video bitrate")
+    _validate_profile(spec, "final")
+    if preview_spec is not None:
+        if preview_spec.timeline != timeline:
+            raise ValueError("Preview and final profiles must share one timeline")
+        _validate_profile(preview_spec, "preview")
 
 
 SPECS = load_export_specs()
 PREVIEW_SPEC = SPECS["preview"]
 FINAL_SPEC = SPECS["final"]
-validate_final_spec(FINAL_SPEC)
 
 
 def video_codec_args(spec: ExportSpec, *, test_codec: str | None = None) -> list[str]:

@@ -77,7 +77,7 @@ weather-hourly.json
 
 口播检测与停顿门槛在 `tools/ingest/trim_talk_pauses.py`（默认 Silero VAD）。对比旧能量门限加 `--speech-detect band`。skill 不复述剪停顿算法；**跑流程只调脚本看输出，不要为执行去 Read 源码**（改算法 / 排错除外）。
 
-多段 `run-*` 默认 `--jobs 2` 并行渲（可改；`-j 1` 串行）；失败看 `hud-renders/*-hud-render.log` 定位哪条 clip。审片预览使用 `*-hud-preview.mp4`；最终导出使用原片和 `*-hud-alpha.mov`。`--preview` 先渲透明层再生成轻量审片文件，alpha 是最终导出的中间层。不走剪映可以不理 alpha。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
+多段 `run-*` 默认 `--jobs 2` 并行渲（可改；`-j 1` 串行）；失败看 `hud-renders/*-hud-render.log` 定位哪条 clip。整条审片预览由 `/p3-assemble` 从原片和 alpha 一次生成；`*-hud-preview.mp4` 只用于单段检查。最终导出使用原片和 `*-hud-alpha.mov`。`--preview` 先渲透明层，再按 preview profile 生成单段检查文件，alpha 是最终导出的中间层。不走剪映可以不理 alpha。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
 
 ## 完成
 
