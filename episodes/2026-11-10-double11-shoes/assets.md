@@ -53,8 +53,9 @@
 - ingest: done（角色 open=001 / run-a..d=002..005 / close=006；open+close 句间粗剪 vad + keep_lead_silence；open 约省 5.19s、close 约省 7.39s；`*-raw` 保留；**未动 run-***）
 - shoes: done（1080v14；`-sn "1080v14" -sk 31.61`；跑完后；FIT 20.727 km；开跑前 10.88）
 - hud: done（`-sn "1080v14" -sk 31.61`；`--jobs 2`；`--preview`；`--weather-city shanghai`；Open-Meteo archive 曾 400 但 weather-hourly.json 仍有 11-10 05–08 时点≈7°C；preview 句间粗剪已 apply，`keep_lead_silence=True`；a≈省11.7s / b≈13.1s / c≈25.6s / d≈14.2s；raw 备份 `*-hud-preview-raw.mp4`；工作 preview 时长 a 161.47 / b 122.67 / c 140.30 / d 81.40）
+- assemble: done（open + run-a..d hud-preview + close-stats；xfade 0.2；run 风转场+whoosh；响度两遍 loudnorm；无 --ass；无冷开场/打字机；overlays 无；成片 `2026-11-10-run-final.mp4` 666.19s≈11:06；墙钟≈5m08s（08:11:12→08:16:20 Asia/Shanghai）；loudness 实测 I=-16.03 LUFS TP=-1.25 dBTP LRA=4.70 OK）
+- loudness: done（拼时带响度，跳过单独 p3-loudness）
+- qc: done（抽帧 qc/01-open-start、02-open-run-seam、03-hud-mid、04-run-close-seam、05-close-end；open/close 无 HUD；中段鞋名 1080v14、气温约 7°/体感 4°；接缝叠化正常；close 末 COROS stats 在左侧）
 - cover: done（定稿句「Go Ultra 拍摄跑步画质会更好吗？」；字号硬性下限下排版断行减字 `Go Ultra|拍摄画质|更好吗？`；复用自拍 `1794267046645.jpg` rembg 抠图 `cover-work/person-cutout.png` + AI 底 `cover-work/bg.jpg`；三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`）
-- assemble: pending
-- qc: pending
 - subs: pending
 - upload: pending
