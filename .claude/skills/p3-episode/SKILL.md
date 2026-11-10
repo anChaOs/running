@@ -116,4 +116,4 @@ python3 tools/episode_status.py YYYY-MM-DD-slug   # 或 --latest
 
 - `episode.md`：`shot` → `hud` → `edited`（`p3-subs` 用户确认后）→ `published`（`p3-publish`；抖音不挡）。
 - `assets.md`：`assemble` / `qc` / `loudness` / `subs` / `burn` / `upload`；拼时带响度则一并写 `loudness: done`。
-- 改字幕：改 txt 后 `txt_to_subs.py`，一般不用重拼。改 `-sk`：重 HUD 再 assemble；preview 时长变了就重对口型。改封面句：只 `p3-cover`。
+- 改字幕：改 `subtitles.txt` 后重新生成媒体 SRT，一般不用重拼。改 `-sk`：重 HUD 再 assemble；preview 时长变了就重对口型。改封面句：只 `p3-cover`。

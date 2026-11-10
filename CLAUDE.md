@@ -32,7 +32,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `inbox/` | 连主题都说不清的碎片 |
 | `calendar/` | 只放未来排期，不放单期拍摄手册 |
 | `topics/` | 备选主题库（`/p3-library`）；有拍摄日再 `/p3-topic` |
-| `episodes/YYYY-MM-DD-slug/` | 一期一个文件夹：`episode.md` + plan/talk/script/assets |
+| `episodes/YYYY-MM-DD-slug/` | 一期一个文件夹：`episode.md` + plan/talk/script/assets。字幕只提交 `subtitles.txt` |
 | `knowledge/wiki/` | 跑步等编译知识；查询先读 `wiki/index.md` |
 | `knowledge/raw/` | 知识来源只读 |
 | `knowledge/production/` | 拍摄、命名、HUD、剪映 SOP（人写，先不编进 wiki） |
@@ -42,7 +42,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `tools/ingest/` | 手机导出收进素材目录 |
 | `tools/hud/` | HUD 时间探测与批量渲染 |
 | `tools/assemble/` | 全长成片拼接 |
-| `tools/subs/` | 字幕初稿、强制对齐、质检门、txt 收成外挂 SRT |
+| `tools/subs/` | 字幕初稿、强制对齐、质检门；txt 收成外挂 SRT 与烧字 ASS（都不进 git） |
 | `.claude/skills/` | 按需加载；主题库 `p3-library`，选题 `p3-topic`，成片入口 `p3-episode`，归档 `p3-archive` |
 
 新一期用 `templates/episode.md`。口播可用 `templates/run-talk-video.md`。知识页用 `templates/wiki-page.md`，规则见 `knowledge/CLAUDE.md`。

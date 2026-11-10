@@ -17,8 +17,7 @@ LSD 那篇在第四期 [`../2026-04-26-lsd/`](../2026-04-26-lsd/episode.md)。
 |------|------|
 | `assets.md` | 素材索引 |
 | `plan.md` | 发布文案 |
-| `subtitles.txt` | 口播校正稿 |
-| `subtitles.srt` | B 站 / YouTube 外挂 |
+| `subtitles.txt` | 口播校正稿（仓库只留这一份） |
 
 ## 发布
 

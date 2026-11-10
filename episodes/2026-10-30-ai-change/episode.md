@@ -25,7 +25,7 @@ bilibili_bvid: BV1GvxY6UEvV
 - `talk.md`：边跑边说提纲（要点，非完整可念稿）
 - `plan.md`：发布计划与简介
 - `assets.md`：素材索引
-- `subtitles.txt` / `subtitles.srt` / `subtitles.ass`：字幕定稿（ASS 已烧进成片）
+- `subtitles.txt`：字幕定稿（仓库只留这一份；ASS 已烧进成片）
 
 ## 发布
 
@@ -33,4 +33,4 @@ bilibili_bvid: BV1GvxY6UEvV
 - Bilibili：BV1GvxY6UEvV（https://www.bilibili.com/video/BV1GvxY6UEvV）
 - 抖音：https://v.douyin.com/lIbBDrjFY7M/
 - 成片：`~/Movies/running-content/2026-10-30-ai-change/AI，让我有点怕.mp4`
-- 外挂：`subtitles.srt`（不改成标题名）
+- 外挂：媒体目录 `subtitles.srt`（不改成标题名）
