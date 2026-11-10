@@ -8,29 +8,36 @@
 
 ### 视频素材
 
-- `VID_...mp4` -> `2026-11-11-open.mp4`
+- `VID_20261111_054701_007.mp4` -> `2026-11-11-open.mp4`
+- `VID_20261111_055445_008.mp4` -> `2026-11-11-run-a.mp4`
+- `VID_20261111_062520_009.mp4` -> `2026-11-11-run-b.mp4`
+- `VID_20261111_071955_011.mp4` -> `2026-11-11-close.mp4`
 
 ### 跑步数据
 
-- `...fit` -> `2026-11-11-run-data.fit`
+- `2026-11-11-run-data.fit` -> `2026-11-11-run-data.fit`
 
 ## 时间顺序依据
 
-- 待 ingest
+- 05:47:01: `open`
+- 05:54:45: `run-a`
+- 06:25:20: `run-b`
+- 07:19:55: `close`
 
 ## 素材关联
 
-- 开场：`2026-11-11-open.mp4`
-- 跑中 A：`2026-11-11-run-a.mp4`
-- 收尾：`2026-11-11-close.mp4`
+- `open`：`2026-11-11-open.mp4`
+- `run-a`：`2026-11-11-run-a.mp4`
+- `run-b`：`2026-11-11-run-b.mp4`
+- `close`：`2026-11-11-close.mp4`
 - FIT：`2026-11-11-run-data.fit`
 
 ## 制作状态
 
-- ingest: pending
-- shoes: pending
+- ingest: done（007=open / 008=run-a / 009=run-b / 011=close；010 误删未拍；open 67.33→65.47s、close 58.26→56.87s，keep_lead_silence=True；鞋图未改名）
+- shoes: done（1080v14；`-sn "1080v14" -sk 52.39`；跑完后；FIT 15.348 km；开跑前 37.04；与 11-10 账本 31.61 相差 5.43 km，按用户口述 52.39 记账）
 - hud: pending
-- cover: pending
+- cover: waiting-review（复用 11-02 退役鞋数据与抠图，去掉残片后重排；封面句「我已退役的跑鞋」；cover-16x9-1920x1080.jpg / cover-4x3-1920x1440.jpg / cover-3x4-1080x1440.jpg）
 - assemble: pending
 - qc: pending
 - subs: pending
