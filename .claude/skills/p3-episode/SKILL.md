@@ -30,7 +30,7 @@ run-* + FIT + -sk
   p3-hud      → hud-renders/*-hud-alpha.mov + *-hud-preview.mp4
   p3-cover    → cover-*.jpg（与 HUD 并行）
 
-原片 + HUD alpha + open/close/stats
+HUD preview + open / 数据图段或 close
   p3-assemble → review-preview.mp4 + 预览画面核对
 
 review-preview
@@ -59,7 +59,7 @@ review-preview
 | 只收素材 | 原始视频 | `p3-ingest`（缺目录则先 `p3-scaffold`） |
 | 只记鞋 | 鞋名 + 里程口径 | `p3-shoes` |
 | 只做 HUD | 已命名 `run-*` + FIT + `-sk` | `p3-shoes` → `p3-hud` |
-| 只做预览 | 原片 + HUD alpha | `p3-assemble` |
+| 只做预览 | 各段 HUD preview 已渲（有数据图则 close-stats） | `p3-assemble` |
 | 只做字幕 | review preview | `p3-subs` |
 | 最终导出 | `subs: done` + `qc: done` + 用户确认 | `final_export.py` |
 | 发布 / 清临时 | 双链或用户说发完了 | `p3-publish` |

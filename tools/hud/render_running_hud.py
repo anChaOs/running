@@ -285,7 +285,7 @@ def bake_matched_preview(
     log_path: Path | None = None,
     label: str | None = None,
 ) -> None:
-    # 单段 preview 使用统一轻量规格；整条审片预览不会再读取它重压。
+    # 单段 preview 使用统一轻量规格。整条审片预览只拼接这些文件，不再从原片和 alpha 重压。
     vcodec = video_codec_args(PREVIEW_SPEC)
     cmd = [
         "ffmpeg",
