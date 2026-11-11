@@ -2,8 +2,8 @@
 
 ## 编码边界
 
-- `p3-hud --preview` 只生成单段检查用的轻量文件；`preview_episode.py` 从原片、HUD alpha 和 stats 图片生成整条审片预览，整条只编码一次，不把单段 preview 再压一遍。
-- 最终导出唯一入口是 `tools/assemble/final_export.py`。它直接读取 `open`、原始 `run-*`、`close`、HUD alpha、stats 图片和 `subtitles.txt`，在同一张 FFmpeg filter graph 内完成叠加、转场、拼接、字幕和响度，最后只编码一次 HEVC 成片。
+- `p3-hud --preview` 只生成单段检查用的轻量文件；`preview_episode.py` 从原片、HUD alpha、stats 图片和 `overlays.json`（若有）生成整条审片预览，整条只编码一次，不把单段 preview 再压一遍。
+- 最终导出唯一入口是 `tools/assemble/final_export.py`。它直接读取 `open`、原始 `run-*`、`close`、HUD alpha、stats 图片、`overlays.json`（若有）和 `subtitles.txt`，在同一张 FFmpeg filter graph 内完成叠加、转场、拼接、字幕和响度，最后只编码一次 HEVC 成片。没有 `overlays.json` 时滤镜图与原先一致。
 - `loudnorm` 第一遍只输出到 `null` 做测量，不写媒体；第二遍才写最终文件。`assemble_episode.py`、`burn_ass.py`、`loudness_only.py` 和 `close-stats.mp4` 不再是新期正式成片路径；旧期可保留 close-stats 供兼容，但不参与新期预览。
 
 ## 字幕门闩

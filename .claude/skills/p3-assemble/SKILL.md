@@ -13,6 +13,7 @@ description: 从原片 + HUD alpha + stats 图片一次生成整条审片预览�
 
 - 原始 `run-*`、对应 `hud-renders/*-hud-alpha.mov` 已齐；单段 `*-hud-preview.mp4` 只用于单段检查，不作为整条预览输入。
 - `open` / `close` 可缺；有 close 时 stats 图片会直接在预览滤镜图里叠加。`close-stats.mp4` 不是新期必经步骤，最终导出和预览都读取原 `close` + stats 图片。旧期若仅有 close-stats，按旧流程兼容处理。
+- 中段静帧放 `overlays.json`：先找 `<media-dir>/overlays.json`，再找 `episodes/<媒体目录名>/overlays.json`。字段与 `assemble_episode.py` 相同（`file`、`start`、`hold_until`，可选 `anchor` `final|close`、`x`、`y`、`width`、`opacity`、`fade_in`、`fade_out`）。预览和 `final_export.py` 共用这张滤镜图，帧率用 export spec，不写死 60 fps。没有这个文件就不叠。
 - 不要使用或覆盖 `*-run-final.mp4`，不要写 `upload/`。
 
 ## 步骤

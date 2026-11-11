@@ -38,7 +38,7 @@ review-preview
 
 人工确认字幕后
   final_export.py --confirmed
-              → 原片 + HUD alpha + stats + 字幕 + 响度一次编码
+              → 原片 + HUD alpha + stats + overlays.json + 字幕 + 响度一次编码
               → YYYY-MM-DD-run-final.mp4
 
 双链齐

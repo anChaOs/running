@@ -193,15 +193,15 @@ def resolve_overlays(overlays: list[dict], close_start: float | None, total: flo
     return res
 
 
-def overlay_input_spec(ov: dict) -> list[str]:
+def overlay_input_spec(ov: dict, *, fps: int = 60) -> list[str]:
     if ov["is_image"]:
-        return ["-loop", "1", "-framerate", "60", "-t", f"{ov['span']:.6f}", "-i", str(ov["file"])]
+        return ["-loop", "1", "-framerate", str(fps), "-t", f"{ov['span']:.6f}", "-i", str(ov["file"])]
     return ["-i", str(ov["file"])]
 
 
-def overlay_chain(index: int, ov: dict, k: int, vin: str, vout: str) -> str:
+def overlay_chain(index: int, ov: dict, k: int, vin: str, vout: str, *, fps: int = 60) -> str:
     """把第 index 路输入放到 t0..t1：放完原片后用最后一帧停住（tpad clone），到 t1 撤掉。"""
-    f = [f"[{index}:v]fps=60,format=yuva420p"]
+    f = [f"[{index}:v]fps={fps},format=yuva420p"]
     if ov["width"]:
         f.append(f"scale={int(ov['width'])}:-2")
     if ov["hold"] > 0:
