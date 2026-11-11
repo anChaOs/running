@@ -19,3 +19,9 @@ media: ~/Movies/running-content/2026-11-11-double11-buys/
 
 - `plan.md`：发布计划与简介占位
 - `assets.md`：素材索引
+
+## 发布
+
+- YouTube：
+- Bilibili：https://www.bilibili.com/video/BV1R4Wj6wEYN
+- 抖音：
