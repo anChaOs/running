@@ -58,6 +58,10 @@ description: 把已经渲好的 HUD / 数据图片段接成整条审片预览（
 
 最终导出直接读取原始片段与 HUD alpha，并在一次编码中叠 HUD、stats、字幕和响度。它不读 HUD preview、review preview 或 close-stats。修改字幕后只改 `subtitles.txt`，重新运行最终导出；不要先生成无字幕成片再单独 burn。
 
+## 记日志
+
+`preview_episode.py` 写 `review-preview`，`final_export.py` 写 `final-export`（`--dry-run` 不写）。脚本已写就不要再记。失败由脚本写 `FAIL`。
+
 ## 完成后
 
 > 预览核对通过后走 `/p3-subs`。字幕用户确认后运行 `final_export.py --confirmed`，不要走旧的 `assemble --ass`、`burn_ass.py` 或 `loudness_only.py`。

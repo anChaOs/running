@@ -13,6 +13,9 @@ import shutil
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import log_timeline  # noqa: E402
+
 COVERS = (
     "cover-4x3-1920x1440.jpg",
     "cover-3x4-1080x1440.jpg",
@@ -188,7 +191,8 @@ def main(argv: list[str] | None = None) -> int:
         help="标题名烧字成片；默认同目录或 upload/ 自动识别",
     )
     args = ap.parse_args(argv)
-    pack(args.media_dir, args.title_mp4)
+    with log_timeline.span(args.media_dir, "pack-upload"):
+        pack(args.media_dir, args.title_mp4)
     return 0
 
 

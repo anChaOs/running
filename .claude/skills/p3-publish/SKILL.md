@@ -114,6 +114,10 @@ Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上�
 3. 清完把实际移入废纸篓的路径与腾出的体积报给用户。
 4. 这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。
 
+## 记日志
+
+`pack_upload.py` 会写 `pack-upload`。写上 `published` 时用 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start published`，再 `end`。脚本或 helper 已写的行不要重复；失败用 `fail`。
+
 ## 完成后
 
 > 双链已写、`published`、episode PR 已 squash 进 main。复盘已在 box：`running-retrospect/<YYYY-MM-DD-slug>/`（logs / episode-repo / youtube-upload 有或无，如实说；传失败不要说成已同步）。清临时清单如下，确认后进废纸篓。

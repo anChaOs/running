@@ -23,6 +23,7 @@ sys.path.insert(0, str(TOOLS_DIR))
 sys.path.insert(0, str(SUBS_DIR))
 sys.path.insert(0, str(ASSEMBLE_DIR))
 
+import log_timeline
 from export_spec import (
     FINAL_SPEC,
     ExportSpec,
@@ -515,7 +516,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-overlays", action="store_true", help="有 overlays.json 也不叠")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    media_dir = Path(args.media_dir).expanduser().resolve()
+    with log_timeline.span(media_dir, "final-export", enabled=not args.dry_run) as wall:
+        wall.rc = _export_episode(args)
+        return wall.rc
 
+
+def _export_episode(args) -> int:
     media_dir = Path(args.media_dir).expanduser().resolve()
     episode_dir = Path(args.episode_dir).expanduser().resolve()
     subtitles = Path(args.subtitles).expanduser().resolve() if args.subtitles else episode_dir / "subtitles.txt"

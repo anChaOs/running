@@ -26,6 +26,7 @@ sys.path.insert(0, str(TOOLS_DIR))
 sys.path.insert(0, str(TOOLS_DIR / "assemble"))
 sys.path.insert(0, str(TOOLS_DIR / "subs"))
 
+import log_timeline
 from export_spec import PREVIEW_SPEC, ExportSpec, video_codec_args
 # 和最终导出用同一套 stats 图片判定，这样「有数据图却没有 close-stats」的失败条件和最终会叠的静帧一致。
 # XFADE 只用来对齐时间轴，不在这里重压叠化。
@@ -747,8 +748,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional subtitles.txt. Writes a same-named .srt beside the preview with unchanged cue times. Does not burn in.",
     )
     args = parser.parse_args(argv)
-
     media_dir = Path(args.media_dir).expanduser().resolve()
+    with log_timeline.span(media_dir, "review-preview", enabled=not args.dry_run) as wall:
+        wall.rc = _preview(args, media_dir)
+        return wall.rc
+
+
+def _preview(args, media_dir: Path) -> int:
     if not media_dir.is_dir():
         raise SystemExit(f"media dir not found: {media_dir}")
     cut = discover_preview_cut(media_dir)

@@ -18,7 +18,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import log_timeline  # noqa: E402
 import subs_core as sc  # noqa: E402
 
 LEAD = 0.10              # 入点比开口早一点
@@ -275,7 +277,21 @@ def main() -> int:
     ap.add_argument("--report", help="对齐报告 JSON（默认 <wav>.align.json，放媒体目录 asr/，check_subs 会复用）")
     ap.add_argument("--no-guided", action="store_true", help="跳过短窗重听")
     args = ap.parse_args()
+    media_dir = _media_dir_from_audio(Path(args.audio))
+    with log_timeline.span(media_dir, "force-align") as wall:
+        wall.rc = _align(args)
+        return wall.rc
 
+
+def _media_dir_from_audio(audio: Path) -> Path:
+    """wav 在 <media>/asr/，成片 mp4 在 <media>/。不另起一套目录。"""
+    path = audio.expanduser()
+    if path.parent.name == "asr":
+        return path.parent.parent
+    return path.parent
+
+
+def _align(args) -> int:
     t0 = time.time()
     txt = Path(args.txt).expanduser()
     wav = sc.ensure_wav(Path(args.audio).expanduser())

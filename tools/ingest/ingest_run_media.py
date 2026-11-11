@@ -15,6 +15,9 @@ from datetime import timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import log_timeline  # noqa: E402
+
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 VID_RE = re.compile(r"VID_(\d{8})_(\d{6})", re.IGNORECASE)
@@ -442,7 +445,13 @@ def main() -> int:
         help="Do not trim long pauses in open/close",
     )
     args = parser.parse_args()
+    media_dir = Path(args.media_root).expanduser() / f"{args.date}-{args.slug}"
+    with log_timeline.span(media_dir, "ingest", enabled=args.apply) as wall:
+        wall.rc = _ingest(args)
+        return wall.rc
 
+
+def _ingest(args) -> int:
     src = Path(args.src).expanduser().resolve()
     if not src.is_dir():
         raise SystemExit(f"Source is not a directory: {src}")

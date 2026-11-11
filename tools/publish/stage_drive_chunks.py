@@ -21,6 +21,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import BinaryIO, Callable
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import log_timeline  # noqa: E402
+
 DEFAULT_CHUNK_BYTES = 99_000_000
 DEFAULT_JOBS = 8
 HASH_NAME = "original.sha256"
@@ -818,6 +821,14 @@ def _validate_work_dir(source: Path, work_dir: Path, plan: list[tuple[str, int, 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    src = Path(args.src).expanduser()
+    media = src.parent.parent if src.parent.name == "upload" else None
+    with log_timeline.span(media if media is not None else src, "drive-stage", enabled=media is not None) as wall:
+        wall.rc = _stage(args)
+        return wall.rc
+
+
+def _stage(args) -> int:
     try:
         if args.dest is not None and args.drive_folder:
             raise SystemExit("pass only one of --dest or --drive-folder")

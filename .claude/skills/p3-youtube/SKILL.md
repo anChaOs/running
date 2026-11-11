@@ -89,6 +89,10 @@ Mac upload/  →  Google Drive「跑步成片」/YYYY-MM-DD-slug/  （暂存 mp4
 - 若 403 `insufficientPermissions` / 缺 **`youtube.force-ssl`**：记一笔，**视频照样 public**；告知用户可在 Studio 手挂或下次扩 scope 重授权
 - 不要为字幕失败重新上传整片
 
+## 记日志
+
+`tools/publish/stage_drive_chunks.py` 在源文件位于 `upload/` 时会写 `drive-stage`；不在 `upload/` 时用 helper 补记。box 上的 YouTube 上传没有仓库脚本：开始 `start youtube-upload`，成功 `end`，失败 `fail`（`.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug`）。已有的行不要重复。
+
 ## 成功后
 
 1. 把 `https://youtu.be/…` 写入该期 `episode.md`「发布」栏「YouTube：」（B 站仍空则 **不要** 改 `published`）
