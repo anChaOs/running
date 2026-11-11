@@ -17,6 +17,7 @@ from gopro_overlay import arguments as go_args
 from gopro_overlay import font as go_font
 from gopro_overlay import layout_xml as lx
 from gopro_overlay.dimensions import Dimension
+from gopro_overlay.gpmf import GPS_FIXED_VALUES
 from gopro_overlay.journey import Journey
 from gopro_overlay.layout import Overlay
 from gopro_overlay.layout_components import text as text_widget
@@ -26,6 +27,9 @@ from gopro_overlay.widgets import map as map_widgets
 from PIL import Image
 from PIL import ImageDraw
 from PIL import ImageFont
+
+from route_progress import completed_route_index
+from route_progress import progress_from_entry
 
 
 _orig_formatter = lx.quantity_formatter_for
@@ -617,15 +621,14 @@ _REMAINING_FILL = (150, 150, 150, 210)
 _REMAINING_OUTLINE = (70, 70, 70, 200)
 
 
-def _nearest_route_index(locs, location) -> int:
-    if not locs:
-        return 0
-    best_i, best_d = 0, float("inf")
-    for i, p in enumerate(locs):
-        d = (p.lat - location.lat) ** 2 + (p.lon - location.lon) ** 2
-        if d < best_d:
-            best_d, best_i = d, i
-    return best_i
+def _current_route_progress(widget) -> float | None:
+    entry_fn = getattr(widget, "_hud_entry", None)
+    if not callable(entry_fn):
+        return None
+    entry = entry_fn()
+    if entry is None:
+        return None
+    return progress_from_entry(entry)
 
 
 def _route_heading_rad(locs, idx: int) -> float:
@@ -656,14 +659,30 @@ def _route_heading_rad(locs, idx: int) -> float:
 
 def _circuit_draw(self, image, draw):
     # 灰=全程底/未跑；沙色=已跑；三角=当前位置朝向。
+    # 已跑按采样时间截前缀。套圈/折返时当前位置会靠到另一段，
+    # 全路线最近邻会把还没跑的那段涂成沙色，下一帧再弹回来。
     if getattr(self, "_hud_route_ready", False) is False:
         journey = Journey()
+        samples: list = []
+
+        def collect(item):
+            if item.gpsfix not in GPS_FIXED_VALUES or item.point is None:
+                return None
+            if self.privacy_zone.encloses(item.point):
+                return None
+            samples.append(item)
+            return None
+
         self.framemeta.process(journey.accept)
+        self.framemeta.process(collect)
         self.bbox = journey.bounding_box
         self.size = self.bbox.size() * 1.1
 
-        locs = [p for p in journey.locations if not self.privacy_zone.encloses(p)]
+        locs = [sample.point for sample in samples]
+        progress = [progress_from_entry(sample) for sample in samples]
         self._hud_route_locs = locs
+        self._hud_route_progress = progress
+        self._hud_route_progress_ok = bool(progress) and all(value is not None for value in progress)
 
         orig_dim = self.dimensions
         orig_fill = self.outline.fill_width
@@ -699,7 +718,8 @@ def _circuit_draw(self, image, draw):
     locs = getattr(self, "_hud_route_locs", [])
     pts = getattr(self, "_hud_points", [])
     if locs and pts and not self.privacy_zone.encloses(location):
-        idx = _nearest_route_index(locs, location)
+        progress = self._hud_route_progress if getattr(self, "_hud_route_progress_ok", False) else None
+        idx = completed_route_index(locs, progress, location, _current_route_progress(self))
         done = pts[: max(1, idx + 1)]
         if len(done) >= 2:
             line_kw = {"joint": "curve"}
@@ -767,6 +787,8 @@ def create_circuit_map(self, element, entry, **kwargs):
         if raw is not None:
             element.attrib["loc-size"] = raw
     widget._hud_marker_size = int(raw) if raw else 12
+    # entry() 是当前帧。路线前缀用它的时间，不用这一帧经纬度去全路线最近点。
+    widget._hud_entry = entry
     return widget
 
 

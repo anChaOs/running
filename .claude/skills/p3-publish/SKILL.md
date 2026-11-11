@@ -40,7 +40,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 1. 写两边链接进 `episode.md`「发布」栏，`status=published`
 2. **立刻合并该期 episode PR 进 `main`**（squash；可删远程分支）；不要等用户再点合
-3. **复盘日志上 box**（下一节，必做；不要等清临时确认）
+3. **复盘日志上 box**（下一节，必做；不要等清临时确认）。拷完立刻 `/p3-publish-report`
 4. 再按下文列清临时清单（体积）→ 用户确认 → 进废纸篓（禁止 `rm`）
 
 抖音短链不挡本步；有了再补写「抖音：」。
