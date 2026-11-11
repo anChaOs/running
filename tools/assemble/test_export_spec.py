@@ -15,7 +15,6 @@ sys.path.insert(0, str(ROOT / "assemble"))
 sys.path.insert(0, str(ROOT.parent))
 
 import final_export as final
-import preview_episode as preview
 from export_spec import (
     FINAL_SPEC,
     PREVIEW_SPEC,
@@ -45,6 +44,8 @@ def test_specs() -> None:
     assert video_codec_args(FINAL_SPEC) == ["-c:v", "hevc_videotoolbox", "-b:v", "28M", "-tag:v", "hvc1"]
     assert video_codec_args(FINAL_SPEC, test_codec="libx264") == ["-c:v", "libx264", "-preset", "veryfast"]
     assert video_codec_args(PREVIEW_SPEC) == ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
+    assert PREVIEW_SPEC.assembly == "concat-copy"
+    assert FINAL_SPEC.assembly is None
 
 
 def test_4k_timeline_loads_from_config() -> None:
@@ -111,7 +112,21 @@ def test_final_discovery_rejects_legacy_close_stats() -> None:
         expect_exit(lambda: final.discover_sources(media), "legacy preview only")
 
 
-def test_final_and_preview_share_transitions_and_stats_source() -> None:
+def test_preview_assembly_rejects_restack() -> None:
+    payload = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+    payload["preview"]["assembly"] = "restack"
+    with tempfile.TemporaryDirectory() as td:
+        path = Path(td) / "export-spec.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        try:
+            load_export_specs(path)
+        except ValueError as exc:
+            assert "concat-copy" in str(exc)
+        else:
+            raise AssertionError("restack assembly should be rejected")
+
+
+def test_final_graph_still_composites_alpha_stats_and_transitions() -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         sources = final.SourceSet(
@@ -122,24 +137,14 @@ def test_final_and_preview_share_transitions_and_stats_source() -> None:
             (root / "2026-01-01-stats-01.png", root / "2026-01-01-stats-02.png"),
         )
         durations = [1.0, 2.0, 2.0, 2.0]
-        preview_cmd = preview.build_command(sources, durations, root / "review-preview.mp4")
-        preview_text = " ".join(preview_cmd)
-        assert "hud-preview" not in preview_text and "close-stats" not in preview_text
-        assert all(str(path) in preview_text for path in (*sources.clips, *sources.hud_alpha, *sources.stats))
-        assert "-c:v libx264" in preview_text and "-crf 23" in preview_text
-
-        preview_plan = final.build_input_plan(sources, durations, PREVIEW_SPEC)
-        preview_graph = final.build_filter_graph(
-            sources, durations, preview_plan, ass=None, spec=PREVIEW_SPEC, apply_loudness=False
-        )
         final_plan = final.build_input_plan(sources, durations, FINAL_SPEC)
         ass = root / "subtitles.ass"
         ass.write_text("[Script Info]\n", encoding="utf-8")
         final_graph = final.build_filter_graph(sources, durations, final_plan, ass)
         for token in ("xfade=transition=fade:duration=0.2", "acrossfade=d=0.2", "dblur=angle=0:radius=46", "adelay="):
-            assert token in preview_graph, token
             assert token in final_graph, token
-        assert "overlay=x=40" in preview_graph and "stats" in preview_graph
+        assert "overlay=x=40" in final_graph and "stats" in final_graph
+        assert all(str(path) in " ".join(final_plan.args) for path in (*sources.clips, *sources.hud_alpha, *sources.stats))
         assert f"fontsdir={final.escape_filter_path(final.SUBTITLE_FONTS_DIR)}" in final_graph
         assert final.SUBTITLE_FONT_FILE.name == "SourceHanSansSC-Heavy.otf"
         assert final.SUBTITLE_FONT_FILE.is_file()
@@ -162,9 +167,9 @@ def test_audio_graph_uses_asetpts() -> None:
         root = Path(td)
         sources = _sources(root)
         durations = [2.0, 3.0, 3.0]
-        plan = final.build_input_plan(sources, durations, PREVIEW_SPEC)
+        plan = final.build_input_plan(sources, durations, FINAL_SPEC)
         graph = final.build_filter_graph(
-            sources, durations, plan, ass=None, spec=PREVIEW_SPEC, apply_loudness=False
+            sources, durations, plan, ass=None, spec=FINAL_SPEC, apply_loudness=False
         )
         assert "asetpts=PTS-STARTPTS" in graph
         assert "atrim=0:" in graph
@@ -177,7 +182,8 @@ if __name__ == "__main__":
     test_4k_timeline_loads_from_config()
     test_final_gate_and_source_rejection()
     test_final_discovery_rejects_legacy_close_stats()
-    test_final_and_preview_share_transitions_and_stats_source()
+    test_preview_assembly_rejects_restack()
+    test_final_graph_still_composites_alpha_stats_and_transitions()
     test_hud_preview_uses_export_profile()
     test_audio_graph_uses_asetpts()
     print("ok test_export_spec")

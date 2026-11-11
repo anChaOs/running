@@ -11,7 +11,8 @@
     "crf": 23,
     "preset": "veryfast",
     "acodec": "aac",
-    "abitrate": "128k"
+    "abitrate": "128k",
+    "assembly": "concat-copy"
   },
   "final": {
     "vcodec": "hevc_videotoolbox",

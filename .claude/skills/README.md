@@ -32,8 +32,8 @@
   p3-scaffold     建 episodes/YYYY-MM-DD-slug
   p3-ingest       VID_ / FIT → open/run-*/close
   p3-shoes        training/logs/shoes.md，算出 -sk
-  p3-hud          overlay + 单段检查 preview，并行封面
-  p3-assemble     原片 + HUD alpha/stats 成整条审片预览 + 抽帧核对（不出最终片）
+  p3-hud          overlay + 单段 HUD preview（整条预览会拼接它），并行封面
+  p3-assemble     拼接 HUD preview / 数据图段成整条审片预览 + 抽帧核对（不出最终片）
   p3-subs         字幕（转写→人改→对齐→人工确认）
   final_export.py  从原片一次叠 HUD/stats、拼接、烧字幕、响度并导出
   p3-loudness     已废弃（响度随 final_export 一次编码）

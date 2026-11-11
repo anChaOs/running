@@ -2,9 +2,10 @@
 
 ## 编码边界
 
-- `p3-hud --preview` 只生成单段检查用的轻量文件；`preview_episode.py` 从原片、HUD alpha 和 stats 图片生成整条审片预览，整条只编码一次，不把单段 preview 再压一遍。
+- `p3-hud --preview` 生成单段 `*-hud-preview.mp4`。`preview_episode.py` 把这些已渲片段，加上 open，以及已叠数据图的 `*-close-stats.mp4`（没有数据图时用原 close）接成整条审片预览。各段编码、分辨率、像素格式、音频一致且已是 30fps 时 stream copy；只有对不上的段才按 preview profile 轻转，然后再 `-c copy`。不从原片和 HUD alpha 重压。缺 HUD preview，或有 stats 图片却没有 close-stats 时，直接失败。
+- 预览保持 30fps，不为求快降分辨率，不做叠化。时长等于各段时长之和，外挂字幕时间不平移。不烧字幕、不修响度。
 - 最终导出唯一入口是 `tools/assemble/final_export.py`。它直接读取 `open`、原始 `run-*`、`close`、HUD alpha、stats 图片和 `subtitles.txt`，在同一张 FFmpeg filter graph 内完成叠加、转场、拼接、字幕和响度，最后只编码一次 HEVC 成片。
-- `loudnorm` 第一遍只输出到 `null` 做测量，不写媒体；第二遍才写最终文件。`assemble_episode.py`、`burn_ass.py`、`loudness_only.py` 和 `close-stats.mp4` 不再是新期正式成片路径；旧期可保留 close-stats 供兼容，但不参与新期预览。
+- `loudnorm` 第一遍只输出到 `null` 做测量，不写媒体；第二遍才写最终文件。`assemble_episode.py`、`burn_ass.py`、`loudness_only.py` 不是新期正式成片路径。`close-stats.mp4` 只作为审片预览的数据图段；最终导出仍读取原 close 和 stats 图片，不读这条视频。
 
 ## 字幕门闩
 
