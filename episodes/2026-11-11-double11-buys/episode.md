@@ -2,7 +2,7 @@
 date: 2026-11-11
 slug: double11-buys
 title:
-status: shot
+status: assemble
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-11-double11-buys/
 ---
