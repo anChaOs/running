@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "assemble"))
 sys.path.insert(0, str(ROOT.parent))
 
+import assemble_episode as assemble
 import final_export as final
 import preview_episode as preview
 from export_spec import (
@@ -99,6 +100,15 @@ def test_final_gate_and_source_rejection() -> None:
         expect_exit(
             lambda: final.validate_gate(episode, episode / "subtitles.txt", True, preview_source),
             "encoded preview",
+        )
+        expect_exit(
+            lambda: final.validate_gate(
+                episode,
+                episode / "subtitles.txt",
+                True,
+                _sources(root, run_name="2026-01-01-run-final.mp4"),
+            ),
+            "run-final",
         )
         _done_assets(episode)
         final.validate_gate(episode, episode / "subtitles.txt", True, sources)
@@ -297,6 +307,124 @@ def test_mid_timeline_image_overlay_in_final_and_preview_graphs() -> None:
         assert "enable='between(t,12.000000,13.000000)'" in close_graph
 
 
+def test_final_rejects_intermediate_overlays_before_input_plan() -> None:
+    bad_names = (
+        "2026-01-01-run-a-hud-preview.mp4",
+        "2026-01-01-close-stats.mp4",
+        "2026-01-01-run-final.mp4",
+    )
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        media = root / "2026-01-01-topic"
+        episode = root / "episode"
+        (media / "hud-renders").mkdir(parents=True)
+        episode.mkdir()
+        for name in (
+            "2026-01-01-open.mp4",
+            "2026-01-01-run-a.mp4",
+            "2026-01-01-close.mp4",
+            "2026-01-01-stats-01.png",
+        ):
+            (media / name).touch()
+        (media / "hud-renders" / "2026-01-01-run-a-hud-alpha.mov").touch()
+        _done_assets(episode)
+        for name in bad_names:
+            (media / name).write_bytes(b"intermediate")
+            (media / "overlays.json").write_text(
+                json.dumps({"overlays": [{"file": name, "start": 1, "hold_until": 2}]}),
+                encoding="utf-8",
+            )
+            planned = {"hit": False}
+
+            def fail_plan(*args, **kwargs):
+                planned["hit"] = True
+                raise AssertionError(f"build_input_plan should not run: {args} {kwargs}")
+
+            with (
+                patch.object(final, "probe_duration", return_value=3.0),
+                patch.object(final, "build_input_plan", fail_plan),
+            ):
+                expect_exit(
+                    lambda: final.main(
+                        [
+                            "--media-dir",
+                            str(media),
+                            "--episode-dir",
+                            str(episode),
+                            "--out",
+                            str(root / "out.mp4"),
+                            "--confirmed",
+                            "--dry-run",
+                        ]
+                    ),
+                    name,
+                )
+            assert planned["hit"] is False, name
+
+
+def test_overlay_time_rejects_nonfinite_and_negative() -> None:
+    bad_values = (
+        -1,
+        -0.5,
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        "nan",
+        "inf",
+        "-inf",
+        "Infinity",
+        "-1",
+        "-1:00",
+    )
+    for bad in bad_values:
+        try:
+            assemble.parse_time(bad)
+        except ValueError as exc:
+            assert "finite" in str(exc), (bad, exc)
+        else:
+            raise AssertionError(f"accepted bad time {bad!r}")
+    assert assemble.parse_time(0) == 0.0
+    assert assemble.parse_time("0:00.0") == 0.0
+    assert assemble.parse_time("5:50") == 350
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / "still.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        cfg = root / "overlays.json"
+        cases = (
+            {"start": -1, "hold_until": 2},
+            {"start": float("nan"), "hold_until": 2},
+            {"start": float("inf"), "hold_until": 2},
+            {"start": 1, "hold_until": float("nan")},
+            {"start": 1, "hold_until": float("-inf")},
+            {"start": "nan", "hold_until": 2},
+            {"start": "-3", "hold_until": 2},
+            {"start": 1, "hold_until": "inf"},
+        )
+        for raw_times in cases:
+            cfg.write_text(
+                json.dumps({"overlays": [{"file": "still.png", **raw_times}]}),
+                encoding="utf-8",
+            )
+            expect_exit(lambda: assemble.load_overlays(cfg, root), "finite")
+
+    nan_start = {"n": 1, "anchor": "final", "start": float("nan"), "until": 2.0, "is_image": True, "src_dur": None}
+    expect_exit(lambda: assemble.resolve_overlays([nan_start], None, 10), "finite")
+    inf_until = {"n": 1, "anchor": "final", "start": 1.0, "until": float("inf"), "is_image": False, "src_dur": 1.0}
+    expect_exit(lambda: assemble.resolve_overlays([inf_until], None, 10), "finite")
+    neg_dur = {"n": 1, "anchor": "final", "start": 1.0, "until": None, "is_image": False, "src_dur": float("-inf")}
+    expect_exit(lambda: assemble.resolve_overlays([neg_dur], None, 10), "finite")
+    # close 锚点把负数 start 抬成正的成片时间，仍然不能放进 setpts。
+    slipped = {"n": 1, "anchor": "close", "start": -1.0, "until": 1.0, "is_image": True, "src_dur": None}
+    expect_exit(lambda: assemble.resolve_overlays([slipped], 12.0, 20.0), "finite")
+    ok = assemble.resolve_overlays(
+        [{"n": 1, "anchor": "final", "start": 1, "until": 2, "is_image": True, "src_dur": None}],
+        None,
+        10,
+    )[0]
+    assert ok["t0"] == 1.0 and ok["t1"] == 2.0
+
+
 def test_no_overlays_json_leaves_filter_graph_unchanged() -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -344,5 +472,7 @@ if __name__ == "__main__":
     test_hud_preview_uses_export_profile()
     test_audio_graph_uses_asetpts()
     test_mid_timeline_image_overlay_in_final_and_preview_graphs()
+    test_final_rejects_intermediate_overlays_before_input_plan()
+    test_overlay_time_rejects_nonfinite_and_negative()
     test_no_overlays_json_leaves_filter_graph_unchanged()
     print("ok test_export_spec")

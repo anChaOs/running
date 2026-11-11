@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import wave
 from array import array
+from collections.abc import Callable
 from pathlib import Path
 
 
@@ -113,15 +114,21 @@ IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
 
 
 def parse_time(v: object) -> float:
-    """'5:50' / '1:05:50' / '350.5' / 350 → 秒。"""
-    if isinstance(v, (int, float)):
-        return float(v)
-    parts = str(v).strip().split(":")
-    if not 1 <= len(parts) <= 3:
+    """'5:50' / '1:05:50' / '350.5' / 350 → 秒。只接受有限且不小于 0 的时间。"""
+    # bool 是 int 的子类，不能当成秒数。
+    if isinstance(v, bool):
         raise ValueError(f"bad time: {v!r}")
-    sec = 0.0
-    for part in parts:
-        sec = sec * 60 + float(part)
+    if isinstance(v, (int, float)):
+        sec = float(v)
+    else:
+        parts = str(v).strip().split(":")
+        if not 1 <= len(parts) <= 3:
+            raise ValueError(f"bad time: {v!r}")
+        sec = 0.0
+        for part in parts:
+            sec = sec * 60 + float(part)
+    if not math.isfinite(sec) or sec < 0:
+        raise ValueError(f"time must be finite and >= 0: {v!r}")
     return sec
 
 
@@ -138,8 +145,16 @@ def find_overlays_file(media_dir: Path, explicit: str | None) -> Path | None:
     return None
 
 
-def load_overlays(cfg_path: Path, media_dir: Path) -> list[dict]:
-    """读 overlays.json；只做静态校验，成片时间轴上的换算放到 resolve_overlays。"""
+def load_overlays(
+    cfg_path: Path,
+    media_dir: Path,
+    *,
+    file_gate: Callable[[Path], None] | None = None,
+) -> list[dict]:
+    """读 overlays.json；只做静态校验，成片时间轴上的换算放到 resolve_overlays。
+
+    file_gate 在探测时长之前看已解析路径。最终导出用它拒绝编码中间产物。
+    """
     data = json.loads(cfg_path.read_text(encoding="utf-8"))
     items = data.get("overlays", data) if isinstance(data, dict) else data
     out: list[dict] = []
@@ -151,12 +166,17 @@ def load_overlays(cfg_path: Path, media_dir: Path) -> list[dict]:
             f = (media_dir / f) if (media_dir / f).exists() else (cfg_path.parent / f)
         if not f.is_file():
             raise SystemExit(f"{cfg_path}: overlay #{n} 文件不存在：{f}")
+        if file_gate is not None:
+            file_gate(f)
         anchor = raw.get("anchor", "final")
         if anchor not in ("final", "close"):
             raise SystemExit(f"{cfg_path}: overlay #{n} anchor 只能是 final / close")
         is_image = f.suffix.lower() in IMAGE_EXT
-        start = parse_time(raw["start"])
-        until = parse_time(raw["hold_until"]) if raw.get("hold_until") is not None else None
+        try:
+            start = parse_time(raw["start"])
+            until = parse_time(raw["hold_until"]) if raw.get("hold_until") is not None else None
+        except ValueError as exc:
+            raise SystemExit(f"{cfg_path}: overlay #{n} {exc}") from exc
         if until is None and is_image:
             raise SystemExit(f"{cfg_path}: overlay #{n} 是图片，要给 hold_until")
         if until is not None and until <= start:
@@ -172,23 +192,47 @@ def load_overlays(cfg_path: Path, media_dir: Path) -> list[dict]:
 
 
 def resolve_overlays(overlays: list[dict], close_start: float | None, total: float) -> list[dict]:
-    """anchor=close 的换到成片时间轴；补齐 until（视频不给就放完一遍）；超出成片的截掉。"""
+    """anchor=close 的换到成片时间轴；补齐 until（视频不给就放完一遍）；超出成片的截掉。
+
+    写进 setpts / between 之前，时间必须是有限数且不小于 0。
+    """
+    try:
+        total_s = parse_time(total)
+        close_base = None if close_start is None else parse_time(close_start)
+    except ValueError as exc:
+        raise SystemExit(f"timeline time: {exc}") from exc
     res: list[dict] = []
     for ov in overlays:
+        try:
+            start_off = parse_time(ov["start"])
+            until_off = None if ov["until"] is None else parse_time(ov["until"])
+            src_dur = None if ov["is_image"] else parse_time(ov["src_dur"])
+        except ValueError as exc:
+            raise SystemExit(f"overlay #{ov['n']} {exc}") from exc
         base = 0.0
         if ov["anchor"] == "close":
-            if close_start is None:
+            if close_base is None:
                 raise SystemExit(f"overlay #{ov['n']} anchor=close，但这次没有 close")
-            base = close_start
-        start = base + ov["start"]
-        until = base + ov["until"] if ov["until"] is not None else start + ov["src_dur"]
-        if start >= total:
-            raise SystemExit(f"overlay #{ov['n']} 开始 {start:.2f}s 超出成片 {total:.2f}s")
-        if until > total:
-            print(f"  ⚠ overlay #{ov['n']} hold_until {until:.2f}s 超出成片，截到 {total:.2f}s")
-            until = total
+            base = close_base
+        start = base + start_off
+        if until_off is not None:
+            until = base + until_off
+        elif src_dur is None:
+            raise SystemExit(f"overlay #{ov['n']} time must be finite and >= 0: missing duration")
+        else:
+            until = start + src_dur
+        if not math.isfinite(start) or start < 0 or not math.isfinite(until) or until < 0:
+            raise SystemExit(f"overlay #{ov['n']} time must be finite and >= 0: {start!r} -> {until!r}")
+        if start >= total_s:
+            raise SystemExit(f"overlay #{ov['n']} 开始 {start:.2f}s 超出成片 {total_s:.2f}s")
+        if until > total_s:
+            print(f"  ⚠ overlay #{ov['n']} hold_until {until:.2f}s 超出成片，截到 {total_s:.2f}s")
+            until = total_s
         span = until - start
-        hold = 0.0 if ov["is_image"] else max(0.0, span - ov["src_dur"])
+        if ov["is_image"] or src_dur is None:
+            hold = 0.0
+        else:
+            hold = max(0.0, span - src_dur)
         res.append({**ov, "t0": start, "t1": until, "span": span, "hold": hold})
     return res
 
