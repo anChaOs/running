@@ -40,5 +40,5 @@
 - cover: done（用户确认改排后的三比例；封面句「我已退役的跑鞋」；复用 11-02 退役鞋数据与抠图；cover-16x9-1920x1080.jpg / cover-4x3-1920x1440.jpg / cover-3x4-1080x1440.jpg）
 - assemble: done（审片预览 `2026-11-11-review-preview.mp4`，745.4s / 12:25，h264 1080p30；未导出成片）
 - qc: done（抽帧 qc/01-open-start、02-open-run-seam、03-hud-mid-a、04-hud-mid-b、05-run-close-seam、06-close-stats、07-close-end；open/close 无 HUD；中段鞋名 1080v14、气温约 6–7°/体感 4–5°，与 COROS 截图 10°C 不同因走上海 Open-Meteo；跑段累计里程与 37.04+本场距离一致；接缝叠化正常；close 全程左侧 stats，未截断）
-- subs: pending
+- subs: waiting-review
 - upload: pending
