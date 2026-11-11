@@ -4,7 +4,7 @@
 
 | skill / 工具 | 做什么 | 产物 |
 | --- | --- | --- |
-| `p3-library` / `p3-topic` | 备选主题、选题与口播卡 | `topics/`、`talk.md` |
+| `p3-library` / `p3-topic` | 备选主题、选题与可念口播 | `topics/`、`talk.md` |
 | `p3-scaffold` / `p3-ingest` / `p3-shoes` | 建期、收素材、鞋账本 | episode 目录、素材、鞋里程 |
 | `p3-hud` | 原始 run 渲 HUD alpha 与审片 preview | `hud-renders/` |
 | `p3-assemble` | 把 HUD preview 接成整条审片预览并核对 | `*-review-preview.mp4`、`qc/` |
