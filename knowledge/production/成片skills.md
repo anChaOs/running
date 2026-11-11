@@ -11,6 +11,7 @@
 | `p3-subs` | 转写、人工改字、force_align、质检门 | `subtitles.txt`、外挂 SRT |
 | `final_export.py` | 字幕确认后从原片一次叠 HUD/stats、拼接、烧字幕、响度并编码 | `*-run-final.mp4` |
 | `p3-publish` | 双链、发布状态、复盘日志、清临时 | `published`、box 复盘 |
+| `p3-publish-report` | 复盘拷完后的发布报告 | 单屏 `publish-report.html` |
 | `p3-bilibili` / `p3-youtube` | 独立上传拿平台链接 | BV / YouTube URL |
 | `p3-cover` / `p3-qc` | 封面、补充核对 | 封面 / QC |
 | `p3-jianying` / `p3-archive` | 短视频剪辑、满 7 天归档 | 剪映工程 / Passport |
@@ -24,6 +25,7 @@ p3-library / p3-topic / p3-scaffold
   → p3-subs（字幕源稿；人工确认门）
   → final_export.py --confirmed（唯一最终编码：原片 + alpha + stats + 字幕 + 响度）
   → publish
+  → p3-publish-report
 ```
 
 最终导出不读取 HUD preview、review preview 或 close-stats 视频。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 是历史旁路，不属于新流程。仓库只跟踪 `subtitles.txt`；SRT/ASS 是生成物。
