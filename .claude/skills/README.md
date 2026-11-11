@@ -39,6 +39,7 @@
   p3-loudness     已废弃（响度随 final_export 一次编码）
   p3-burn         已废弃（字幕随 final_export 一次编码）
   p3-publish      发布：写双链 / published / 合 PR / 复盘日志上 box / 清临时
+  p3-publish-report  复盘拷完后的单屏 HTML 发布报告
   p3-bilibili     可选：biliup 自动投 B 站（独立，不进主链）
   p3-youtube      可选：Drive→box→YouTube Data API（独立，默认不用用户电脑）
   p3-cover        只换封面 / 重抽
@@ -59,6 +60,7 @@ p3-library / p3-topic / p3-scaffold
   → final_export（字幕、响度、画面一次最终编码）
   → （可选）p3-bilibili / p3-youtube 自动上传；均不挡、不嵌入 publish
   → publish（published 门闩 / 复盘日志上 box / 清临时真源）
+  → p3-publish-report（复盘拷完后的单屏 HTML）
   → archive（满 7 天）
 ```
 

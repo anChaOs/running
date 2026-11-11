@@ -43,13 +43,14 @@ review-preview
 
 双链齐
   p3-publish  → 写链接 / published / 合 episode PR / 复盘日志上 box / 清临时
+  p3-publish-report → 复盘拷完后立刻出单屏 HTML（清临时仍在 p3-publish）
 ```
 
 **唯一最终导出入口：** `tools/assemble/final_export.py`。它不读取 HUD preview、review preview 或 close-stats 视频；直接读取原片和 HUD alpha。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 不属于新流程。
 
 **人工字幕门闩不能跳过：** `subtitles.txt` 是唯一源稿。用户确认前保持 `subs: waiting-review`，不能最终导出；用户确认后才写 `subs: done`，再执行 `final_export.py --confirmed`。
 
-**耗时记录：** 各 stage 继续把墙钟写到媒体目录 `logs/timeline.txt`；失败记 `logs/failures.md`。并行步的墙钟以实际总耗时为准。
+**耗时记录：** 每个 stage 当时把开始、结束、耗时、成功或失败追加到媒体目录 `logs/timeline.txt`（Asia/Shanghai）；失败再记 `logs/failures.md`。并行步的墙钟以实际总耗时为准。
 
 ## 目标与前置
 
@@ -62,6 +63,7 @@ review-preview
 | 只做字幕 | review preview | `p3-subs` |
 | 最终导出 | `subs: done` + `qc: done` + 用户确认 | `final_export.py` |
 | 发布 / 清临时 | 双链或用户说发完了 | `p3-publish` |
+| 发布报告 | 已 published，复盘已拷 | `p3-publish-report` |
 | 只换封面 | 自拍 + 封面句 | `p3-cover` |
 | 再核对 | review preview 或最终成片 | `p3-qc` |
 | 剪映短片 | HUD alpha | `p3-jianying` |
