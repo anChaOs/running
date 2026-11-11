@@ -45,6 +45,9 @@ class ExportSpec:
     abitrate: str
     subtitle: SubtitleSpec
     loudness: LoudnessSpec
+    # Preview-only. "concat-copy" concatenates rendered segments and stream-copies
+    # when the formats already match. Final export leaves this unset.
+    assembly: str | None = None
 
 
 def _object(value: Any, label: str) -> dict[str, Any]:
@@ -120,6 +123,7 @@ def load_export_specs(path: Path = SPEC_PATH) -> dict[str, ExportSpec]:
             abitrate=str(_required(raw, "abitrate", name)),
             subtitle=subtitle,
             loudness=loudness,
+            assembly=str(raw["assembly"]) if raw.get("assembly") not in (None, "") else None,
         )
     validate_final_spec(specs["final"], preview_spec=specs["preview"])
     return specs
@@ -152,6 +156,8 @@ def validate_final_spec(spec: ExportSpec, *, preview_spec: ExportSpec | None = N
         if preview_spec.timeline != timeline:
             raise ValueError("Preview and final profiles must share one timeline")
         _validate_profile(preview_spec, "preview")
+        if preview_spec.assembly != "concat-copy":
+            raise ValueError("Preview profile must use concat-copy assembly")
 
 
 SPECS = load_export_specs()
