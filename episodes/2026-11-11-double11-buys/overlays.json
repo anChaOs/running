@@ -1,0 +1,28 @@
+{
+  "overlays": [
+    {
+      "file": "cover-4x3-1920x1440.jpg",
+      "anchor": "final",
+      "start": "0:09:36.52",
+      "hold_until": "0:09:59.80",
+      "x": "W-w-48",
+      "y": 168,
+      "width": 920,
+      "fade_in": 0.35,
+      "fade_out": 0.35,
+      "opacity": 0.85
+    },
+    {
+      "file": "cover-3x4-1080x1440.jpg",
+      "anchor": "close",
+      "start": 0.4,
+      "hold_until": 56.866667,
+      "x": "W-w-48",
+      "y": "(H-h)/2",
+      "width": 520,
+      "fade_in": 0.35,
+      "fade_out": 0.35,
+      "opacity": 0.85
+    }
+  ]
+}
