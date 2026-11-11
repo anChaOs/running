@@ -19,6 +19,6 @@ media: ~/Movies/running-content/2026-11-12-8020/
 
 ## 文件
 
-- `talk.md`：边跑边说口播（close 待安超自写）
+- `talk.md`：边跑边说口播
 - `plan.md`：发布计划（标题／封面句／简介占位）
 - `assets.md`：素材索引
