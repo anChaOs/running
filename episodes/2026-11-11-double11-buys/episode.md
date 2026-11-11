@@ -1,7 +1,7 @@
 ---
 date: 2026-11-11
 slug: double11-buys
-title:
+title: Go Ultra 拍跑步怎么样？我的退役跑鞋
 status: edited
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-11-double11-buys/
