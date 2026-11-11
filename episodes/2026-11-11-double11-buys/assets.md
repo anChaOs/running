@@ -43,4 +43,4 @@
 - qc: done（抽帧 qc/01-open-start、02-open-run-seam、03-hud-mid-a、04-hud-mid-b、05-run-close-seam、06-close-stats、07-close-end；open/close 无 HUD；中段鞋名 1080v14、气温约 6–7°/体感 4–5°，与 COROS 截图 10°C 不同因走上海 Open-Meteo；跑段累计里程与 37.04+本场距离一致；接缝叠化正常；close 全程左侧 stats，未截断；HUD 重渲后补 qc/hud-map-3734、qc/hud-map-3748（0:37:34 / 0:37:48，剩余路线仍灰）；带鞋预览抽 qc/retired-overlay-mid、qc/retired-overlay-close）
 - subs: done（用户确认含 0:06:44.96–0:06:45.50 的 0.54s 漏盖空档；换行已按用户清单拆分）
 - final: done（11-11 10:25–10:32 Asia/Shanghai 用独立 worktree PR #82 tools @ 1aebc9e 一次导出；因本集分支尚未合入 overlays.json 最终导出支持，未把 #82 合进本分支或 main；成片 `2026-11-11-run-final.mp4` 745.400s / 12:25.40，1080p30 hevc/hvc1 + AAC 192k，2.5G，moov 在前；含 mid 4:3 `cover-4x3-1920x1440.jpg` 576.52–599.80 与 close 3:4 `cover-3x4-1080x1440.jpg` 688.922833–745.3895，fade 0.35 / opacity 0.85；已烧字幕并做响度；抽帧 qc/final-retired-overlay-mid、qc/final-retired-overlay-close、qc/final-subs-sample）
-- upload: pending
+- upload: ready（`upload/`：标题名成片硬链自 `2026-11-11-run-final.mp4`，加 16:9/4:3/3:4 封面与 subtitles.srt；根目录成片保留，避免改正在播放的文件）
