@@ -32,36 +32,16 @@ description: 把已经渲好的 HUD / 数据图片段接成整条审片预览（
 
 编码：以已渲好的 HUD preview 为模板，能拷贝就拷贝，只轻转对不上的短段，不要为对齐格式去重压长段。短段按 `tools/export-spec.json` 的 preview profile 转。不降分辨率。
 
-时长对齐最终成片的 xfade，不做叠化。`final_export.py` 在 open→第一段跑、最后一段跑→close 各叠 0.2s，时间轴因此各短 0.2s；段与段之间不缩短。预览在这两处已经要轻转的短段上剪掉同样的 0.2s（open 的尾、close 或数据图段的头），中间的 HUD preview 继续 stream copy，然后硬切。字幕按秒，不用改。和最终成片比，剩下的差只是 HUD preview 比原始 run 多出来的帧（通常每段约 1 帧）。不烧字幕、不做最终响度。字幕还没写就不要传 `--subtitles`。已经有 `subtitles.txt`、想让 IINA 自动挂时：
-
-```bash
-.venv/bin/python tools/assemble/preview_episode.py \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
-  --subtitles episodes/YYYY-MM-DD-slug/subtitles.txt
-```
-
-这只在预览旁边写同名 `.srt`，cue 时间原样拷贝。
+脚本会缩短时间轴，对齐最终成片。预览比各段相加短一点是正常的，不要再剪，也不要挪字幕时间。`subtitles.txt` 还没写就不要传 `--subtitles`。
 
 ## 核对
 
-至少抽帧检查：open 开头、open→run、跑中 HUD、run→close、close 结尾。接缝是硬切。确认 HUD、stats 和音画没有明显缺元素后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表预览画面人工核对，不代表字幕已确认。
-
-字幕仍走 `/p3-subs`：写 `subtitles.txt` 后必须停，等人手改字；用户确认后才写 `subs: done`。最终导出必须用：
-
-```bash
-.venv/bin/python tools/assemble/final_export.py \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
-  --episode-dir episodes/YYYY-MM-DD-slug \
-  --out ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4 \
-  --confirmed
-```
-
-最终导出直接读取原始片段与 HUD alpha，并在一次编码中叠 HUD、stats、字幕和响度。它不读 HUD preview、review preview 或 close-stats。修改字幕后只改 `subtitles.txt`，重新运行最终导出；不要先生成无字幕成片再单独 burn。
+至少抽帧检查：open 开头、open→run、跑中 HUD、run→close、close 结尾。缺的段跳过。接缝是硬切，叠化不算过。确认 HUD、stats 和音画没有明显缺元素后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表预览画面人工核对，不代表字幕已确认。下一步是 `/p3-subs`。
 
 ## 记日志
 
-`preview_episode.py` 写 `review-preview`，`final_export.py` 写 `final-export`（`--dry-run` 不写）。脚本已写就不要再记。失败由脚本写 `FAIL`。
+`preview_episode.py` 写 `review-preview`（`--dry-run` 不写）。脚本已写就不要再记。失败由脚本写 `FAIL`。
 
 ## 完成后
 
-> 预览核对通过后走 `/p3-subs`。字幕用户确认后运行 `final_export.py --confirmed`，不要走旧的 `assemble --ass`、`burn_ass.py` 或 `loudness_only.py`。
+> 预览核对通过后走 `/p3-subs`。
