@@ -151,9 +151,14 @@ def validate_gate(episode_dir: Path, subtitles: Path, confirmed: bool, sources: 
         raise SystemExit("Final export requires assets.md subs: done after user confirmation")
     if not status.get("qc", "").startswith("done"):
         raise SystemExit("Final export requires preview qc: done before final export")
-    all_sources = (*sources.clips, *sources.hud_alpha, *sources.stats)
-    if any(not _allowed_source(p) or "hud-preview" in p.name or "close-stats" in p.name for p in all_sources):
-        raise SystemExit("Final export cannot consume encoded preview intermediates")
+    for path in (*sources.clips, *sources.hud_alpha, *sources.stats):
+        reject_encoded_intermediate(path)
+
+
+def reject_encoded_intermediate(path: Path) -> None:
+    """发现源和 overlay 共用 RAW_CLIP_PARTS；编码中间产物不能进最终输入。"""
+    if not _allowed_source(path):
+        raise SystemExit(f"Final export cannot consume encoded preview intermediates: {path.name}")
 
 
 def escape_filter_path(path: Path) -> str:
@@ -183,11 +188,8 @@ def load_timeline_overlays(
         print("Overlays: none")
         return []
     close_start, total = assemble.timeline(durations, has_open, has_close)
-    resolved = assemble.resolve_overlays(
-        assemble.load_overlays(ov_file, media_dir, forbidden_name_parts=RAW_CLIP_PARTS),
-        close_start,
-        total,
-    )
+    loaded = assemble.load_overlays(ov_file, media_dir, file_gate=reject_encoded_intermediate)
+    resolved = assemble.resolve_overlays(loaded, close_start, total)
     print(f"Overlays: {ov_file}")
     for ov in resolved:
         print(
