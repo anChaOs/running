@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -177,6 +178,121 @@ def test_audio_graph_uses_asetpts() -> None:
             if "atrim=" in part:
                 assert ",setpts=" not in part, part
 
+
+def test_mid_timeline_overlay_in_final_graph_only() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        image = root / "still.png"
+        image.write_bytes(b"\x89PNG\r\n\x1a\n")
+        (root / "overlays.json").write_text(
+            json.dumps({"overlays": [{
+                "file": "still.png",
+                "start": 5,
+                "hold_until": 8,
+                "x": 48,
+                "y": 120,
+                "width": 560,
+                "opacity": 0.95,
+                "fade_in": 0.35,
+                "fade_out": 0.35,
+            }]}),
+            encoding="utf-8",
+        )
+        sources = final.SourceSet(
+            root / "open.mp4",
+            (root / "run-a.mp4",),
+            root / "close.mp4",
+            (root / "run-a-hud-alpha.mov",),
+            (root / "2026-01-01-stats-01.png",),
+        )
+        durations = [2.0, 10.0, 4.0]
+        overlays = final.load_timeline_overlays(root, durations, has_open=True, has_close=True)
+        assert len(overlays) == 1
+        ov = overlays[0]
+        assert ov["is_image"] and ov["t0"] == 5.0 and ov["t1"] == 8.0
+        assert 1.8 < ov["t0"] < ov["t1"] < 11.6
+
+        bare_plan = final.build_input_plan(sources, durations, FINAL_SPEC)
+        bare_graph = final.build_filter_graph(sources, durations, bare_plan, ass=None, apply_loudness=False)
+        assert "yuva420p" not in bare_graph
+
+        for spec in (FINAL_SPEC, replace(FINAL_SPEC, timeline=replace(FINAL_SPEC.timeline, fps=24))):
+            plan = final.build_input_plan(sources, durations, spec, overlays)
+            graph = final.build_filter_graph(
+                sources, durations, plan, ass=None, spec=spec, apply_loudness=False, overlays=overlays,
+            )
+            fps = spec.timeline.fps
+            chain = (
+                f"[{plan.overlay_indices[0]}:v]fps={fps},format=yuva420p,scale=560:-2,"
+                "trim=duration=3.000000,fade=t=in:st=0:d=0.350:alpha=1,"
+                "fade=t=out:st=2.650000:d=0.350:alpha=1,colorchannelmixer=aa=0.950,"
+                "setpts=PTS-STARTPTS+5.000000/TB[ol0]"
+            )
+            assert chain in graph, graph
+            assert "overlay=x=48:y=120:eof_action=pass:format=auto:enable='between(t,5.000000,8.000000)'[vov0]" in graph
+            assert graph.rindex("xfade=") < graph.index(chain)
+            assert graph.index(chain) < graph.index("format=yuv420p[v]")
+            args = list(plan.args)
+            image_at = args.index(str(ov["file"]))
+            assert args[image_at - 7:image_at] == ["-loop", "1", "-framerate", str(fps), "-t", "3.000000", "-i"]
+            if fps != 60:
+                assert "fps=60,format=yuva420p" not in graph
+
+        ass = root / "subtitles.ass"
+        ass.write_text("[Script Info]\n", encoding="utf-8")
+        final_plan = final.build_input_plan(sources, durations, FINAL_SPEC, overlays)
+        final_graph = final.build_filter_graph(sources, durations, final_plan, ass, overlays=overlays)
+        assert final_graph.index("scale=560:-2") < final_graph.index("subtitles=")
+        assert "loudnorm=" in final_graph and "overlay=x=40" in final_graph
+        assert video_codec_args(FINAL_SPEC) == ["-c:v", "hevc_videotoolbox", "-b:v", "28M", "-tag:v", "hvc1"]
+
+        empty_plan = final.build_input_plan(sources, durations, FINAL_SPEC, [])
+        assert bare_plan.args == empty_plan.args
+        assert final.build_filter_graph(sources, durations, empty_plan, ass, overlays=[]) == final.build_filter_graph(
+            sources, durations, bare_plan, ass
+        )
+
+
+def test_review_preview_rejected_as_source_and_overlay() -> None:
+    names = (
+        "2026-01-02-review-preview.mp4",
+        "review-preview-with-shoes.mp4",
+        "review-preview-fast.mp4",
+    )
+    with tempfile.TemporaryDirectory() as td:
+        media = Path(td)
+        (media / "2026-01-02-run-a.mp4").touch()
+        (media / "2026-01-02-run-review-preview.mp4").touch()
+        (media / "2026-01-02-open-review-preview.mp4").touch()
+        (media / "hud-renders").mkdir()
+        (media / "hud-renders/2026-01-02-run-a-hud-alpha.mov").touch()
+        (media / "hud-renders/2026-01-02-run-review-preview-hud-alpha.mov").touch()
+        for name in names:
+            (media / name).touch()
+        sources = final.discover_sources(media)
+        selected = [p.name for p in (*sources.clips, *sources.hud_alpha, *sources.stats)]
+        assert selected == ["2026-01-02-run-a.mp4", "2026-01-02-run-a-hud-alpha.mov"]
+        assert all("review-preview" not in name for name in selected)
+
+        episode = media / "episode"
+        episode.mkdir()
+        _done_assets(episode)
+        for name in names:
+            bad = final.SourceSet(media / name, sources.runs, None, sources.hud_alpha, ())
+            expect_exit(
+                lambda bad=bad: final.validate_gate(episode, episode / "subtitles.txt", True, bad),
+                "encoded preview",
+            )
+            (media / "overlays.json").write_text(
+                json.dumps({"overlays": [{"file": name, "start": 1, "hold_until": 2}]}),
+                encoding="utf-8",
+            )
+            expect_exit(
+                lambda: final.load_timeline_overlays(media, [4.0], has_open=False, has_close=False),
+                "review-preview",
+            )
+
+
 if __name__ == "__main__":
     test_specs()
     test_4k_timeline_loads_from_config()
@@ -186,4 +302,6 @@ if __name__ == "__main__":
     test_final_graph_still_composites_alpha_stats_and_transitions()
     test_hud_preview_uses_export_profile()
     test_audio_graph_uses_asetpts()
+    test_mid_timeline_overlay_in_final_graph_only()
+    test_review_preview_rejected_as_source_and_overlay()
     print("ok test_export_spec")

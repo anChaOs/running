@@ -138,7 +138,12 @@ def find_overlays_file(media_dir: Path, explicit: str | None) -> Path | None:
     return None
 
 
-def load_overlays(cfg_path: Path, media_dir: Path) -> list[dict]:
+def load_overlays(
+    cfg_path: Path,
+    media_dir: Path,
+    *,
+    forbidden_name_parts: tuple[str, ...] = (),
+) -> list[dict]:
     """读 overlays.json；只做静态校验，成片时间轴上的换算放到 resolve_overlays。"""
     data = json.loads(cfg_path.read_text(encoding="utf-8"))
     items = data.get("overlays", data) if isinstance(data, dict) else data
@@ -149,6 +154,11 @@ def load_overlays(cfg_path: Path, media_dir: Path) -> list[dict]:
         f = Path(raw["file"]).expanduser()
         if not f.is_absolute():
             f = (media_dir / f) if (media_dir / f).exists() else (cfg_path.parent / f)
+        blocked = next((part for part in forbidden_name_parts if part in f.name), None)
+        if blocked is not None:
+            raise SystemExit(
+                f"{cfg_path}: overlay #{n} {f.name} 不能当叠加层输入（文件名含 {blocked!r}）"
+            )
         if not f.is_file():
             raise SystemExit(f"{cfg_path}: overlay #{n} 文件不存在：{f}")
         anchor = raw.get("anchor", "final")
@@ -193,15 +203,15 @@ def resolve_overlays(overlays: list[dict], close_start: float | None, total: flo
     return res
 
 
-def overlay_input_spec(ov: dict) -> list[str]:
+def overlay_input_spec(ov: dict, *, fps: int = 60) -> list[str]:
     if ov["is_image"]:
-        return ["-loop", "1", "-framerate", "60", "-t", f"{ov['span']:.6f}", "-i", str(ov["file"])]
+        return ["-loop", "1", "-framerate", str(fps), "-t", f"{ov['span']:.6f}", "-i", str(ov["file"])]
     return ["-i", str(ov["file"])]
 
 
-def overlay_chain(index: int, ov: dict, k: int, vin: str, vout: str) -> str:
+def overlay_chain(index: int, ov: dict, k: int, vin: str, vout: str, *, fps: int = 60) -> str:
     """把第 index 路输入放到 t0..t1：放完原片后用最后一帧停住（tpad clone），到 t1 撤掉。"""
-    f = [f"[{index}:v]fps=60,format=yuva420p"]
+    f = [f"[{index}:v]fps={fps},format=yuva420p"]
     if ov["width"]:
         f.append(f"scale={int(ov['width'])}:-2")
     if ov["hold"] > 0:

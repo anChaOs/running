@@ -2,7 +2,7 @@
 """字幕确认后的唯一最终导出入口。
 
 预览只用于人工检查；本入口直接读取原片和 HUD 透明层，在一次最终编码中完成
-转场拼接、数据图叠加、字幕和响度处理。
+转场拼接、数据图叠加、中段 overlays.json、字幕和响度处理。
 """
 
 from __future__ import annotations
@@ -17,9 +17,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 TOOLS_DIR = Path(__file__).resolve().parents[1]
+ASSEMBLE_DIR = Path(__file__).resolve().parent
 SUBS_DIR = TOOLS_DIR / "subs"
 sys.path.insert(0, str(TOOLS_DIR))
 sys.path.insert(0, str(SUBS_DIR))
+sys.path.insert(0, str(ASSEMBLE_DIR))
 
 from export_spec import (
     FINAL_SPEC,
@@ -31,11 +33,22 @@ from txt_to_ass import (  # type: ignore[import-not-found]
     parse_txt,
     render_ass,
 )
+import assemble_episode as assemble  # noqa: E402
 
 DATE_STATS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-stats-\d+$")
 RAW_STATS_HINTS = ("screenshot", "coros", "截图")
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
-RAW_CLIP_PARTS = ("run-final", "hud-preview", "close-stats", "-raw", "pre-", "-bad", "orient", "transpose")
+RAW_CLIP_PARTS = (
+    "run-final",
+    "hud-preview",
+    "close-stats",
+    "-raw",
+    "pre-",
+    "-bad",
+    "orient",
+    "transpose",
+    "review-preview",
+)
 XFADE = 0.2
 WIND = 0.08
 WHOOSH_PATH = Path(__file__).resolve().parent / "sfx" / "whoosh.wav"
@@ -64,6 +77,7 @@ class InputPlan:
     stats_indices: tuple[int, ...]
     stats_duration: float
     whoosh_index: int | None = None
+    overlay_indices: tuple[int, ...] = ()
 
 
 def _one(paths: list[Path], label: str) -> Path | None:
@@ -85,23 +99,27 @@ def _stats_files(media_dir: Path) -> tuple[Path, ...]:
     )
 
 
+def _allowed_source(path: Path) -> bool:
+    return not any(part in path.stem for part in RAW_CLIP_PARTS)
+
+
 def discover_sources(media_dir: Path, *, allow_legacy_close_stats: bool = False) -> SourceSet:
-    open_clip = _one(sorted(media_dir.glob("*-open.mp4")), "open")
+    open_clip = _one([p for p in sorted(media_dir.glob("*-open.mp4")) if _allowed_source(p)], "open")
     close_candidates = [
-        p for p in sorted(media_dir.glob("*-close.mp4")) if "stats" not in p.name and "hud" not in p.name
+        p for p in sorted(media_dir.glob("*-close.mp4"))
+        if _allowed_source(p) and "stats" not in p.name and "hud" not in p.name
     ]
     close_clip = _one(close_candidates, "close")
     if close_clip is None and allow_legacy_close_stats:
         close_clip = _one(sorted(media_dir.glob("*-close-stats.mp4")), "legacy close-stats")
     elif close_clip is None and list(media_dir.glob("*-close-stats.mp4")):
         raise SystemExit("Final export requires original close; close-stats.mp4 is a legacy preview only")
-    runs = tuple(
-        p for p in sorted(media_dir.glob("*-run-*.mp4"))
-        if not any(part in p.stem for part in RAW_CLIP_PARTS)
-    )
+    runs = tuple(p for p in sorted(media_dir.glob("*-run-*.mp4")) if _allowed_source(p))
     if not runs:
         raise SystemExit(f"No original run clips in {media_dir}; final export never consumes HUD previews")
-    alpha = tuple(sorted((media_dir / "hud-renders").glob("*-run-*-hud-alpha.mov")))
+    alpha = tuple(
+        p for p in sorted((media_dir / "hud-renders").glob("*-run-*-hud-alpha.mov")) if _allowed_source(p)
+    )
     if len(alpha) != len(runs):
         raise SystemExit(f"Need one HUD alpha per run: runs={len(runs)} alpha={len(alpha)}")
     for run, layer in zip(runs, alpha, strict=True):
@@ -134,7 +152,7 @@ def validate_gate(episode_dir: Path, subtitles: Path, confirmed: bool, sources: 
     if not status.get("qc", "").startswith("done"):
         raise SystemExit("Final export requires preview qc: done before final export")
     all_sources = (*sources.clips, *sources.hud_alpha, *sources.stats)
-    if any("hud-preview" in p.name or "close-stats" in p.name for p in all_sources):
+    if any(not _allowed_source(p) or "hud-preview" in p.name or "close-stats" in p.name for p in all_sources):
         raise SystemExit("Final export cannot consume encoded preview intermediates")
 
 
@@ -151,7 +169,40 @@ def make_ass(subtitles: Path) -> Path:
     return Path(name)
 
 
-def build_input_plan(sources: SourceSet, durations: list[float], spec: ExportSpec) -> InputPlan:
+def load_timeline_overlays(
+    media_dir: Path,
+    durations: list[float],
+    *,
+    has_open: bool,
+    has_close: bool,
+    explicit: str | None = None,
+) -> list[dict]:
+    """按 assemble 的 overlays.json 约定解析到成片时间轴。没有配置就返回空列表。"""
+    ov_file = assemble.find_overlays_file(media_dir, explicit)
+    if ov_file is None:
+        print("Overlays: none")
+        return []
+    close_start, total = assemble.timeline(durations, has_open, has_close)
+    resolved = assemble.resolve_overlays(
+        assemble.load_overlays(ov_file, media_dir, forbidden_name_parts=RAW_CLIP_PARTS),
+        close_start,
+        total,
+    )
+    print(f"Overlays: {ov_file}")
+    for ov in resolved:
+        print(
+            f"  #{ov['n']} {ov['file'].name}  {assemble.fmt_ts(ov['t0'])} → {assemble.fmt_ts(ov['t1'])}"
+            f"（停住 {ov['hold']:.1f}s）  x={ov['x']} y={ov['y']}"
+        )
+    return resolved
+
+
+def build_input_plan(
+    sources: SourceSet,
+    durations: list[float],
+    spec: ExportSpec,
+    overlays: list[dict] | None = None,
+) -> InputPlan:
     args: list[str] = []
     clip_count = len(sources.clips)
     for clip in sources.clips:
@@ -169,7 +220,21 @@ def build_input_plan(sources: SourceSet, durations: list[float], spec: ExportSpe
     if len(sources.runs) > 1 and WHOOSH_PATH.is_file():
         whoosh_index = clip_count + len(alpha_indices) + len(stats_indices)
         args.extend(["-i", str(WHOOSH_PATH)])
-    return InputPlan(tuple(args), clip_count, tuple(alpha_indices), tuple(stats_indices), close_duration, whoosh_index)
+    overlay_indices: list[int] = []
+    next_index = clip_count + len(alpha_indices) + len(stats_indices) + (0 if whoosh_index is None else 1)
+    for ov in overlays or ():
+        overlay_indices.append(next_index)
+        args.extend(assemble.overlay_input_spec(ov, fps=spec.timeline.fps))
+        next_index += 1
+    return InputPlan(
+        tuple(args),
+        clip_count,
+        tuple(alpha_indices),
+        tuple(stats_indices),
+        close_duration,
+        whoosh_index,
+        tuple(overlay_indices),
+    )
 
 
 def loudness_filter(spec: ExportSpec, measured: dict[str, str] | None = None) -> str:
@@ -321,8 +386,9 @@ def build_filter_graph(
     spec: ExportSpec = FINAL_SPEC,
     measured: dict[str, str] | None = None,
     apply_loudness: bool = True,
+    overlays: list[dict] | None = None,
 ) -> str:
-    """生成预览或最终滤镜图；两者共用画面和转场，只在出口规格上区别。"""
+    """最终导出滤镜图。中段静帧叠在转场之后、字幕之前。"""
     fps = spec.timeline.fps
     width, height = spec.timeline.width, spec.timeline.height
     parts: list[str] = []
@@ -372,6 +438,15 @@ def build_filter_graph(
         sources.open_clip is not None, sources.close_clip is not None,
         width, height, fps, plan.whoosh_index,
     )
+    resolved = tuple(overlays or ())
+    if len(resolved) != len(plan.overlay_indices):
+        raise ValueError(
+            f"overlay count {len(resolved)} does not match input plan {len(plan.overlay_indices)}"
+        )
+    for k, (index, ov) in enumerate(zip(plan.overlay_indices, resolved, strict=True)):
+        nxt = f"vov{k}"
+        parts.append(assemble.overlay_chain(index, ov, k, vout, nxt, fps=fps))
+        vout = nxt
     if ass is not None:
         ass_path = escape_filter_path(ass)
         fontsdir = escape_filter_path(SUBTITLE_FONTS_DIR)
@@ -431,6 +506,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--confirmed", action="store_true")
     parser.add_argument("--test-codec", choices=("libx264",), help="仅隔离测试使用")
+    parser.add_argument(
+        "--overlays",
+        help="叠加层配置 JSON。默认找 <media-dir>/overlays.json，再找 episodes/<媒体目录名>/overlays.json",
+    )
+    parser.add_argument("--no-overlays", action="store_true", help="有 overlays.json 也不叠")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
 
@@ -443,14 +523,21 @@ def main(argv: list[str] | None = None) -> int:
     if output.exists() and not args.dry_run:
         raise SystemExit(f"Refusing to overwrite existing final output: {output}")
     durations = [probe_duration(path) for path in sources.clips]
-    plan = build_input_plan(sources, durations, FINAL_SPEC)
+    overlays = [] if args.no_overlays else load_timeline_overlays(
+        media_dir,
+        durations,
+        has_open=sources.open_clip is not None,
+        has_close=sources.close_clip is not None,
+        explicit=args.overlays,
+    )
+    plan = build_input_plan(sources, durations, FINAL_SPEC, overlays)
     ass = make_ass(subtitles)
     try:
-        first_graph = build_filter_graph(sources, durations, plan, ass, measured=None)
+        first_graph = build_filter_graph(sources, durations, plan, ass, measured=None, overlays=overlays)
         measured = None if args.dry_run else measure_loudness(plan, first_graph)
         if measured is not None:
             print(f"Loudnorm pass 1: I={measured['input_i']} TP={measured['input_tp']}")
-        final_graph = build_filter_graph(sources, durations, plan, ass, measured=measured)
+        final_graph = build_filter_graph(sources, durations, plan, ass, measured=measured, overlays=overlays)
         cmd = build_encode_cmd(plan, final_graph, output, test_codec=args.test_codec)
         print("$", " ".join(cmd))
         if not args.dry_run:
