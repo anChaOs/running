@@ -22,6 +22,6 @@ media: ~/Movies/running-content/2026-11-11-double11-buys/
 
 ## 发布
 
-- YouTube：
+- YouTube：https://youtu.be/a_0BitIEZrM
 - Bilibili：https://www.bilibili.com/video/BV1R4Wj6wEYN
 - 抖音：
