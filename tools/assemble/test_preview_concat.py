@@ -51,6 +51,8 @@ def stream(**overrides: object) -> preview.StreamInfo:
         n_audio=1,
     )
     base.update(overrides)
+    if "fps_rate" not in base:
+        base["fps_rate"] = preview._rate_key(float(base["fps"]))
     return preview.StreamInfo(**base)  # type: ignore[arg-type]
 
 
@@ -256,6 +258,71 @@ def test_long_hevc_open_does_not_reencode_h264_preview() -> None:
     assert "libx264" in cmd and "overlay" not in cmd and "filter_complex" not in cmd
 
 
+def test_phone_full_range_ntsc_hud_previews_are_copied() -> None:
+    """yuvj420p + 30000/1001 HUD previews stay copy. HEVC 30/1 open/close transcode onto them."""
+    ntsc = 30000 / 1001
+    assert preview._is_30(ntsc)
+    assert not preview._rates_match(30.0, ntsc)
+    hud = stream(pix_fmt="yuvj420p", fps=ntsc, profile="high")
+    hevc = stream(vcodec="hevc", pix_fmt="yuvj420p", fps=30.0, profile="main")
+    segments = [
+        Path("/media/2026-01-02-open.mp4"),
+        Path("/media/hud-renders/2026-01-02-run-a-hud-preview.mp4"),
+        Path("/media/hud-renders/2026-01-02-run-b-hud-preview.mp4"),
+        Path("/media/2026-01-02-close.mp4"),
+    ]
+    infos = [hevc, hud, hud, hevc]
+    durations = [12.0, 300.0, 400.0, 20.0]
+    plan = preview.plan_preview(
+        segments, infos, durations, has_open=True, has_close=True,
+    )
+    assert [action.mode for action in plan.actions] == ["transcode", "copy", "copy", "transcode"]
+    assert plan.target.pix_fmt == "yuvj420p"
+    assert plan.target.vcodec == "h264"
+    assert plan.target.fps_rate == "30000/1001"
+    assert abs(plan.target.fps - ntsc) <= 0.001
+    assert plan.actions[0].trim_end == preview.XFADE and plan.actions[0].trim_start == 0
+    assert plan.actions[1].trim_start == 0 and plan.actions[1].trim_end == 0
+    assert plan.actions[2].trim_start == 0 and plan.actions[2].trim_end == 0
+    assert plan.actions[3].trim_start == preview.XFADE and plan.actions[3].trim_end == 0
+    assert "29.970" in plan.actions[0].reason
+    assert "yuv420p" not in plan.actions[0].reason
+    assert abs(plan.expected_duration - (sum(durations) - 2 * preview.XFADE)) < 1e-9
+    commands = preview.commands_for_plan(plan, infos, Path("/tmp/out.mp4"), Path("/tmp/work"))
+    assert len(commands) == 3
+    open_cmd = " ".join(commands[0])
+    close_cmd = " ".join(commands[1])
+    assert "-pix_fmt yuvj420p" in open_cmd and "-pix_fmt yuvj420p" in close_cmd
+    assert "-r 30000/1001" in open_cmd and "fps=30000/1001" in open_cmd
+    assert "trim=start=0.000000" in open_cmd
+    assert "trim=start=0.200000" in close_cmd
+    assert "-pix_fmt yuv420p" not in open_cmd and "-r 30/1" not in open_cmd
+    encoded = open_cmd + " " + close_cmd
+    assert "run-a-hud-preview" not in encoded and "run-b-hud-preview" not in encoded
+    assert commands[2][commands[2].index("-c") + 1] == "copy"
+
+
+def test_xfade_trim_does_not_reencode_matching_middle_segments() -> None:
+    info = stream()
+    segments = [
+        Path("/media/open.mp4"),
+        Path("/media/hud-renders/run-a-hud-preview.mp4"),
+        Path("/media/hud-renders/run-b-hud-preview.mp4"),
+        Path("/media/close.mp4"),
+    ]
+    plan = preview.plan_preview(
+        segments, [info, info, info, info], [2.0, 8.0, 9.0, 3.0], has_open=True, has_close=True,
+    )
+    assert [action.mode for action in plan.actions] == ["transcode", "copy", "copy", "transcode"]
+    assert plan.actions[1].trim_start == plan.actions[1].trim_end == 0
+    assert abs(plan.expected_duration - (22.0 - 2 * preview.XFADE)) < 1e-9
+    encoded = " ".join(" ".join(cmd) for cmd in preview.commands_for_plan(
+        plan, [info, info, info, info], Path("/out.mp4"), Path("/tmp/work"),
+    ))
+    assert "run-a-hud-preview" not in encoded and "run-b-hud-preview" not in encoded
+    assert "xfade trim tail" in preview.format_plan(plan)
+
+
 def test_audio_mismatch_copies_video() -> None:
     phone = stream(sample_rate=44100)
     hud = stream()
@@ -366,7 +433,9 @@ def test_concat_copy_keeps_duration_fps_and_pictures() -> None:
         assert not paths["out"].exists()
         assert not paths["out"].with_suffix(".srt").exists()
         assert "concat=-c copy" in text
-        assert "transcode" not in text
+        assert f"copy {paths['preview']}" in text
+        assert f"transcode {paths['open']}" in text and "xfade trim tail" in text
+        assert f"transcode {paths['close']}" in text and "xfade trim head" in text
         assert "filter_complex" not in text and "overlay" not in text
         assert str(paths["preview"]) in text
         assert str(paths["run_original"]) not in text
@@ -376,19 +445,24 @@ def test_concat_copy_keeps_duration_fps_and_pictures() -> None:
         with patch.object(final, "build_filter_graph", side_effect=AssertionError("restack")):
             code, text = run_preview(argv)
         assert code == 0, text
-        expected = probe_duration(paths["open"]) + probe_duration(paths["preview"]) + probe_duration(paths["close"])
+        expected = (
+            probe_duration(paths["open"])
+            + probe_duration(paths["preview"])
+            + probe_duration(paths["close"])
+            - 2 * preview.XFADE
+        )
         actual = probe_duration(paths["out"])
         assert abs(actual - expected) <= preview.duration_slack(3), (actual, expected)
         assert abs(probe_fps(paths["out"]) - 30) <= 0.02
         assert probe_size(paths["out"]) == (320, 240)
         assert set(stream_types(paths["out"])) == {"video", "audio"}
-        open_d = probe_duration(paths["open"])
+        open_out = probe_duration(paths["open"]) - preview.XFADE
         run_d = probe_duration(paths["preview"])
         checks = [
             (0.2, "blue"),
-            (open_d - 0.08, "blue"),
-            (open_d + 0.15, "red"),
-            (open_d + run_d + 0.15, "yellow"),
+            (open_out - 0.08, "blue"),
+            (open_out + 0.15, "red"),
+            (open_out + run_d + 0.15, "yellow"),
         ]
         for t, color in checks:
             px = pixel(paths["out"], t, 30, 30)
@@ -411,17 +485,17 @@ def test_outlier_is_light_transcoded_and_duration_holds() -> None:
         assert code == 0, text
         assert f"transcode {paths['open']}" in text
         assert f"copy {paths['preview']}" in text
-        assert f"copy {paths['close']}" in text
+        assert f"transcode {paths['close']}" in text and "xfade trim head" in text
         assert str(paths["run_original"]) not in text
         assert "overlay" not in text and "filter_complex" not in text
         assert probe_size(paths["out"]) == (320, 240)
         assert abs(probe_fps(paths["out"]) - 30) <= 0.02
-        expected = sum(probe_duration(paths[name]) for name in ("open", "preview", "close"))
+        expected = sum(probe_duration(paths[name]) for name in ("open", "preview", "close")) - 2 * preview.XFADE
         actual = probe_duration(paths["out"])
         assert abs(actual - expected) <= preview.duration_slack(3), (actual, expected)
-        open_d = probe_duration(paths["open"])
+        open_out = probe_duration(paths["open"]) - preview.XFADE
         run_d = probe_duration(paths["preview"])
-        for t, color in ((0.2, "blue"), (open_d + 0.2, "red"), (open_d + run_d + 0.15, "yellow")):
+        for t, color in ((0.15, "blue"), (open_out + 0.15, "red"), (open_out + run_d + 0.15, "yellow")):
             px = pixel(paths["out"], t, 80, 60)
             assert is_color(px, color), (t, color, px)
 
@@ -444,7 +518,7 @@ def test_sixty_fps_sources_become_thirty() -> None:
         assert str(run) not in text
         assert abs(probe_fps(out) - 30) <= 0.02
         assert is_color(pixel(out, 0.15, 30, 30), "red")
-        expected = probe_duration(preview_path) + probe_duration(close)
+        expected = probe_duration(preview_path) + probe_duration(close) - preview.XFADE
         actual = probe_duration(out)
         assert abs(actual - expected) <= preview.duration_slack(2), (actual, expected)
 
@@ -510,13 +584,104 @@ def test_hevc_open_and_60fps_stats_leave_hud_preview_copied() -> None:
             probe_duration(media / f"{D}-open.mp4")
             + probe_duration(preview_path)
             + probe_duration(stats)
+            - 2 * preview.XFADE
         )
         assert abs(probe_duration(out) - expected) <= preview.duration_slack(3)
-        open_d = probe_duration(media / f"{D}-open.mp4")
+        open_out = probe_duration(media / f"{D}-open.mp4") - preview.XFADE
         run_d = probe_duration(preview_path)
-        for t, color in ((0.15, "blue"), (open_d + 0.2, "red"), (open_d + run_d + 0.12, "yellow")):
+        for t, color in ((0.15, "blue"), (open_out + 0.15, "red"), (open_out + run_d + 0.12, "yellow")):
             px = pixel(out, t, 30, 30)
             assert is_color(px, color), (t, color, px)
+
+
+def write_phone(
+    path: Path,
+    *,
+    color: str,
+    dur: float,
+    codec: str,
+    rate: str,
+    pix_fmt: str,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    video = (
+        ["-c:v", "libx264", "-profile:v", "high", "-preset", "veryfast"]
+        if codec == "h264"
+        else ["-c:v", "libx265", "-preset", "ultrafast", "-tag:v", "hvc1"]
+    )
+    ff(
+        "-f", "lavfi", "-i", f"color=c={color}:s=320x240:r={rate}:d={dur}",
+        "-f", "lavfi", "-i", f"sine=frequency=440:sample_rate=48000:duration={dur}",
+        "-t", f"{dur}",
+        *video,
+        "-pix_fmt", pix_fmt,
+        "-r", rate,
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
+        str(path),
+    )
+
+
+def probe_pix_fmt(path: Path) -> str:
+    return subprocess.check_output(
+        [
+            "ffprobe", "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=pix_fmt", "-of", "default=nw=1:nk=1", str(path),
+        ],
+        text=True,
+    ).strip()
+
+
+def test_real_phone_yuvj420p_ntsc_copies_hud_previews() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        media = Path(td)
+        hud = media / "hud-renders"
+        hud.mkdir()
+        open_path = media / f"{D}-open.mp4"
+        close = media / f"{D}-close.mp4"
+        run_a = media / f"{D}-run-a.mp4"
+        run_b = media / f"{D}-run-b.mp4"
+        prev_a = hud / f"{D}-run-a-hud-preview.mp4"
+        prev_b = hud / f"{D}-run-b-hud-preview.mp4"
+        out = media / f"{D}-review-preview.mp4"
+        write_phone(open_path, color="blue", dur=0.8, codec="hevc", rate="30/1", pix_fmt="yuvj420p")
+        write_phone(close, color="yellow", dur=0.8, codec="hevc", rate="30/1", pix_fmt="yuvj420p")
+        write_phone(run_a, color="green", dur=0.7, codec="h264", rate="30000/1001", pix_fmt="yuvj420p")
+        write_phone(prev_a, color="red", dur=0.7, codec="h264", rate="30000/1001", pix_fmt="yuvj420p")
+        write_phone(run_b, color="green", dur=0.7, codec="h264", rate="30000/1001", pix_fmt="yuvj420p")
+        write_phone(prev_b, color="green", dur=0.7, codec="h264", rate="30000/1001", pix_fmt="yuvj420p")
+        code, text = run_preview(["--media-dir", str(media), "--out", str(out), "--dry-run"])
+        assert code == 0, text
+        assert f"copy {prev_a}" in text and f"copy {prev_b}" in text
+        assert f"transcode {open_path}" in text and f"transcode {close}" in text
+        assert "yuvj420p" in text and "30000/1001" in text
+        assert "29.970" in text
+        assert str(run_a) not in text and str(run_b) not in text
+        assert "filter_complex" not in text and "overlay" not in text
+        code, text = run_preview(["--media-dir", str(media), "--out", str(out)])
+        assert code == 0, text
+        assert probe_pix_fmt(out) == "yuvj420p"
+        assert abs(probe_fps(out) - (30000 / 1001)) <= 0.001
+        expected = (
+            probe_duration(open_path)
+            + probe_duration(prev_a)
+            + probe_duration(prev_b)
+            + probe_duration(close)
+            - 2 * preview.XFADE
+        )
+        actual = probe_duration(out)
+        assert abs(actual - expected) <= preview.duration_slack(4), (actual, expected)
+        open_out = probe_duration(open_path) - preview.XFADE
+        run_a_d = probe_duration(prev_a)
+        run_b_d = probe_duration(prev_b)
+        checks = [
+            (0.12, "blue"),
+            (open_out + 0.12, "red"),
+            (open_out + run_a_d + 0.12, "green"),
+            (open_out + run_a_d + run_b_d + 0.12, "yellow"),
+        ]
+        for t, color in checks:
+            px = pixel(out, t, 30, 30)
+            assert is_color(px, color), (t, color, px, actual)
 
 
 def test_remux_drops_extra_audio_without_reencode() -> None:
@@ -539,12 +704,14 @@ def test_remux_drops_extra_audio_without_reencode() -> None:
         )
         code, text = run_preview(["--media-dir", str(media), "--out", str(out)])
         assert code == 0, text
-        assert f"remux {extra}" in text
+        assert f"transcode {extra}" in text and "xfade trim tail" in text
         assert f"copy {preview_path}" in text
-        assert "libx264" not in text
+        assert "0:a:0" in text
         assert set(stream_types(out)) == {"video", "audio"}
         assert abs(probe_fps(out) - 30) <= 0.02
-        expected = probe_duration(extra) + probe_duration(preview_path) + probe_duration(close)
+        expected = (
+            probe_duration(extra) + probe_duration(preview_path) + probe_duration(close) - 2 * preview.XFADE
+        )
         assert abs(probe_duration(out) - expected) <= preview.duration_slack(3)
 
 
@@ -555,6 +722,8 @@ if __name__ == "__main__":
     test_non_30fps_is_not_stream_copied()
     test_extra_streams_are_remuxed_not_reencoded()
     test_long_hevc_open_does_not_reencode_h264_preview()
+    test_phone_full_range_ntsc_hud_previews_are_copied()
+    test_xfade_trim_does_not_reencode_matching_middle_segments()
     test_audio_mismatch_copies_video()
     test_larger_frame_wins_a_duration_tie()
     test_reject_final_paths()
@@ -566,5 +735,6 @@ if __name__ == "__main__":
     test_sixty_fps_sources_become_thirty()
     test_close_stats_is_the_data_segment()
     test_hevc_open_and_60fps_stats_leave_hud_preview_copied()
+    test_real_phone_yuvj420p_ntsc_copies_hud_previews()
     test_remux_drops_extra_audio_without_reencode()
     print("ok test_preview_concat")

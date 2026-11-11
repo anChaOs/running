@@ -2,8 +2,11 @@
 """把已经渲好的 HUD / 数据图片段接成整条审片预览。
 
 优先 stream copy。只有编码、分辨率、像素格式、帧率或音频对不上时，才按
-preview profile 轻转那一段，然后再 `-c copy` 接起来。保持 30fps。缺 HUD
-preview 就失败，不会退回原片 + alpha 重压。不烧字幕、不修响度。
+preview profile 轻转那一段，然后再 `-c copy` 接起来。30/1 和 30000/1001
+都算 30fps，目标像素格式跟 HUD preview（常见 yuvj420p）走，不把长预览收成
+整数 30 或 yuv420p。open 尾和 close 头按最终成片的 0.2s xfade 剪掉同样的
+时长，中间段不剪、也不做叠化。缺 HUD preview 就失败，不会退回原片 + alpha
+重压。不烧字幕、不修响度。
 """
 
 from __future__ import annotations
@@ -25,12 +28,18 @@ sys.path.insert(0, str(TOOLS_DIR / "subs"))
 
 from export_spec import PREVIEW_SPEC, ExportSpec, video_codec_args
 # 和最终导出用同一套 stats 图片判定，这样「有数据图却没有 close-stats」的失败条件和最终会叠的静帧一致。
-from final_export import RAW_CLIP_PARTS, _one, _stats_files
+# XFADE 只用来对齐时间轴，不在这里重压叠化。
+from final_export import RAW_CLIP_PARTS, XFADE, _one, _stats_files
 from txt_to_subs import parse_txt, write_srt
 
 DATE_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})")
-# Below the final path's 0.2s crossfade, above a frame of mux slack.
+# Mux slack after the xfade trim is already subtracted. Kept under one 0.2s overlap.
 DURATION_SLACK_S = 0.15
+# 30/1 and 30000/1001 are both copy-eligible. They are not the same rate.
+NTSC_30 = 30000 / 1001
+RATE_EPS = 0.001
+PREVIEW_PIX_FMTS = {"yuv420p", "yuvj420p"}
+H264_PROFILES = {"high", "main", "baseline"}
 
 
 @dataclass(frozen=True)
@@ -48,6 +57,7 @@ class StreamInfo:
     n_streams: int
     n_video: int
     n_audio: int
+    fps_rate: str = "30/1"
 
 
 @dataclass(frozen=True)
@@ -69,6 +79,8 @@ class SegmentAction:
     video: str  # copy | encode
     audio: str  # copy | encode
     reason: str
+    trim_start: float = 0.0
+    trim_end: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -79,11 +91,27 @@ class PreviewPlan:
 
     @property
     def expected_duration(self) -> float:
-        return float(sum(self.durations))
+        total = 0.0
+        for duration, action in zip(self.durations, self.actions, strict=True):
+            total += duration - action.trim_start - action.trim_end
+        return total
 
 
 def _is_30(fps: float) -> bool:
-    return abs(fps - 30.0) <= 0.02
+    """True for integer 30/1 and phone 30000/1001. 60fps is not."""
+    return abs(fps - 30.0) <= RATE_EPS or abs(fps - NTSC_30) <= RATE_EPS
+
+
+def _rates_match(left: float, right: float) -> bool:
+    return abs(left - right) <= RATE_EPS
+
+
+def _rate_key(fps: float) -> str:
+    if abs(fps - NTSC_30) <= RATE_EPS:
+        return "30000/1001"
+    if abs(fps - 30.0) <= RATE_EPS:
+        return "30/1"
+    return f"{fps:.3f}"
 
 
 def _parse_rate(value: object) -> float:
@@ -95,6 +123,23 @@ def _parse_rate(value: object) -> float:
         denom = float(den)
         return float(num) / denom if denom else 0.0
     return float(text)
+
+
+def _fps_fields(stream: dict) -> tuple[float, str]:
+    fps = _frame_rate(stream)
+    for key in ("avg_frame_rate", "r_frame_rate"):
+        token = str(stream.get(key) or "")
+        if "/" not in token:
+            continue
+        parsed = _parse_rate(token)
+        if parsed <= 0 or abs(parsed - fps) > RATE_EPS:
+            continue
+        num, den = token.split("/", 1)
+        try:
+            return fps, f"{int(float(num))}/{int(float(den))}"
+        except ValueError:
+            continue
+    return fps, _rate_key(fps)
 
 
 def _frame_rate(stream: dict) -> float:
@@ -128,7 +173,7 @@ def _video_matches(left: StreamInfo, right: StreamInfo) -> bool:
         return False
     if (left.width, left.height) != (right.width, right.height):
         return False
-    if not _is_30(left.fps) or not _is_30(right.fps):
+    if not _is_30(left.fps) or not _is_30(right.fps) or not _rates_match(left.fps, right.fps):
         return False
     if left.profile and right.profile and left.profile != right.profile:
         return False
@@ -159,6 +204,7 @@ def _signature_key(info: StreamInfo) -> tuple:
         info.acodec,
         info.sample_rate,
         info.channels,
+        _rate_key(info.fps),
     )
 
 
@@ -180,8 +226,8 @@ def classify_segment(info: StreamInfo, target: StreamInfo) -> tuple[str, str, st
             reasons.append(f"pix_fmt {info.pix_fmt}!={target.pix_fmt}")
         if info.sar != target.sar:
             reasons.append(f"sar {info.sar}!={target.sar}")
-        if not _is_30(info.fps) or not _is_30(target.fps):
-            reasons.append(f"fps {info.fps:.3f}!=30")
+        if not _rates_match(info.fps, target.fps) or not _is_30(info.fps) or not _is_30(target.fps):
+            reasons.append(f"fps {info.fps:.3f}!={target.fps:.3f}")
         if info.profile and target.profile and info.profile != target.profile:
             reasons.append(f"profile {info.profile}!={target.profile}")
     if not audio_ok:
@@ -196,11 +242,13 @@ def choose_target(infos: list[StreamInfo], durations: list[float]) -> StreamInfo
     """Pick the 30fps signature the long HUD previews can keep.
 
     h264 wins when any 30fps h264 group exists, even if a longer HEVC open is
-    present, so those previews stay stream-copy. Outliers are transcoded to it.
+    present, so those previews stay stream-copy. yuvj420p is eligible and stays
+    distinct from yuv420p: the winning group's own pix_fmt and frame rate
+    (including 30000/1001) become the target. Outliers are transcoded to it.
     """
     groups: dict[tuple, list[tuple[StreamInfo, float]]] = {}
     for info, duration in zip(infos, durations, strict=True):
-        if not (_is_30(info.fps) and info.pix_fmt == "yuv420p" and info.acodec):
+        if not (_is_30(info.fps) and info.pix_fmt in PREVIEW_PIX_FMTS and info.acodec):
             continue
         groups.setdefault(_signature_key(info), []).append((info, duration))
     if not groups:
@@ -211,6 +259,7 @@ def choose_target(infos: list[StreamInfo], durations: list[float]) -> StreamInfo
             height=longest.height,
             pix_fmt="yuv420p",
             fps=30.0,
+            fps_rate="30/1",
             profile="high",
             sar="1:1",
             acodec="aac",
@@ -232,11 +281,36 @@ def choose_target(infos: list[StreamInfo], durations: list[float]) -> StreamInfo
     return pool[best][0][0]
 
 
+def _boundary_trims(
+    index: int,
+    count: int,
+    duration: float,
+    *,
+    has_open: bool,
+    has_close: bool,
+) -> tuple[float, float]:
+    """Match final_export's xfade shortening without restacking the blend.
+
+    The final graph overlaps open into the first run, and the last run into
+    close, by XFADE. Joins between runs do not change duration. Trim those
+    same seconds off the short boundary clips while they are already being
+    lightly transcoded. Leave the long HUD previews untouched.
+    """
+    if count < 2 or duration <= XFADE + 0.05:
+        return 0.0, 0.0
+    trim_end = XFADE if index == 0 and has_open else 0.0
+    trim_start = XFADE if index == count - 1 and has_close else 0.0
+    return trim_start, trim_end
+
+
 def plan_preview(
     segments: list[Path] | tuple[Path, ...],
     infos: list[StreamInfo],
     durations: list[float],
     spec: ExportSpec = PREVIEW_SPEC,
+    *,
+    has_open: bool = False,
+    has_close: bool = False,
 ) -> PreviewPlan:
     if spec.assembly != "concat-copy":
         raise SystemExit("Preview spec must use concat-copy assembly. Review preview does not restack.")
@@ -248,9 +322,25 @@ def plan_preview(
         raise SystemExit("A preview segment has no duration.")
     target = choose_target(list(infos), list(durations))
     actions: list[SegmentAction] = []
-    for source, info in zip(segments, infos, strict=True):
+    count = len(segments)
+    for index, (source, info, duration) in enumerate(zip(segments, infos, durations, strict=True)):
         mode, video, audio, reason = classify_segment(info, target)
-        actions.append(SegmentAction(source, mode, video, audio, reason))
+        trim_start, trim_end = _boundary_trims(
+            index, count, duration, has_open=has_open, has_close=has_close,
+        )
+        if trim_start or trim_end:
+            mode = "transcode"
+            video = "encode"
+            audio = "encode"
+            notes: list[str] = []
+            if trim_end:
+                notes.append(f"xfade trim tail {trim_end:.3f}s")
+            if trim_start:
+                notes.append(f"xfade trim head {trim_start:.3f}s")
+            reason = ", ".join(part for part in (reason, *notes) if part)
+        actions.append(
+            SegmentAction(source, mode, video, audio, reason, trim_start, trim_end)
+        )
     return PreviewPlan(tuple(actions), target, tuple(durations))
 
 
@@ -291,12 +381,14 @@ def probe_streams(path: Path) -> StreamInfo:
     video = videos[0]
     audio = audios[0]
     profile = video.get("profile")
+    fps, fps_rate = _fps_fields(video)
     return StreamInfo(
         vcodec=str(video.get("codec_name") or ""),
         width=int(video.get("width") or 0),
         height=int(video.get("height") or 0),
         pix_fmt=str(video.get("pix_fmt") or ""),
-        fps=_frame_rate(video),
+        fps=fps,
+        fps_rate=fps_rate,
         profile=str(profile).lower() if profile and profile != "N/A" else None,
         sar=_sar(video.get("sample_aspect_ratio")),
         acodec=str(audio.get("codec_name") or "") or None,
@@ -394,7 +486,7 @@ def assert_preview_ready(output: Path, expected_duration: float, segments: int) 
     slack = duration_slack(segments)
     if abs(actual - expected_duration) > slack:
         raise SystemExit(
-            f"Review preview duration {actual:.3f}s != sum of sources {expected_duration:.3f}s "
+            f"Review preview duration {actual:.3f}s != expected cut {expected_duration:.3f}s "
             f"(drift {actual - expected_duration:+.3f}s, slack {slack:.3f}s). "
             "Refusing a drifted preview."
         )
@@ -411,7 +503,7 @@ def format_plan(plan: PreviewPlan) -> str:
         "preview assembly=concat-copy "
         f"segments={len(plan.actions)} "
         f"target={target.vcodec} {target.width}x{target.height} "
-        f"{target.fps:.3f}fps {target.acodec} "
+        f"{target.fps:.3f}fps {target.pix_fmt} profile={target.profile or '-'} {target.acodec} "
         f"duration={plan.expected_duration:.3f}",
     ]
     for action in plan.actions:
@@ -447,8 +539,17 @@ def concat_list_text(paths: list[Path]) -> str:
     return "".join(lines)
 
 
-def _video_filters(info: StreamInfo, target: StreamInfo) -> list[str]:
+def _rate_token(target: StreamInfo) -> str:
+    return target.fps_rate or _rate_key(target.fps)
+
+
+def _video_filters(info: StreamInfo, target: StreamInfo, action: SegmentAction, duration: float) -> list[str]:
     filters: list[str] = []
+    if action.trim_start or action.trim_end:
+        end = duration - action.trim_end
+        filters.append(
+            f"trim=start={action.trim_start:.6f}:end={end:.6f},setpts=PTS-STARTPTS"
+        )
     if (info.width, info.height) != (target.width, target.height):
         width, height = target.width, target.height
         filters.append(
@@ -457,8 +558,8 @@ def _video_filters(info: StreamInfo, target: StreamInfo) -> list[str]:
         )
     elif info.sar != "1:1":
         filters.append("setsar=1")
-    if not _is_30(info.fps):
-        filters.append("fps=30")
+    if not _rates_match(info.fps, target.fps):
+        filters.append(f"fps={_rate_token(target)}")
     return filters
 
 
@@ -483,7 +584,10 @@ def _video_encode_args(target: StreamInfo, spec: ExportSpec) -> list[str]:
             "Stream-copy needs matching codecs. "
             "Review preview does not restack originals and HUD alpha."
         )
-    return video_codec_args(spec)
+    args = video_codec_args(spec)
+    if target.profile in H264_PROFILES:
+        args.extend(["-profile:v", target.profile])
+    return args
 
 
 def build_normalize_cmd(
@@ -491,6 +595,7 @@ def build_normalize_cmd(
     action: SegmentAction,
     dest: Path,
     target: StreamInfo,
+    duration: float,
     spec: ExportSpec = PREVIEW_SPEC,
 ) -> list[str]:
     cmd = ["ffmpeg", "-y", "-nostdin", "-hide_banner", "-i", str(action.source)]
@@ -502,21 +607,28 @@ def build_normalize_cmd(
             "-movflags", "+faststart",
             str(dest),
         ]
-    filters = _video_filters(info, target) if action.video == "encode" else []
+    filters = _video_filters(info, target, action, duration) if action.video == "encode" else []
     if filters:
         cmd.extend(["-vf", ",".join(filters)])
     cmd.extend(["-map", "0:v:0", "-map", "0:a:0"])
     if action.video == "encode":
         cmd.extend(_video_encode_args(target, spec))
-        cmd.extend(["-pix_fmt", target.pix_fmt or "yuv420p"])
-        if not _is_30(info.fps):
-            cmd.extend(["-r", "30"])
+        cmd.extend(["-pix_fmt", target.pix_fmt or "yuv420p", "-r", _rate_token(target)])
     else:
         cmd.extend(["-c:v", "copy"])
     if action.audio == "encode":
+        if action.trim_start or action.trim_end:
+            end = duration - action.trim_end
+            cmd.extend([
+                "-af",
+                f"atrim=start={action.trim_start:.6f}:end={end:.6f},asetpts=PTS-STARTPTS",
+            ])
         cmd.extend(_audio_encode_args(target, spec))
     else:
         cmd.extend(["-c:a", "copy"])
+    if action.trim_start or action.trim_end:
+        kept = duration - action.trim_start - action.trim_end
+        cmd.extend(["-t", f"{kept:.6f}"])
     cmd.extend(["-movflags", "+faststart", str(dest)])
     return cmd
 
@@ -546,7 +658,14 @@ def commands_for_plan(
         if action.mode == "copy":
             continue
         commands.append(
-            build_normalize_cmd(info, action, normalized_path(work_dir, index, action.source), plan.target, spec)
+            build_normalize_cmd(
+                info,
+                action,
+                normalized_path(work_dir, index, action.source),
+                plan.target,
+                plan.durations[index],
+                spec,
+            )
         )
     commands.append(build_concat_cmd(list_path, output))
     return commands
@@ -614,7 +733,14 @@ def main(argv: list[str] | None = None) -> int:
     segments = list(cut.segments)
     infos = [probe_streams(path) for path in segments]
     durations = [probe_duration(path) for path in segments]
-    plan = plan_preview(segments, infos, durations, PREVIEW_SPEC)
+    plan = plan_preview(
+        segments,
+        infos,
+        durations,
+        PREVIEW_SPEC,
+        has_open=cut.open_clip is not None,
+        has_close=cut.close_clip is not None,
+    )
     subtitles = Path(args.subtitles).expanduser().resolve() if args.subtitles else None
     if subtitles is not None and not subtitles.is_file():
         raise SystemExit(f"subtitles not found: {subtitles}")

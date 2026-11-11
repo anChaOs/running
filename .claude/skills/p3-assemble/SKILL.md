@@ -30,9 +30,9 @@ description: 把已经渲好的 HUD / 数据图片段接成整条审片预览（
   --out ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4
 ```
 
-编码：各段的视频编码、分辨率、像素格式、音频参数一致，并且已经是 30fps 时，整段 stream copy，再 `-c copy` 接起来。只有对不上的段才按 `tools/export-spec.json` 的 preview profile（libx264 veryfast crf 23、AAC 128k）轻转，转完仍是 `-c copy` 拼接。多出来的音轨或数据轨只做 remux，不重编码。保持 30fps，不降分辨率。手机 open 常是 HEVC，`overlay_close_stats.py` 的数据图段是 60fps HEVC，这两段会对不上 HUD preview，只转它们；已经是 30fps H.264 的 HUD preview 不再编码。
+编码：目标跟 HUD preview 走。手机 HUD preview 常见是 H.264 High、`yuvj420p`、`30000/1001`（29.97）。`yuvj420p` 和 `yuv420p` 都能当拷贝目标，但互不相等，以 preview 自己的像素格式为准。`30/1` 和 `30000/1001` 都算 30fps，不要为了收成整数 30 去重编码长 preview。整数 30 的 HEVC open/close 轻转到这个目标（含帧率和像素格式）后再 `-c copy`。只有编码、分辨率、像素格式、帧率或音频对不上的段才按 `tools/export-spec.json` 的 preview profile（libx264 veryfast crf 23、AAC 128k）轻转。多出来的音轨或数据轨只做 remux，不重编码。不降分辨率。`overlay_close_stats.py` 的数据图段是 60fps HEVC，对不上就只转它。
 
-预览不做叠化。时长等于 open + 各段 HUD preview + close 或数据图段之和，字幕时间不用改。不烧字幕、不做最终响度。字幕还没写就不要传 `--subtitles`。已经有 `subtitles.txt`、想让 IINA 自动挂时：
+时长对齐最终成片的 xfade，不做叠化。`final_export.py` 在 open→第一段跑、最后一段跑→close 各叠 0.2s，时间轴因此各短 0.2s；段与段之间不缩短。预览在这两处已经要轻转的短段上剪掉同样的 0.2s（open 的尾、close 或数据图段的头），中间的 HUD preview 继续 stream copy，然后硬切。字幕按秒，不用改。和最终成片比，剩下的差只是 HUD preview 比原始 run 多出来的帧（通常每段约 1 帧）。不烧字幕、不做最终响度。字幕还没写就不要传 `--subtitles`。已经有 `subtitles.txt`、想让 IINA 自动挂时：
 
 ```bash
 .venv/bin/python tools/assemble/preview_episode.py \
