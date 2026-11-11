@@ -65,6 +65,10 @@ MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间�
 
 ingest `--apply` 会直接跑粗剪 `--apply`。已经收过的素材，单独跑上面这条。
 
+## 记日志
+
+`ingest_run_media.py --apply` 会写 `ingest`（不加 `--apply` 不写）。脚本已写就不要再记一条。单独重跑、脚本没写上时，用 `tools/log_timeline.py` 补 `START`/`END`；失败用 `fail`。
+
 ## 完成
 
 - 媒体目录有 `open` / `run-*` / `close` / `*-run-data.fit`；open/close 若粗剪过，另有 `*-raw.mp4`

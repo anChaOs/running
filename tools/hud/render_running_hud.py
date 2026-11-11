@@ -22,6 +22,7 @@ except ImportError:  # 运行时由仓库 .venv 提供；静态检查环境可�
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export_spec import PREVIEW_SPEC, video_codec_args
+import log_timeline
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 HUD_DIR = Path(__file__).resolve().parent
@@ -405,6 +406,16 @@ def render_one_clip(
 
 
 def main() -> int:
+    args = _parse_args()
+    if args.preview:
+        args.overlay_only = True
+    media_dir = Path(args.media_dir).expanduser()
+    with log_timeline.span(media_dir, "hud-render", enabled=not args.dry_run) as wall:
+        wall.rc = _render_main(args)
+        return wall.rc
+
+
+def _parse_args():
     parser = argparse.ArgumentParser(
         description="Render running HUDs automatically with gopro-dashboard-overlay."
     )
@@ -473,10 +484,10 @@ def main() -> int:
         default=2,
         help="Parallel clip renders (default: 2). Use 1 for serial.",
     )
-    args = parser.parse_args()
-    if args.preview:
-        args.overlay_only = True
+    return parser.parse_args()
 
+
+def _render_main(args) -> int:
     gopro_python = REPO_ROOT / ".venv" / "bin" / "python"
     gopro_dashboard = Path(__file__).resolve().parent / "gopro_dashboard_wrap.py"
     if not gopro_python.exists():

@@ -64,6 +64,6 @@ p3-library / p3-topic / p3-scaffold
   → archive（满 7 天）
 ```
 
-推荐墙钟：`assemble`（整条轻量预览）→ `subs` → `final_export` → `publish`。最终导出前不单独烧字或补响度；详见 `p3-assemble`。
+推荐墙钟：`assemble`（整条轻量预览）→ `subs` → `final_export` → `publish`。最终导出前不单独烧字或补响度；详见 `p3-assemble`。每步墙钟追加到媒体目录 `logs/timeline.txt`（硬规则在 `p3-episode`）。官方脚本会写；没写上的用 `tools/log_timeline.py`。
 
 任意一步都可以停。改字幕只改 `subtitles.txt`，再生成媒体 SRT，不用重拼。改 `-sk` 要重渲 HUD 再拼。

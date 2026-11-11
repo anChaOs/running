@@ -26,6 +26,9 @@ import shutil
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import log_timeline  # noqa: E402
+
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
 
 REPO = Path(__file__).resolve().parents[2]
@@ -257,7 +260,12 @@ def main() -> int:
     ap.add_argument("--title-color", default="255,255,255", help="封面句颜色 R,G,B（默认白，配深描边）")
     ap.add_argument("--prefix", default="", help="出候选时加前缀，如 cover-candidates/b-")
     args = ap.parse_args()
+    with log_timeline.span(Path(args.out_dir).expanduser(), "cover") as wall:
+        wall.rc = _compose(args)
+        return wall.rc
 
+
+def _compose(args) -> int:
     out = Path(args.out_dir).expanduser()
     work = out / "cover-work"
     work.mkdir(parents=True, exist_ok=True)

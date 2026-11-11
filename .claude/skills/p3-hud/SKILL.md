@@ -79,6 +79,10 @@ weather-hourly.json
 
 多段 `run-*` 默认 `--jobs 2` 并行渲（可改；`-j 1` 串行）；失败看 `hud-renders/*-hud-render.log` 定位哪条 clip。整条审片预览由 `/p3-assemble` 从原片和 alpha 一次生成；`*-hud-preview.mp4` 只用于单段检查。最终导出使用原片和 `*-hud-alpha.mov`。`--preview` 先渲透明层，再按 preview profile 生成单段检查文件，alpha 是最终导出的中间层。不走剪映可以不理 alpha。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
 
+## 记日志
+
+`render_running_hud.py` 正式渲染会写 `hud-render`（含并行 clip 的实际墙钟；`--dry-run` 不写）。脚本已写就不要再记。失败由脚本写 `FAIL`。
+
 ## 完成
 
 `assets.md`：`hud: done`（记下 `-sn` / `-sk`）。`episode.md` 改为 `hud`。

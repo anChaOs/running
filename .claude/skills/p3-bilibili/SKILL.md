@@ -85,6 +85,10 @@ biliup -u "$COOKIE" upload \
 - cookie 失效 → `login` / `renew` 后再传
 - 客户端提交失效 → biliup 常自动改走 APP；仍失败再查版本（`biliup -V`）
 
+## 记日志
+
+biliup 没有仓库挂钩。投稿前 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start bilibili-upload`，成功把 `start` 换成 `end`，失败用 `fail`。已有这条就不要再记一条。
+
 ## 成功后
 
 1. 把 `https://www.bilibili.com/video/BV…` 写入该期 `episode.md`「发布」栏「Bilibili：」（YouTube 仍空则 **不要** 改 `published`）

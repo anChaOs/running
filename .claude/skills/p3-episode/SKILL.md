@@ -50,7 +50,11 @@ review-preview
 
 **人工字幕门闩不能跳过：** `subtitles.txt` 是唯一源稿。用户确认前保持 `subs: waiting-review`，不能最终导出；用户确认后才写 `subs: done`，再执行 `final_export.py --confirmed`。
 
-**耗时记录：** 每个 stage 当时把开始、结束、耗时、成功或失败追加到媒体目录 `logs/timeline.txt`（Asia/Shanghai）；失败再记 `logs/failures.md`。并行步的墙钟以实际总耗时为准。
+**墙钟日志（硬规则）：** 媒体目录 `logs/timeline.txt`，Asia/Shanghai，`YYYY-MM-DD HH:MM:SS`（不知道秒就不要编）。只追加，不改旧行。`START` / `END` / `FAIL` 各一行；`elapsed` 是这一步的墙钟，并行步不要把子步相加。失败再追加 `logs/failures.md`。没有该步的 `START` 和 `END`（或 `FAIL`）就不算做完。官方脚本会自己写；否则用 `tools/log_timeline.py`：
+
+`.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start|end|fail <step>`
+
+步名：`scaffold` `ingest` `shoes` `cover` `hud-render` `review-preview` `draft-subs` `force-align` `final-export` `pack-upload` `drive-stage` `youtube-upload` `bilibili-upload` `published`。重试是新行。`p3-scaffold` 建期时就建 `logs/`，不要拖到最终导出。`p3-qc` 抽帧不单记一步。
 
 ## 目标与前置
 

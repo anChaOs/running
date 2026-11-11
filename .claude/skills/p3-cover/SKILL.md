@@ -70,6 +70,10 @@ cover-candidates/            # 仅在主推/备选需要并排时用
 - 不要用糊帧、运动模糊的图当人物素材
 - 不要为了换封面去重渲 HUD
 
+## 记日志
+
+`compose_cover.py` 会写 `cover`。脚本已写就不要再记一条。整段手做、没跑脚本时，用 `tools/log_timeline.py` 补 `START`/`END`；失败用 `fail`。
+
 ## 完成后
 
 用户只是要换封面句：停在这里，不用重拼成片。

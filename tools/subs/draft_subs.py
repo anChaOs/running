@@ -18,7 +18,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import log_timeline  # noqa: E402
 import subs_core as sc  # noqa: E402
 
 MIN_DUR = 1.0
@@ -169,7 +171,21 @@ def main() -> int:
     ap.add_argument("--words-cache")
     ap.add_argument("--force", action="store_true", help="txt 已存在也覆盖（默认拒绝，防止冲掉人手改的字）")
     args = ap.parse_args()
+    media_dir = _media_dir_from_audio(Path(args.audio))
+    with log_timeline.span(media_dir, "draft-subs") as wall:
+        wall.rc = _draft(args)
+        return wall.rc
 
+
+def _media_dir_from_audio(audio: Path) -> Path:
+    """wav 在 <media>/asr/，成片 mp4 在 <media>/。不另起一套目录。"""
+    path = audio.expanduser()
+    if path.parent.name == "asr":
+        return path.parent.parent
+    return path.parent
+
+
+def _draft(args) -> int:
     txt = Path(args.txt).expanduser()
     if txt.exists() and not args.force:
         raise SystemExit(f"{txt} 已存在。人手改过的字不要被初稿冲掉；确实要重来加 --force。")

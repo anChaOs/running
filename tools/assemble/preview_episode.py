@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import final_export as final
+import log_timeline
 from export_spec import PREVIEW_SPEC
 
 
@@ -43,8 +44,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
-
     media_dir = Path(args.media_dir).expanduser().resolve()
+    with log_timeline.span(media_dir, "review-preview", enabled=not args.dry_run) as wall:
+        wall.rc = _preview(args, media_dir)
+        return wall.rc
+
+
+def _preview(args, media_dir: Path) -> int:
     sources = discover(media_dir)
     durations = [final.probe_duration(path) for path in sources.clips]
     date = sources.clips[0].name[:10]

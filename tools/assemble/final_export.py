@@ -21,6 +21,7 @@ SUBS_DIR = TOOLS_DIR / "subs"
 sys.path.insert(0, str(TOOLS_DIR))
 sys.path.insert(0, str(SUBS_DIR))
 
+import log_timeline
 from export_spec import (
     FINAL_SPEC,
     ExportSpec,
@@ -433,7 +434,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--test-codec", choices=("libx264",), help="仅隔离测试使用")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    media_dir = Path(args.media_dir).expanduser().resolve()
+    with log_timeline.span(media_dir, "final-export", enabled=not args.dry_run) as wall:
+        wall.rc = _export_episode(args)
+        return wall.rc
 
+
+def _export_episode(args) -> int:
     media_dir = Path(args.media_dir).expanduser().resolve()
     episode_dir = Path(args.episode_dir).expanduser().resolve()
     subtitles = Path(args.subtitles).expanduser().resolve() if args.subtitles else episode_dir / "subtitles.txt"

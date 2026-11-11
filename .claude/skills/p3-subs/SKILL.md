@@ -172,6 +172,10 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 - 禁止把「破三实验室」等**频道名**当标签；「破三」这类主题词可用。
 - 抖音仍 ≤5；B 站 / YouTube **不受抖音 5 条上限**，但也不要超过 8。
 
+## 记日志
+
+`draft_subs.py` 写 `draft-subs`，`force_align.py` 写 `force-align`。脚本已写就不要再记。没跑这两个脚本的手做步骤，用 `tools/log_timeline.py` 补；失败用 `fail`。
+
 ## 完成后
 
 分两段说，不要把「等人改」和「对口型」混在一次里。
