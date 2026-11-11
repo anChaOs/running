@@ -238,33 +238,49 @@ def classify_segment(info: StreamInfo, target: StreamInfo) -> tuple[str, str, st
     return "transcode", "copy" if video_ok else "encode", "copy" if audio_ok else "encode", ", ".join(reasons)
 
 
-def choose_target(infos: list[StreamInfo], durations: list[float]) -> StreamInfo:
-    """Pick the 30fps signature the long HUD previews can keep.
+def _is_hud_preview(path: Path) -> bool:
+    return path.name.endswith("-hud-preview.mp4") and "hud-renders" in path.parts
 
-    h264 wins when any 30fps h264 group exists, even if a longer HEVC open is
-    present, so those previews stay stream-copy. yuvj420p is eligible and stays
-    distinct from yuv420p: the winning group's own pix_fmt and frame rate
-    (including 30000/1001) become the target. Outliers are transcoded to it.
+
+def choose_target(
+    segments: list[Path] | tuple[Path, ...],
+    infos: list[StreamInfo],
+    durations: list[float],
+) -> StreamInfo:
+    """Copy target is the HUD preview group's own pix_fmt and frame rate.
+
+    Only hud-renders/*-hud-preview.mp4 segments vote. A longer h264 open or
+    close, even at a different pix_fmt or 30/1 vs 30000/1001, does not outrank
+    them. yuvj420p stays distinct from yuv420p. Ineligible HUD previews (for
+    example 60fps) do not hand the target to open/close; those outliers are
+    transcoded to a 30fps h264 preview profile at the HUD preview's size.
     """
+    hud = [index for index, path in enumerate(segments) if _is_hud_preview(path)]
+    if not hud:
+        raise SystemExit(
+            "Review preview has no HUD preview segment to take a copy target from. "
+            "Review preview does not restack originals and HUD alpha."
+        )
     groups: dict[tuple, list[tuple[StreamInfo, float]]] = {}
-    for info, duration in zip(infos, durations, strict=True):
+    for index in hud:
+        info = infos[index]
         if not (_is_30(info.fps) and info.pix_fmt in PREVIEW_PIX_FMTS and info.acodec):
             continue
-        groups.setdefault(_signature_key(info), []).append((info, duration))
+        groups.setdefault(_signature_key(info), []).append((info, durations[index]))
     if not groups:
-        longest = max(zip(infos, durations, strict=True), key=lambda item: item[1])[0]
+        anchor = infos[max(hud, key=lambda index: durations[index])]
         return StreamInfo(
             vcodec="h264",
-            width=longest.width,
-            height=longest.height,
+            width=anchor.width,
+            height=anchor.height,
             pix_fmt="yuv420p",
             fps=30.0,
             fps_rate="30/1",
             profile="high",
             sar="1:1",
             acodec="aac",
-            sample_rate=longest.sample_rate or PREVIEW_SPEC.timeline.sample_rate,
-            channels=longest.channels or 2,
+            sample_rate=anchor.sample_rate or PREVIEW_SPEC.timeline.sample_rate,
+            channels=anchor.channels or 2,
             n_streams=2,
             n_video=1,
             n_audio=1,
@@ -320,7 +336,7 @@ def plan_preview(
         raise SystemExit("Preview plan inputs do not line up.")
     if any(duration <= 0 for duration in durations):
         raise SystemExit("A preview segment has no duration.")
-    target = choose_target(list(infos), list(durations))
+    target = choose_target(segments, list(infos), list(durations))
     actions: list[SegmentAction] = []
     count = len(segments)
     for index, (source, info, duration) in enumerate(zip(segments, infos, durations, strict=True)):
@@ -430,21 +446,29 @@ def _find_close(media_dir: Path, stats: tuple[Path, ...]) -> Path | None:
         ],
         "close",
     )
-    if close_stats is not None:
-        return close_stats
-    if not stats:
-        return close_raw
-    names = ", ".join(path.name for path in stats)
-    if close_raw is None:
+    if stats:
+        if close_stats is not None:
+            return close_stats
+        names = ", ".join(path.name for path in stats)
+        if close_raw is None:
+            raise SystemExit(
+                f"Stats images are present ({names}) but there is no close or close-stats segment. "
+                "Review preview does not restack stats onto another clip."
+            )
         raise SystemExit(
-            f"Stats images are present ({names}) but there is no close or close-stats segment. "
-            "Review preview does not restack stats onto another clip."
+            f"Stats images are present ({names}) but no rendered close-stats segment. "
+            "Render the 数据图 segment with tools/assemble/overlay_close_stats.py first. "
+            "Review preview does not restack close and stats."
         )
-    raise SystemExit(
-        f"Stats images are present ({names}) but no rendered close-stats segment. "
-        "Render the 数据图 segment with tools/assemble/overlay_close_stats.py first. "
-        "Review preview does not restack close and stats."
-    )
+    if close_raw is not None:
+        return close_raw
+    if close_stats is not None:
+        raise SystemExit(
+            f"No stats images, so {close_stats.name} is not a preview segment, "
+            "and there is no original close clip. "
+            "Review preview does not restack."
+        )
+    return None
 
 
 def discover_preview_cut(media_dir: Path) -> PreviewCut:

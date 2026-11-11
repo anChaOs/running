@@ -258,6 +258,31 @@ def test_long_hevc_open_does_not_reencode_h264_preview() -> None:
     assert "libx264" in cmd and "overlay" not in cmd and "filter_complex" not in cmd
 
 
+def test_long_h264_open_does_not_outrank_hud_previews() -> None:
+    """A longer yuv420p 30/1 open must not become the copy target over HUD previews."""
+    ntsc = 30000 / 1001
+    boundary = stream(pix_fmt="yuv420p", fps=30.0, profile="high")
+    hud = stream(pix_fmt="yuvj420p", fps=ntsc, profile="high")
+    segments = [
+        Path("/media/2026-01-02-open.mp4"),
+        Path("/media/hud-renders/2026-01-02-run-a-hud-preview.mp4"),
+        Path("/media/hud-renders/2026-01-02-run-b-hud-preview.mp4"),
+        Path("/media/2026-01-02-close.mp4"),
+    ]
+    plan = preview.plan_preview(
+        segments, [boundary, hud, hud, boundary], [500.0, 40.0, 40.0, 200.0],
+    )
+    assert plan.target.pix_fmt == "yuvj420p"
+    assert plan.target.vcodec == "h264"
+    assert plan.target.fps_rate == "30000/1001"
+    assert abs(plan.target.fps - ntsc) <= 0.001
+    assert [action.mode for action in plan.actions] == ["transcode", "copy", "copy", "transcode"]
+    assert "yuv420p!=yuvj420p" in plan.actions[0].reason
+    assert "30.000!=29.970" in plan.actions[0].reason
+    assert plan.actions[1].source.name.endswith("-hud-preview.mp4")
+    assert plan.actions[2].mode == "copy"
+
+
 def test_phone_full_range_ntsc_hud_previews_are_copied() -> None:
     """yuvj420p + 30000/1001 HUD previews stay copy. HEVC 30/1 open/close transcode onto them."""
     ntsc = 30000 / 1001
@@ -386,6 +411,37 @@ def test_missing_close_stats_fails_without_restack() -> None:
         (media / f"{D}-stats-01.png").touch()
         expect_exit(lambda: preview.discover_preview_cut(media), "overlay_close_stats.py")
         expect_exit(lambda: preview.discover_preview_cut(media), "does not restack")
+
+
+def test_leftover_close_stats_without_stills_uses_raw_close() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        media = Path(td)
+        hud = media / "hud-renders"
+        hud.mkdir()
+        (media / f"{D}-run-a.mp4").touch()
+        (hud / f"{D}-run-a-hud-preview.mp4").touch()
+        raw = media / f"{D}-close.mp4"
+        leftover = media / f"{D}-close-stats.mp4"
+        raw.touch()
+        leftover.touch()
+        cut = preview.discover_preview_cut(media)
+        assert cut.close_clip == raw
+        assert leftover not in cut.segments
+        plan = preview.plan_preview(
+            cut.segments,
+            [stream(), stream()],
+            [4.0, 2.0],
+            has_close=cut.close_clip is not None,
+        )
+        assert [path.name for path in cut.segments] == [
+            f"{D}-run-a-hud-preview.mp4",
+            f"{D}-close.mp4",
+        ]
+        assert plan.actions[-1].source == raw
+        assert "close-stats" not in plan.actions[-1].source.name
+        raw.unlink()
+        expect_exit(lambda: preview.discover_preview_cut(media), "not a preview segment")
+        expect_exit(lambda: preview.discover_preview_cut(media), leftover.name)
 
 
 def test_orphan_preview_is_not_a_segment() -> None:
@@ -573,6 +629,7 @@ def test_hevc_open_and_60fps_stats_leave_hud_preview_copied() -> None:
         write_clip(run, color="green", dur=1.0)
         write_clip(preview_path, color="red", dur=1.0)
         write_hevc(stats, color="yellow", dur=0.6, fps=60)
+        (media / f"{D}-stats-01.png").touch()
         code, text = run_preview(["--media-dir", str(media), "--out", str(out)])
         assert code == 0, text
         assert f"copy {preview_path}" in text
@@ -722,6 +779,7 @@ if __name__ == "__main__":
     test_non_30fps_is_not_stream_copied()
     test_extra_streams_are_remuxed_not_reencoded()
     test_long_hevc_open_does_not_reencode_h264_preview()
+    test_long_h264_open_does_not_outrank_hud_previews()
     test_phone_full_range_ntsc_hud_previews_are_copied()
     test_xfade_trim_does_not_reencode_matching_middle_segments()
     test_audio_mismatch_copies_video()
@@ -729,6 +787,7 @@ if __name__ == "__main__":
     test_reject_final_paths()
     test_missing_hud_preview_fails_without_restack()
     test_missing_close_stats_fails_without_restack()
+    test_leftover_close_stats_without_stills_uses_raw_close()
     test_orphan_preview_is_not_a_segment()
     test_concat_copy_keeps_duration_fps_and_pictures()
     test_outlier_is_light_transcoded_and_duration_holds()
