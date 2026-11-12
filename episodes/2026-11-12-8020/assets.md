@@ -55,7 +55,7 @@
 - preview: done（`2026-11-12-review-preview.mp4` 19:12.75，墙钟 1m17s；run-a..e stream copy，open / close-stats 轻转并剪 0.2s xfade）
 - qc: done（抽帧核过 open 开头、open→run、跑中 HUD、run-e→close、close 数据图两张与结尾）
 - subs: done（368 条已对口型并经用户确认；外挂已写入媒体目录 subtitles.srt 与 2026-11-12-review-preview.srt）
-- loudness: pending
+- loudness: done（final_export 一次编码内的 loudnorm；pass 1 因只 map [a] 绑定失败 rc=234，实际为单次 dynamic，output_i=-15.91 TP=-1.50）
 - burn: deprecated
-- final: pending
+- final: done（`2026-11-12-run-final.mp4` 1152.600s / 34578 帧，3.8GiB；含 run-e 16周图与 close 数据图；未烧硬字幕，外挂 subtitles.srt 与 2026-11-12-run-final.srt；截断的第一次导出留在 2026-11-12-run-final-truncated.mp4）
 - upload: pending
