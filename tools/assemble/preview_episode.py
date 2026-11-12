@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""把已经渲好的 HUD / 数据图片段接成整条审片预览。
+"""审片预览。有 logs/program.json 时写 mpv EDL，不拼预览成片。
 
-优先 stream copy。只有编码、分辨率、像素格式、帧率或音频对不上时，才按
-preview profile 轻转那一段，然后再 `-c copy` 接起来。30/1 和 30000/1001
-都算 30fps，目标像素格式跟 HUD preview（常见 yuvj420p）走，不把长预览收成
-整数 30 或 yuv420p。open 尾和 close 头按最终成片的 0.2s xfade 剪掉同样的
-时长，中间段不剪、也不做叠化。缺 HUD preview 就失败，不会退回原片 + alpha
-重压。不烧字幕、不修响度。
+播放清单按时间表的入点和时长直接播原片。冷开场和 close 的 0.2s xfade
+只从非跑步那一侧扣掉，不做叠化；跑步段之间的风刮不扣。不渲 HUD，不重编码，
+不烧字幕，不修响度。
+
+没有这张表时，才把已经渲好的 HUD / 数据图片段接成一条 mp4：格式一致则
+stream copy，对不上的段才按 preview profile 轻转。缺 HUD preview 就失败，
+不会退回原片 + alpha 重压。
 """
 
 from __future__ import annotations
@@ -18,7 +19,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -509,38 +509,10 @@ def duration_slack(segments: int) -> float:
     return min(DURATION_SLACK_S, 0.06 + 0.01 * segments)
 
 
-# 输入 seek + stream copy 的起点落在前一个关键帧。手机 HEVC 的 GOP 常见 1–8 秒，
-# 每段都可能比时间表长这么多。偏长是预期，不因此改回重编码。
-# 偏短才当丢段：copy 的 -to 只在包边界上少一点点。
-COPY_PREVIEW_GOP_SLACK_S = 8.0
-COPY_PREVIEW_SHORT_FRAME_S = 0.05
-
-
-def program_preview_duration_bounds(expected_duration: float, segments: int) -> tuple[float, float]:
-    """copy 预览允许的时长区间（含端点外的拒绝线，调用方用开区间比较）。"""
-    count = max(int(segments), 1)
-    short_slack = max(1.5, COPY_PREVIEW_SHORT_FRAME_S * count)
-    long_slack = COPY_PREVIEW_GOP_SLACK_S * count
-    return expected_duration - short_slack, expected_duration + long_slack
-
-
-def assert_program_preview_duration(output: Path, expected_duration: float, segments: int) -> None:
-    """copy 预览会比时间表长一个关键帧量级。明显偏短才拒绝，不为帧精确重编码。"""
-    actual = probe_duration(output)
-    low, high = program_preview_duration_bounds(expected_duration, segments)
-    drift = actual - expected_duration
-    if actual < low or actual > high:
-        raise SystemExit(
-            f"Review preview duration {actual:.3f}s != program timeline {expected_duration:.3f}s "
-            f"(drift {drift:+.3f}s, allowed {low - expected_duration:+.3f}..{high - expected_duration:+.3f}s). "
-            "Copy cuts land on the previous keyframe and may run long. "
-            "A short preview means a segment was dropped. Do not re-encode to chase frame accuracy."
-        )
-    if abs(drift) > 0.25:
-        print(
-            f"preview duration {actual:.3f}s vs timeline {expected_duration:.3f}s "
-            f"(drift {drift:+.3f}s, keyframe seek, not re-encoded)"
-        )
+# 播放清单的虚拟时长必须贴着时间表。远小于一次 0.2s xfade，更不能吃进关键帧预卷。
+PLAYLIST_DURATION_SLACK_S = 0.001
+# mpv EDL v0：裸值不能含这些字符。开头的 % # ! 也会被解析成转义、注释或头。
+_EDL_BARE_BREAKS = frozenset(",;\n!")
 
 
 def assert_preview_ready(output: Path, expected_duration: float, segments: int) -> None:
@@ -768,90 +740,124 @@ def execute_plan(
 
 
 def write_subtitle_sidecar(subtitles: Path, output: Path) -> Path:
-    """Write an unchanged-time SRT next to the preview. Do not burn it in."""
+    """外挂 SRT 写在播放清单旁边。时间沿用 subtitles.txt 的成片轴，不烧进画面。"""
     dest = output.with_suffix(".srt")
     write_srt(dest, parse_txt(subtitles))
     print(f"sidecar={dest}")
     return dest
 
 
-PREVIEW_COPY_JOBS = 4
+def preview_play_span(action: dict) -> tuple[float, float]:
+    """这一段在原片上的入点和时长。风刮不缩短，关键帧预卷不算进来。"""
+    start = float(action["src_start_s"]) + float(action.get("trim_head_s") or 0.0)
+    end = float(action["src_end_s"]) - float(action.get("trim_tail_s") or 0.0)
+    return start, end - start
 
 
-def program_preview_part(work_dir: Path, index: int, clip: str) -> Path:
-    return work_dir / f"{index:04d}-{Path(clip).stem}.mp4"
+def quote_mpv_edl_value(value: str) -> str:
+    """mpv EDL v0 的参数值。特殊字符用 %字节数% 原文，长度按 UTF-8 字节计。"""
+    if not value or value[0] in "%#!" or any(ch in _EDL_BARE_BREAKS for ch in value):
+        raw = value.encode("utf-8")
+        return f"%{len(raw)}%{value}"
+    return value
 
 
-def copy_range_command(source: Path, dest: Path, start: float, end: float) -> list[str]:
-    """输入 seek 后 stream copy 这一段。-ss 和 -to 都在 -i 前面，不从文件头解码。"""
-    return [
-        "ffmpeg", "-y", "-nostdin", "-hide_banner",
-        "-ss", f"{start:.6f}",
-        "-to", f"{end:.6f}",
-        "-i", str(source),
-        "-map", "0:v:0",
-        "-map", "0:a:0",
-        "-c", "copy",
-        "-avoid_negative_ts", "make_zero",
-        str(dest),
-    ]
+def format_mpv_edl_time(seconds: float) -> str:
+    return f"{seconds:.6f}"
 
 
-def build_program_preview_commands(
-    actions: list[dict],
-    sources: dict[str, Path],
-    output: Path,
-    work_dir: Path,
-) -> list[list[str]]:
-    """按时间表把留下的区间拷出来再接成一条。不重编码，不烧字幕，不修响度。"""
-    list_path = work_dir / "concat.txt"
-    commands: list[list[str]] = []
-    for index, action in enumerate(actions):
+def mpv_edl_text(rows: list[tuple[str, float, float]]) -> str:
+    """# mpv EDL v0，每行 路径,起始秒,时长秒。不要多余空白。"""
+    lines = ["# mpv EDL v0"]
+    for path, start, length in rows:
+        if length <= 0:
+            raise SystemExit(f"program preview range is empty for {path}")
+        lines.append(
+            f"{quote_mpv_edl_value(path)},{format_mpv_edl_time(start)},{format_mpv_edl_time(length)}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def playlist_source(path: Path, playlist: Path) -> str:
+    """和清单同目录时写相对路径，mpv 按清单所在目录解析。不在里面再用绝对路径。"""
+    resolved = path.resolve()
+    base = playlist.parent.resolve()
+    try:
+        return resolved.relative_to(base).as_posix()
+    except ValueError:
+        return str(resolved)
+
+
+def playlist_rows(actions: list[dict], sources: dict[str, Path]) -> list[tuple[str, float, float]]:
+    rows: list[tuple[str, float, float]] = []
+    for action in actions:
         if action.get("mode") != "copy":
             raise SystemExit(
-                f"program preview refuses to re-encode {action.get('id')} ({action.get('mode')}). "
-                "Kept ranges are stream-copied from an input seek."
+                f"program preview refuses to re-encode {action.get('id')} ({action.get('mode')})"
             )
-        start = float(action["src_start_s"]) + float(action["trim_head_s"])
-        end = float(action["src_end_s"]) - float(action["trim_tail_s"])
-        if end <= start:
-            raise SystemExit(f"program preview range is empty for {action['id']}")
-        dest = program_preview_part(work_dir, index, action["clip"])
-        commands.append(copy_range_command(sources[action["clip"]], dest, start, end))
-    commands.append(build_concat_cmd(list_path, output))
-    return commands
+        start, length = preview_play_span(action)
+        if length <= 0:
+            raise SystemExit(f"program preview range is empty for {action.get('id')}")
+        rows.append((str(sources[action["clip"]]), start, length))
+    return rows
 
 
-def program_preview_inputs(actions: list[dict], work_dir: Path) -> list[Path]:
-    return [
-        program_preview_part(work_dir, index, action["clip"])
-        for index, action in enumerate(actions)
-    ]
+def virtual_duration(rows: list[tuple[str, float, float]]) -> float:
+    return sum(length for _, _, length in rows)
 
 
-def _run_program_preview_commands(commands: list[list[str]]) -> None:
-    """各段 copy 并行。concat 等片段都落盘后再跑。"""
-    if len(commands) <= 1:
-        for cmd in commands:
-            subprocess.run(cmd, check=True)
-        return
-    cuts, concat = commands[:-1], commands[-1]
-    workers = min(PREVIEW_COPY_JOBS, len(cuts))
-    errors: list[Exception] = []
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(subprocess.run, cmd, check=True) for cmd in cuts]
-        for fut in as_completed(futures):
-            try:
-                fut.result()
-            except Exception as exc:
-                errors.append(exc)
-    if errors:
-        raise errors[0]
-    subprocess.run(concat, check=True)
+def assert_playlist_matches_timeline(virtual: float, timeline: float) -> None:
+    drift = virtual - timeline
+    if abs(drift) > PLAYLIST_DURATION_SLACK_S:
+        raise SystemExit(
+            f"Review playlist duration {virtual:.3f}s != program timeline {timeline:.3f}s "
+            f"(drift {drift:+.3f}s). "
+            "The playlist uses timeline in/out points and must not include keyframe pre-roll."
+        )
+
+
+def review_playlist_path(media_dir: Path, episode: str, out: str | None) -> Path:
+    if not out:
+        return media_dir / f"{episode[:10]}-review-preview.edl"
+    path = Path(out).expanduser().resolve()
+    if path.suffix.lower() == ".mp4":
+        raise SystemExit("review preview writes an mpv EDL, not an mp4")
+    if path.suffix.lower() != ".edl":
+        raise SystemExit(f"review preview output must be an .edl file, not {path.name}")
+    return path
+
+
+def mpv_play_command(edl_path: Path, subtitles: Path | None) -> list[str]:
+    """mpv 直接打开 EDL。不要加 --no-stdin，那是 IINA 占着 stdin 才需要的。"""
+    cmd = ["mpv"]
+    if subtitles is not None:
+        cmd.append(f"--sub-file={subtitles}")
+    cmd.append(str(edl_path))
+    return cmd
+
+
+def iina_play_command(edl_path: Path, subtitles: Path | None) -> list[str]:
+    """IINA 命令只是尝试。.edl 能否直接打开没有核实，失败不算预览失败。"""
+    cmd = ["iina", "--no-stdin"]
+    if subtitles is not None:
+        cmd.append(f"--mpv-sub-file={subtitles}")
+    cmd.append(str(edl_path))
+    return cmd
+
+
+def launch_mpv(cmd: list[str]) -> str | None:
+    """尝试启动 mpv。找不到或起不来时返回说明，不抛错。"""
+    try:
+        subprocess.Popen(cmd, start_new_session=True)
+    except FileNotFoundError:
+        return "mpv not found. The playlist was written; run the printed mpv command after installing mpv."
+    except OSError as exc:
+        return f"mpv failed to start ({exc}). The playlist was written; run the printed mpv command."
+    return None
 
 
 def _preview_from_program(args, media_dir: Path) -> int:
-    """按时间表 stream copy 出预览。不渲 HUD，不重编码，不烧字幕，不修响度。"""
+    """按时间表写 mpv EDL。不拼预览成片，不渲 HUD，不重编码，不烧字幕，不修响度。"""
     table = edl.load_media(media_dir)
     problems = edl.validate(table)
     if problems:
@@ -859,61 +865,52 @@ def _preview_from_program(args, media_dir: Path) -> int:
     if not table["program"]:
         raise SystemExit("program timeline has no segments")
     episode = str(table.get("episode") or media_dir.name)
-    output = Path(args.out).expanduser().resolve() if args.out else media_dir / f"{episode[:10]}-review-preview.mp4"
+    output = review_playlist_path(media_dir, episode, args.out)
     reject_preview_output(output)
     sources: dict[str, Path] = {}
     for seg in table["program"]:
         clip = seg["clip"]
         if clip in sources:
             continue
-        path = media_dir / clip
+        path = (media_dir / clip).resolve()
         if not path.is_file():
             raise SystemExit(f"program clip not found: {path}")
-        sources[clip] = path
-        # 确认每条原片只有一条视频和一条音频，copy 接不上就在开切之前停。
-        probe_streams(path)
+        sources[clip] = Path(playlist_source(path, output))
     actions = edl.preview_actions(table)
-    copy_actions = [action for action in actions if action["mode"] == "copy"]
-    work_dir = output.parent / f".{output.stem}.preview-work"
-    commands = build_program_preview_commands(actions, sources, output, work_dir)
-    print(f"preview from program.json segments={len(actions)} copy={len(copy_actions)} seek=input")
-    for action in actions:
-        print(f"  {action['mode']:12} {action['id']} {action['clip']} {action['src_start_s']:.3f}-{action['src_end_s']:.3f} {action['reason']}")
-    for cmd in commands:
-        print("$", " ".join(shlex.quote(part) for part in cmd))
-    if any("subtitles=" in part or "loudnorm" in part for cmd in commands for part in cmd):
-        raise SystemExit("program preview must not burn subtitles or normalize loudness")
-    encoded = " ".join(part for cmd in commands for part in cmd)
-    if "libx264" in encoded or "trim=start=" in encoded or "hevc_videotoolbox" in encoded:
-        raise SystemExit("program preview must stream-copy with input seek, not re-encode")
+    rows = playlist_rows(actions, sources)
+    timeline = edl.frame_program_duration(table)
+    duration = virtual_duration(rows)
+    assert_playlist_matches_timeline(duration, timeline)
+    document = mpv_edl_text(rows)
     subtitles = Path(args.subtitles).expanduser().resolve() if args.subtitles else None
     if subtitles is not None and not subtitles.is_file():
         raise SystemExit(f"subtitles not found: {subtitles}")
+    sidecar = output.with_suffix(".srt") if subtitles is not None else None
+    print(
+        f"preview playlist segments={len(rows)} "
+        f"virtual={duration:.3f}s timeline={timeline:.3f}s"
+    )
+    for action, (path, start, length) in zip(actions, rows, strict=True):
+        print(f"  {action['id']} {action['clip']} start={start:.3f} length={length:.3f} {path}")
+    mpv_cmd = mpv_play_command(output, sidecar)
+    iina_cmd = iina_play_command(output, sidecar)
+    print("mpv:", " ".join(shlex.quote(part) for part in mpv_cmd))
+    print("iina (unverified for .edl):", " ".join(shlex.quote(part) for part in iina_cmd))
     if args.dry_run:
-        if subtitles is not None:
-            print(f"sidecar={output.with_suffix('.srt')}")
+        print(document, end="")
+        if sidecar is not None:
+            print(f"sidecar={sidecar}")
         return 0
     if todo_list.load(media_dir).get("layout") != "done":
         raise SystemExit("todo layout is not done; refusing to write the preview")
-    if work_dir.exists():
-        shutil.rmtree(work_dir)
-    work_dir.mkdir(parents=True)
-    try:
-        (work_dir / "concat.txt").write_text(
-            concat_list_text(program_preview_inputs(actions, work_dir)),
-            encoding="utf-8",
-        )
-        try:
-            _run_program_preview_commands(commands)
-            assert_program_preview_duration(output, edl.frame_program_duration(table), len(actions))
-        except BaseException:
-            output.unlink(missing_ok=True)
-            raise
-    finally:
-        shutil.rmtree(work_dir, ignore_errors=True)
+    output.write_text(document, encoding="utf-8")
     if subtitles is not None:
         write_subtitle_sidecar(subtitles, output)
     print(f"Wrote {output}")
+    if args.play:
+        message = launch_mpv(mpv_cmd)
+        if message:
+            print(message, file=sys.stderr)
     try:
         todo_list.mark(media_dir, "preview", "done")
     except ValueError as exc:
@@ -924,11 +921,16 @@ def _preview_from_program(args, media_dir: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--media-dir", required=True)
-    parser.add_argument("--out")
+    parser.add_argument("--out", help="mpv EDL path. Default: YYYY-MM-DD-review-preview.edl in the media dir. Not an mp4.")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
+        "--play",
+        action="store_true",
+        help="After writing the EDL, try to start mpv. A missing player does not fail the playlist.",
+    )
+    parser.add_argument(
         "--subtitles",
-        help="Optional subtitles.txt. Writes a same-named .srt beside the preview with unchanged cue times. Does not burn in.",
+        help="Optional subtitles.txt. Writes an SRT beside the EDL on the virtual timeline. Does not burn in.",
     )
     args = parser.parse_args(argv)
     media_dir = Path(args.media_dir).expanduser().resolve()
@@ -942,6 +944,8 @@ def _preview(args, media_dir: Path) -> int:
         raise SystemExit(f"media dir not found: {media_dir}")
     if edl.program_path(media_dir).is_file():
         return _preview_from_program(args, media_dir)
+    if args.play:
+        print("play applies to the program.json playlist only", file=sys.stderr)
     cut = discover_preview_cut(media_dir)
     output = Path(args.out).expanduser().resolve() if args.out else media_dir / f"{cut.date}-review-preview.mp4"
     reject_preview_output(output)

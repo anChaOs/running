@@ -74,6 +74,13 @@ def test_media_sidecar_does_not_sit_beside_the_burned_final():
         assert (media / "subtitles.srt").is_file()
         assert (media / "2026-01-02-review-preview.srt").is_file()
         assert not (media / "2026-01-02-run-final.srt").exists()
+        (media / "2026-01-02-review-preview.mp4").unlink()
+        (media / "2026-01-02-review-preview.edl").write_bytes(b"edl")
+        names = [path.name for path in txt_to_subs.media_sidecar_targets(media, ep.name)]
+        assert names == ["subtitles.srt", "2026-01-02-review-preview.srt"]
+        (media / "2026-01-02-review-preview.edl").unlink()
+        names = [path.name for path in txt_to_subs.media_sidecar_targets(media, ep.name)]
+        assert names == ["subtitles.srt"]
 
 
 def test_header_starts_with_script_info():

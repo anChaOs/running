@@ -379,44 +379,39 @@ class SameTableTest(unittest.TestCase):
         self.assertIn("loudnorm", graph)
         self.assertIn("xfade=", graph)
         actions = edl.preview_actions(table)
-        commands = preview_episode.build_program_preview_commands(
-            actions,
-            {row["clip"]: Path("/media") / row["clip"] for row in actions},
-            Path("/tmp/review-preview.mp4"),
-            Path("/tmp/work"),
-        )
-        blob = " ".join(" ".join(cmd) for cmd in commands)
-        self.assertNotIn("49M", blob)
-        self.assertNotIn("prores", blob)
-        self.assertNotIn("loudnorm", blob)
-        self.assertNotIn("subtitles=", blob)
-        self.assertNotIn("libx264", blob)
-        self.assertNotIn("hevc_videotoolbox", blob)
-        self.assertNotIn("trim=start=", blob)
-        self.assertNotIn("preview-crf", blob)
-        cuts, concat = commands[:-1], commands[-1]
-        self.assertEqual(len(cuts), len(actions))
-        # open 尾、close 头按 xfade 从 copy 区间里剪掉，跑步段不动。
+        sources = {row["clip"]: Path("/media") / row["clip"] for row in actions}
+        rows = preview_episode.playlist_rows(actions, sources)
+        document = preview_episode.mpv_edl_text(rows)
+        self.assertTrue(document.startswith("# mpv EDL v0\n"))
+        body = [line for line in document.splitlines() if line and not line.startswith("#")]
+        self.assertEqual(len(body), len(actions))
+        # open 尾、close 头按 xfade 扣掉，跑步段不动。时长是长度，不是出点。
         expected = {
             "2026-01-02-open.mp4": ("0.000000", "7.800000"),
             "2026-01-02-run-a.mp4": ("0.000000", "12.300000"),
-            "2026-01-02-close.mp4": ("0.200000", "6.000000"),
+            "2026-01-02-close.mp4": ("0.200000", "5.800000"),
         }
-        for action, cmd in zip(actions, cuts, strict=True):
-            ss = cmd.index("-ss")
-            to = cmd.index("-to")
-            src = cmd.index("-i")
-            self.assertLess(ss, src)
-            self.assertLess(to, src)
-            self.assertEqual(cmd[cmd.index("-c") + 1], "copy")
-            self.assertEqual((cmd[ss + 1], cmd[to + 1]), expected[action["clip"]])
-        self.assertIn("concat", concat)
-        self.assertIn("copy", concat)
-        low, high = preview_episode.program_preview_duration_bounds(1152.6, 130)
-        self.assertGreater(high - 1152.6, 3.9)
-        self.assertLess(high - 1152.6, 1152.6)
-        self.assertGreater(1152.6 - low, 0.5)
-        self.assertLess(1152.6 - low, 30.0)
+        for action, line in zip(actions, body, strict=True):
+            path, start, length = line.split(",")
+            self.assertEqual(path, str(sources[action["clip"]]))
+            self.assertEqual((start, length), expected[action["clip"]])
+        virtual = preview_episode.virtual_duration(rows)
+        self.assertAlmostEqual(virtual, edl.frame_program_duration(table), places=3)
+        self.assertAlmostEqual(virtual, 7.8 + 12.3 + 5.8, places=3)
+        blob = document + " " + " ".join(preview_episode.mpv_play_command(Path("/tmp/review.edl"), None))
+        self.assertNotIn("libx264", blob)
+        self.assertNotIn("hevc_videotoolbox", blob)
+        self.assertNotIn("trim=start=", blob)
+        self.assertNotIn("ffmpeg", blob)
+        self.assertNotIn("-c copy", document)
+        for name in (
+            "build_program_preview_commands",
+            "copy_range_command",
+            "program_preview_duration_bounds",
+            "assert_program_preview_duration",
+            "_run_program_preview_commands",
+        ):
+            self.assertFalse(hasattr(preview_episode, name), name)
         slices = [(row["clip"], row["src_start_s"], row["src_end_s"]) for row in actions]
         self.assertEqual(slices, [(row["clip"], row["src_start_s"], row["src_end_s"]) for row in edl.export_slices(table)])
         self.assertEqual(graph.count("xfade="), 2)
@@ -437,27 +432,26 @@ class SameTableTest(unittest.TestCase):
         )
         actions = edl.preview_actions(table)
         self.assertEqual(actions[0]["mode"], "copy")
-        commands = preview_episode.build_program_preview_commands(
-            actions,
-            {"2026-01-02-run-a.mp4": Path("/media/2026-01-02-run-a.mp4")},
-            Path("/tmp/review-preview.mp4"),
-            Path("/tmp/work"),
-        )
-        cut = commands[0]
-        blob = " ".join(cut)
+        source = Path("/media/2026-01-02-run-a.mp4")
+        rows = preview_episode.playlist_rows(actions, {"2026-01-02-run-a.mp4": source})
+        document = preview_episode.mpv_edl_text(rows)
         start = float(actions[0]["src_start_s"])
         end = float(actions[0]["src_end_s"])
+        play_start, play_length = preview_episode.preview_play_span(actions[0])
         self.assertGreater(start, 12.0)
         self.assertLess(end, 18.3)
-        self.assertLess(cut.index("-ss"), cut.index("-i"))
-        self.assertLess(cut.index("-to"), cut.index("-i"))
-        self.assertEqual(cut[cut.index("-ss") + 1], f"{start:.6f}")
-        self.assertEqual(cut[cut.index("-to") + 1], f"{end:.6f}")
-        self.assertNotEqual(cut[cut.index("-ss") + 1], "0.000000")
-        self.assertEqual(cut[cut.index("-c") + 1], "copy")
-        self.assertNotIn("trim=", blob)
-        self.assertNotIn("libx264", blob)
-        self.assertNotIn("atrim=", blob)
+        self.assertAlmostEqual(play_start, start)
+        self.assertAlmostEqual(play_length, end - start)
+        self.assertNotEqual(f"{play_start:.6f}", "0.000000")
+        line = next(item for item in document.splitlines() if item and not item.startswith("#"))
+        self.assertEqual(
+            line,
+            f"{source},{play_start:.6f},{play_length:.6f}",
+        )
+        self.assertNotIn("trim=", document)
+        self.assertNotIn("libx264", document)
+        self.assertNotIn("atrim=", document)
+        self.assertNotIn("ffmpeg", document)
 
         keep = hud.hud_keep_trim_cmd(Path("/media/run.mp4"), Path("/tmp/keep.mp4"), 12.5, 18.25)
         keep_blob = " ".join(keep)
@@ -481,6 +475,153 @@ class SameTableTest(unittest.TestCase):
         self.assertGreaterEqual(hud.HUD_EXPORT_JOBS, 2)
         self.assertEqual(argv[argv.index("-j") + 1], "2")
         self.assertNotEqual(argv[argv.index("-j") + 1], "1")
+
+    def test_preview_edl_matches_timeline_without_keyframe_preroll(self) -> None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import preview_episode
+
+        durations = [
+            ("2026-11-12-open.mp4", 86.4),
+            ("2026-11-12-run-a.mp4", 201.866667),
+            ("2026-11-12-run-b.mp4", 111.8),
+            ("2026-11-12-run-c.mp4", 113.4),
+            ("2026-11-12-run-d.mp4", 116.333333),
+            ("2026-11-12-run-e.mp4", 263.933333),
+            ("2026-11-12-close.mp4", 259.266667),
+        ]
+        table = edl.empty_program("2026-11-12-8020")
+        edl.set_source_sync(
+            table,
+            [
+                {"clip": name, "fit": "2026-11-12-run-data.fit", "offset_s": 0.0}
+                for name, _dur in durations
+                if "-run-" in name
+            ],
+        )
+        edl.upsert_keeps(
+            table,
+            [{"clip": name, "src_start_s": 0.0, "src_end_s": dur} for name, dur in durations],
+        )
+        actions = edl.preview_actions(table)
+        sources = {row["clip"]: Path("/media") / row["clip"] for row in actions}
+        rows = preview_episode.playlist_rows(actions, sources)
+        self.assertEqual(len(rows), 7)
+        timeline = edl.frame_program_duration(table)
+        virtual = preview_episode.virtual_duration(rows)
+        self.assertAlmostEqual(timeline, 1152.6)
+        self.assertAlmostEqual(virtual, timeline, places=3)
+        # 四道跑步接缝的 0.08 秒风刮不缩短。130 刀的关键帧预卷曾经多出约 55 秒。
+        self.assertLess(abs(virtual - timeline), 0.05)
+        self.assertNotAlmostEqual(virtual, timeline + 55, delta=1)
+        run_rows = [row for action, row in zip(actions, rows, strict=True) if action["type"] == "run"]
+        self.assertEqual(len(run_rows), 5)
+        for action, (_, start, length) in zip(
+            [item for item in actions if item["type"] == "run"], run_rows, strict=True
+        ):
+            self.assertAlmostEqual(start, action["src_start_s"])
+            self.assertAlmostEqual(length, action["src_end_s"] - action["src_start_s"])
+
+        cut = edl.empty_program("2026-01-02-demo")
+        edl.set_source_sync(
+            cut,
+            [
+                {"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0},
+                {"clip": "2026-01-02-run-b.mp4", "fit": "run.fit", "offset_s": 0.0},
+            ],
+        )
+        keeps = [{"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 8.0}]
+        for index in range(130):
+            src = 10.0 + index * 3.0
+            keeps.append({"clip": "2026-01-02-run-a.mp4", "src_start_s": src, "src_end_s": src + 1.0})
+        keeps.append({"clip": "2026-01-02-run-b.mp4", "src_start_s": 0.0, "src_end_s": 4.0})
+        keeps.append({"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 6.0})
+        edl.upsert_keeps(cut, keeps)
+        edl.record_hud(cut, shoe_name="Fly", shoe_km_after=100.0, weather_city="shanghai")
+        self.assertEqual(len(edl.wind_transitions(cut)), 1)
+        cut_actions = edl.preview_actions(cut)
+        cut_rows = preview_episode.playlist_rows(
+            cut_actions, {row["clip"]: Path("/media") / row["clip"] for row in cut_actions}
+        )
+        self.assertEqual(len(cut_rows), 133)
+        cut_timeline = edl.frame_program_duration(cut)
+        cut_virtual = preview_episode.virtual_duration(cut_rows)
+        self.assertAlmostEqual(cut_virtual, cut_timeline, places=3)
+        self.assertLess(cut_virtual, cut_timeline + 1.0)
+        runs = [row for action, row in zip(cut_actions, cut_rows, strict=True) if action["type"] == "run"]
+        self.assertTrue(all(action["trim_head_s"] == 0 and action["trim_tail_s"] == 0
+                            for action in cut_actions if action["type"] == "run"))
+        self.assertAlmostEqual(sum(length for _, _, length in runs), 130.0 + 4.0, places=3)
+
+    def test_mpv_edl_quotes_special_paths(self) -> None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import preview_episode
+
+        plain = "/media/2026-01-02-run-a.mp4"
+        self.assertEqual(preview_episode.quote_mpv_edl_value(plain), plain)
+        spaced = "/media/my run/clip.mp4"
+        self.assertEqual(preview_episode.quote_mpv_edl_value(spaced), spaced)
+        for value in ("dir/a,b.mp4", "a;b.mp4", "a\nb.mp4", "go!clip.mp4", "#clip.mp4", "%2Falready.mp4", ""):
+            quoted = preview_episode.quote_mpv_edl_value(value)
+            raw = value.encode("utf-8")
+            self.assertEqual(quoted, f"%{len(raw)}%{value}")
+        weird = Path("/media/a,b/跑.mp4")
+        text = preview_episode.mpv_edl_text([(str(weird), 1.5, 2.25)])
+        encoded = str(weird).encode("utf-8")
+        self.assertEqual(text, f"# mpv EDL v0\n%{len(encoded)}%{weird},1.500000,2.250000\n")
+        self.assertEqual(
+            preview_episode.playlist_source(Path("/media/a.mp4"), Path("/media/review.edl")),
+            "a.mp4",
+        )
+        outside = preview_episode.playlist_source(Path("/elsewhere/a.mp4"), Path("/media/review.edl"))
+        self.assertTrue(outside.endswith("/elsewhere/a.mp4"))
+        mpv = preview_episode.mpv_play_command(Path("/tmp/review.edl"), Path("/tmp/review.srt"))
+        iina = preview_episode.iina_play_command(Path("/tmp/review.edl"), Path("/tmp/review.srt"))
+        self.assertEqual(mpv[0], "mpv")
+        self.assertNotIn("--no-stdin", mpv)
+        self.assertIn("--sub-file=/tmp/review.srt", mpv)
+        self.assertEqual(iina[:2], ["iina", "--no-stdin"])
+        self.assertIn("--mpv-sub-file=/tmp/review.srt", iina)
+
+    def test_program_preview_writes_edl_not_mp4(self) -> None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import preview_episode
+
+        table = _ready()
+        with tempfile.TemporaryDirectory() as tmp:
+            media = Path(tmp)
+            for name in ("2026-01-02-open.mp4", "2026-01-02-run-a.mp4", "2026-01-02-close.mp4"):
+                (media / name).write_bytes(b"")
+            edl.save(media, table)
+            for step in ("ingest", "edl", "hud-record", "layout"):
+                todo.mark(media, step, "done")
+            subs = media / "subtitles.txt"
+            subs.write_text("0:00:01.00–0:00:02.50  听这一句\n", encoding="utf-8")
+            argv = ["--media-dir", str(media), "--subtitles", str(subs), "--play"]
+            with unittest.mock.patch.object(
+                preview_episode.subprocess, "Popen", side_effect=FileNotFoundError("mpv")
+            ):
+                rc = preview_episode.main(argv)
+            self.assertEqual(rc, 0)
+            playlist = media / "2026-01-02-review-preview.edl"
+            sidecar = media / "2026-01-02-review-preview.srt"
+            self.assertTrue(playlist.is_file())
+            self.assertFalse((media / "2026-01-02-review-preview.mp4").exists())
+            text = playlist.read_text(encoding="utf-8")
+            self.assertTrue(text.startswith("# mpv EDL v0\n"))
+            body = [line for line in text.splitlines() if line and not line.startswith("#")]
+            self.assertEqual(len(body), 3)
+            self.assertTrue(body[0].startswith("2026-01-02-open.mp4,0.000000,7.800000"))
+            self.assertFalse(body[0].startswith("/"))
+            self.assertIn("听这一句", sidecar.read_text(encoding="utf-8"))
+            self.assertIn("00:00:01,000", sidecar.read_text(encoding="utf-8"))
+            self.assertNotIn("libx264", text)
+            self.assertNotIn("trim=start=", text)
+            log = (media / "logs" / "timeline.txt").read_text(encoding="utf-8")
+            self.assertIn("START  review-preview", log)
+            self.assertIn("END    review-preview", log)
+            self.assertEqual(todo.load(media)["preview"], "done")
+            with self.assertRaises(SystemExit):
+                preview_episode.main(["--media-dir", str(media), "--out", str(media / "nope.mp4"), "--dry-run"])
 
     def test_export_seeks_cut_sources_and_trims_from_zero(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))

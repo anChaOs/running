@@ -3,7 +3,7 @@
 
 仓库只跟踪 subtitles.txt。写出的 .srt 是生成文件，不要 git add。
 默认写在 txt 旁边（episodes/*/subtitles.srt 已被 .gitignore）。
---media-dir 再拷到媒体目录的 subtitles.srt。审片预览还在时另拷同名 .srt 给 IINA。
+--media-dir 再拷到媒体目录的 subtitles.srt。审片清单还在时另拷同名 .srt。
 不要在烧字成片旁边留同名 .srt。
 """
 
@@ -53,12 +53,12 @@ def write_srt(path: Path, cues: list[tuple[str, str, str]]) -> None:
 
 
 def media_sidecar_targets(media: Path, episode_name: str) -> list[Path]:
-    """上传用 subtitles.srt。审片预览可以有同名 .srt 给 IINA。烧字成片旁边不留同名 .srt。"""
+    """上传用 subtitles.srt。审片清单可以有同名 .srt。烧字成片旁边不留同名 .srt。"""
     date = episode_name[:10]
     targets = [media / "subtitles.srt"]
-    preview = media / f"{date}-review-preview.mp4"
-    if preview.is_file():
-        targets.append(preview.with_suffix(".srt"))
+    preview_names = (f"{date}-review-preview.edl", f"{date}-review-preview.mp4")
+    if any((media / name).is_file() for name in preview_names):
+        targets.append(media / f"{date}-review-preview.srt")
     return targets
 
 
@@ -67,7 +67,7 @@ def main() -> int:
     parser.add_argument("--txt", required=True, help="episodes/.../subtitles.txt")
     parser.add_argument("--srt", help="输出 SRT。默认写在 txt 旁边（本地导出，不进 git）")
     parser.add_argument("--media-dir", help="同时拷到媒体目录：subtitles.srt（上传用）。"
-                        "若有 YYYY-MM-DD-review-preview.mp4，另拷同名 .srt 给 IINA。"
+                        "若有 YYYY-MM-DD-review-preview.edl（或旧的预览 mp4），另拷同名 .srt。"
                         "不在烧字成片旁边留同名 .srt。传 auto = ~/Movies/running-content/<期名>")
     args = parser.parse_args()
 

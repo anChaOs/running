@@ -1,25 +1,17 @@
 ---
 name: p3-assemble
-description: 按 logs/program.json 用输入 seek + stream copy 立刻拼一条审片预览（不重编码、不渲 HUD），拼完抽帧核对；不生成最终成片。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py，不能在这里烧字或修响度。
+description: 按 logs/program.json 写一份 mpv 播放清单来审片（不拼预览成片、不重编码、不渲 HUD）。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py，不能在这里烧字或修响度。
 ---
 
 # 画面预览
 
-有 `logs/program.json` 时，预览只按这张表用输入 seek + stream copy 把留下的区间接起来，用来决定刀点并开始转写。**不渲 HUD，不重编码，不烧字幕，不修响度。** 切开的段也是 copy，不用 trim 滤镜，也不走 libx264 / `hevc_videotoolbox`。切口落在前一个关键帧，允许比成片稍长，不要为了帧精确改回轻压。跑步段的原片区间和最终导出是同一份。预览不是最终成片，也不能当作最终导出的输入。
+有 `logs/program.json` 时，预览只按这张表写一份播放清单，让播放器按入点和时长直接播原片。看起来像一条时间线，**不写出预览 mp4**。不渲 HUD，不重编码，不烧字幕，不修响度。不要用 ffmpeg 把切开的段 copy 或 concat 成文件，也不要 trim 滤镜从头解码，更不要为了预览走 libx264 / `hevc_videotoolbox`。
 
-没有这张表时，才退回旧路径：拼接已经渲好的 `*-hud-preview.mp4`。不要为了走旧路径去补渲未剪预览。
+预览和导出共用表里的入出点。冷开场进跑步、跑步进 close 的 0.2 秒 xfade，预览只把同样的时长从非跑步那一侧扣掉，不做叠化。不同原片的跑步接缝在导出时有 0.08 秒风刮，那不缩短总时长，预览仍是硬切，不要把这 0.08 秒当成 xfade 剪掉。清单里各段时长加起来等于时间表（`frame_program_duration`），不能把关键帧前面的预卷算进去。
 
-产物：`~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4`
+没有这张表时，才退回旧路径：拼接已经渲好的 `*-hud-preview.mp4`。不要为了走旧路径去补渲未剪预览。成片仍走 `final_export.py --confirmed`。预览清单不能当作最终导出的输入。
 
-官方命令就是 `preview_episode.py`。`--dry-run` 会打印每一段的 copy 区间（`seek=input`）。
-
-## 前置
-
-- `logs/program.json` 里原片对齐、句间刀、冷开场和贴图已经入表。缺了就停，不要改去整段重压。
-- 贴图和数据图记在表的 `overlays` 里，预览可以先不叠。不要为了预览先做 `*-close-stats.mp4`。
-- 不要使用或覆盖 `*-run-final.mp4`，不要写 `upload/`。
-
-## 步骤
+产物：`~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl`（mpv EDL v0，每行 `路径,起始秒,时长秒`）。原片在同一目录时路径相对清单，整夹搬走还能播。路径里有逗号、分号、换行或 `!` 时按 mpv 的 `%字节数%原文` 写。
 
 ```bash
 .venv/bin/python tools/assemble/preview_episode.py \
@@ -27,22 +19,34 @@ description: 按 logs/program.json 用输入 seek + stream copy 立刻拼一条�
   --dry-run
 
 .venv/bin/python tools/assemble/preview_episode.py \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
-  --out ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
 ```
 
-冷开场进跑步、跑步进 close 的 0.2 秒 xfade，预览只把同样的时长从非跑步那一侧的 copy 区间里剪掉，不做叠化。不同原片的跑步接缝在导出时有 0.08 秒风刮和 whoosh，那不缩短总时长，预览这里仍是硬切，不要把这 0.08 秒当成 xfade 剪掉。预览时长允许比时间表长：copy 的起点落在前一个关键帧，多出来的是关键帧到切点之间的原片，不是把丢掉的句间停顿整段接回去。明显短于时间表才算丢段。`subtitles.txt` 还没写就不要传 `--subtitles`；传了也只在旁边写同时间轴的外挂，不烧进画面。
+脚本打印怎么打开：
 
-每段都是 `ffmpeg -ss <start> -to <end> -i <原片> -c copy`，再 `-c copy` 接成一条。不要改回「先打开整文件、用 trim 滤镜从 0 解码、再 libx264」。编码实在接不上时 concat 会失败并停。不要把切开的段一律重编码；若要补救，只重编码接不上的那一段，也不要改走 `assemble_episode.py`。
+```text
+mpv ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl
+```
+
+mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 命令会一并打印，只是尝试：`.edl` 能否被 IINA 直接打开没有核实，打不开不算这步失败。需要当场播再加 `--play`；本机没有 mpv 时清单仍然写好，并说明启动失败。
+
+`subtitles.txt` 还没写就不要传 `--subtitles`。传了只在清单旁边写一份外挂 `.srt`，时间用虚拟时间线（和 txt 里的成片时间同一套），用 `mpv --sub-file=` 挂上，不烧进画面。没有字幕文件就不要造。不要在成片旁边留同名 `.srt`。
+
+## 前置
+
+- `logs/program.json` 里原片对齐、句间刀、冷开场和贴图已经入表。缺了就停，不要改去整段重压。
+- 贴图和数据图记在表的 `overlays` 里，预览可以先不叠。不要为了预览先做 `*-close-stats.mp4`。
+- `logs/todo.md` 的 `layout` 还没 done 时，脚本拒绝写清单。`--dry-run` 不写文件、不记日志。
+- 不要使用或覆盖 `*-run-final.mp4`，不要写 `upload/`。
 
 ## 核对
 
-至少抽帧检查：open 开头、open→run、跑中、run→run、run→close、close 结尾。缺的段跳过。这条预览默认没有最终质量数据条，也没有风刮画面；跑步接缝的硬切不算过，风刮留到确认导出。确认音画没有明显缺段之后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表预览画面人工核对，不代表字幕已确认。脚本成功时会把 `logs/todo.md` 的 `preview` 标成 done；没标上就不算这步完成。下一步是 `/p3-subs`。
+预览用来听旁白、对字幕错别字和换行，不必对着画面逐帧对时间。画面和时间对齐是导出成片的事。确认没有明显缺段之后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表这次审片核对，不代表字幕已确认。脚本成功时会把 `logs/todo.md` 的 `preview` 标成 done；没标上就不算这步完成。下一步是 `/p3-subs`。
 
 ## 记日志
 
-`preview_episode.py` 写 `review-preview`（`--dry-run` 不写）。脚本已写就不要再记。失败由脚本写 `FAIL`。
+`preview_episode.py` 写 `logs/timeline.txt` 的 `review-preview`（`--dry-run` 不写）。脚本已写就不要再记。失败由脚本写 `FAIL`。
 
 ## 完成后
 
-> 预览核对通过后走 `/p3-subs`。
+> 预览核对通过后走 `/p3-subs`。成片走 `final_export.py --confirmed`。

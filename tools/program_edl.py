@@ -786,10 +786,10 @@ def preview_presentation(table: dict, fps: int = 30) -> list[dict]:
 
 
 def preview_actions(table: dict) -> list[dict]:
-    """每段都 copy，包括句间刀切开的区间。
+    """播放清单用的区间，包括句间刀切开的每一段。
 
-    切口由输入 seek 落到前一个关键帧，预览允许比时间表稍长。
-    不因为没接到片尾就改去重编码。
+    入点和时长就是落帧后的时间表：xfade 已从非跑步一侧扣掉，风刮不扣。
+    不把关键帧前面的预卷算进去。mode 仍是 copy，表示直接播原片、不重编码。
     """
     return [{**sl, "mode": "copy", "reason": ""} for sl in preview_presentation(table)]
 

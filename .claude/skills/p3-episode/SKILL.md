@@ -31,7 +31,7 @@ p3-hud --record-only → 鞋、天气、透明层规格记进同一张表，不�
 p3-cover             → cover-*.jpg（与记录 HUD 并行）
 
 冷开场 / 贴图 / 插入写进同一张表
-  p3-assemble → 立刻出低成本 review-preview.mp4（能拷贝就拷贝，不渲 HUD）
+  p3-assemble → 按时间表写 review-preview.edl 播放清单（不拼预览成片，不渲 HUD）
 
 review-preview
   p3-subs     → 转写。对口型前冻结时间表。之后改刀点必须按新表重对齐
