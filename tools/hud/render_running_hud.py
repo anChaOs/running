@@ -23,6 +23,8 @@ except ImportError:  # 运行时由仓库 .venv 提供；静态检查环境可�
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export_spec import PREVIEW_SPEC, video_codec_args
 import log_timeline
+import program_edl as edl
+import todo_list
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 HUD_DIR = Path(__file__).resolve().parent
@@ -405,17 +407,135 @@ def render_one_clip(
         raise RuntimeError(f"{label} failed: {exc}; see {log_path}") from exc
 
 
-def main() -> int:
-    args = _parse_args()
+def _record_only(args) -> int:
+    if args.preview:
+        raise SystemExit("--record-only does not render, and it does not bake a preview")
+    if args.shoe_total_km_after_run is None:
+        raise SystemExit("--record-only needs -sk (cumulative km after this run)")
+    media_dir = Path(args.media_dir).expanduser().resolve()
+    table = edl.load_media(media_dir)
+    city = None if args.no_weather else (args.weather_city or "shanghai")
+    edl.save(media_dir, edl.record_hud(
+        table,
+        shoe_name=args.shoe_name,
+        shoe_km_after=args.shoe_total_km_after_run if args.shoe_total_km_after_run is not None else 0.0,
+        weather_city=city,
+        overlay_profile=args.overlay_profile,
+        video_end_time_mode=args.video_end_time_mode,
+    ))
+    todo_list.mark(media_dir, "hud-record", "done")
+    print(edl.program_path(media_dir))
+    return 0
+
+
+def _alpha_dest(directory: Path, stem: str, profile: str) -> Path:
+    # 渲染器固定写 {stem}-hud-alpha.mov。别的规格放进子目录，避免盖掉已有 ProRes。
+    if profile == "prores4444":
+        return directory / f"{stem}-hud-alpha.mov"
+    return directory / profile / f"{stem}-hud-alpha.mov"
+
+
+def _alpha_matches(path: Path, profile: str) -> bool:
+    try:
+        codec = subprocess.check_output(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name", "-of", "default=nw=1:nk=1", str(path)],
+            text=True,
+        ).strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
+    expected = {"qtrle": "qtrle", "prores4444": "prores", "png": "png"}[profile]
+    return codec == expected or codec.startswith(expected)
+
+
+def export_alphas(media_dir: Path, table: dict, durations: dict[str, float], *, dry_run: bool) -> list[Path]:
+    """只给留下的区间渲 qtrle（或表里记的规格）透明层。已有同名文件就复用，避免重跑。"""
+    hud = table.get("hud") or {}
+    if not hud.get("recorded"):
+        raise SystemExit("HUD data is not recorded on the program timeline")
+    fits = sorted(media_dir.glob("*-run-data.fit"))
+    if not fits and not dry_run:
+        raise SystemExit(f"No FIT file found in {media_dir}")
+    fit = fits[0] if fits else media_dir / "run-data.fit"
+    weather = media_dir / "weather-hourly.json"
+    paths: list[Path] = []
+    for job in edl.hud_jobs(table):
+        src = media_dir / job["clip"]
+        full = durations.get(job["clip"])
+        is_full = full is not None and job["src_start_s"] <= 0.02 and job["src_end_s"] >= full - 0.02
+        profile = str(job["overlay_profile"])
+        if is_full:
+            render_dir = media_dir
+            clip_name = src.name
+            dest = _alpha_dest(media_dir / "hud-renders", src.stem, profile)
+        else:
+            render_dir = media_dir / "hud-renders" / "keeps"
+            clip_name = f"{src.stem}-{job['src_start_s']:.3f}-{job['src_end_s']:.3f}.mp4"
+            dest = _alpha_dest(render_dir, Path(clip_name).stem, profile)
+        paths.append(dest)
+        if dest.is_file() and _alpha_matches(dest, profile):
+            _log(f"reuse {dest.name}")
+            continue
+        if dry_run:
+            _log(f"would render {dest.name} from {job['src_start_s']:.3f}-{job['src_end_s']:.3f} profile={job['overlay_profile']}")
+            continue
+        render_dir.mkdir(parents=True, exist_ok=True)
+        if not is_full:
+            piece = render_dir / clip_name
+            _trim_keep_for_hud(src, piece, float(job["src_start_s"]), float(job["src_end_s"]), float(full or 0))
+        argv = [
+            "--media-dir", str(render_dir),
+            "--fit", str(fit),
+            "--clips", clip_name,
+            "--overlay-only",
+            "--overlay-profile", str(job["overlay_profile"]),
+            "--output-dir", str(dest.parent),
+            "-sn", str(hud.get("shoe_name") or "Secret Shoe"),
+            "-sk", str(hud.get("shoe_km_after") or 0),
+            "-j", "1",
+        ]
+        if weather.is_file():
+            argv.extend(["--weather-json", str(weather)])
+        elif hud.get("weather_city"):
+            argv.extend(["--weather-city", str(hud["weather_city"])])
+        else:
+            argv.append("--no-weather")
+        rc = main(argv)
+        if rc:
+            raise SystemExit(f"HUD render failed for {clip_name}")
+        if not dest.is_file():
+            raise SystemExit(f"HUD alpha missing: {dest}")
+    return paths
+
+
+def _trim_keep_for_hud(src: Path, dest: Path, start: float, end: float, duration: float) -> None:
+    """裁出留下的区间，并把 mtime 设成原片时间上的结束点，HUD 才不会按成片时间取样。"""
+    cmd = [
+        "ffmpeg", "-y", "-hide_banner", "-i", str(src),
+        "-vf", f"trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS",
+        "-af", f"atrim=start={start:.6f}:end={end:.6f},asetpts=PTS-STARTPTS",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:a", "aac", "-b:a", "128k",
+        str(dest),
+    ]
+    subprocess.run(cmd, check=True)
+    mtime = edl.kept_alpha_mtime(src.stat().st_mtime, duration, end)
+    os.utime(dest, (mtime, mtime))
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
+    if args.record_only:
+        return _record_only(args)
     if args.preview:
         args.overlay_only = True
+        _log("warning: --preview encodes an uncut review file in this same job; the official flow does not")
     media_dir = Path(args.media_dir).expanduser()
     with log_timeline.span(media_dir, "hud-render", enabled=not args.dry_run) as wall:
         wall.rc = _render_main(args)
         return wall.rc
 
 
-def _parse_args():
+def _parse_args(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(
         description="Render running HUDs automatically with gopro-dashboard-overlay."
     )
@@ -458,8 +578,13 @@ def _parse_args():
     parser.add_argument(
         "--overlay-profile",
         choices=sorted(OVERLAY_PROFILE_MAP),
-        default="prores4444",
-        help="Alpha encode for --overlay-only. prores4444 is Jianying-friendly; png is PNG-in-MOV; qtrle is smaller Animation codec",
+        default="qtrle",
+        help="Alpha encode for --overlay-only. Default qtrle (lighter than ProRes 4444). png is PNG-in-MOV; prores4444 is the heavier Jianying-friendly option",
+    )
+    parser.add_argument(
+        "--record-only",
+        action="store_true",
+        help="Write shoe, weather, and overlay profile into logs/program.json. Do not render",
     )
     parser.add_argument(
         "--preview",
@@ -484,7 +609,7 @@ def _parse_args():
         default=2,
         help="Parallel clip renders (default: 2). Use 1 for serial.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def _render_main(args) -> int:

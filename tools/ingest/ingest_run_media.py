@@ -17,6 +17,8 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import log_timeline  # noqa: E402
+import program_edl as edl  # noqa: E402
+import todo_list  # noqa: E402
 
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
@@ -552,25 +554,67 @@ def _ingest(args) -> int:
             write_assets_md(assets, media_dir, date, slug, rows, fit_pairs)
 
     if not dry_run:
+        _lock_source_sync(media_dir, date, slug, rows)
         if args.skip_pause_trim:
-            print("skip open/close pause trim")
+            print("skip pause record")
         else:
             trim_script = Path(__file__).resolve().parent / "trim_talk_pauses.py"
-            print("open/close pause trim")
+            print("record pause keeps (no encode)")
             rc = subprocess.run(
                 [
                     sys.executable,
                     str(trim_script),
                     "--media-dir",
                     str(media_dir),
-                    "--apply",
+                    "--record",
+                    "--targets",
+                    "open,close,run",
                 ],
                 check=False,
             ).returncode
             if rc:
-                print(f"open/close 粗剪失败（exit {rc}）：素材已收，但粗剪没做。修好后单独跑 trim_talk_pauses.py --apply，或用 --skip-pause-trim。", file=sys.stderr)
+                print(
+                    f"pause record failed (exit {rc}): media is ingested, keeps were not written. "
+                    "Re-run trim_talk_pauses.py --record, or pass --skip-pause-trim.",
+                    file=sys.stderr,
+                )
                 return rc
     return 0
+
+
+def _lock_source_sync(media_dir: Path, date: str, slug: str, rows: list[dict]) -> None:
+    """原片第 0 秒相对 FIT 开始的偏移。成片怎么剪都不改这张表。"""
+    fit_path = media_dir / f"{date}-run-data.fit"
+    fit_start = None
+    if fit_path.is_file():
+        try:
+            fit_start = fit_window(fit_path)[0]
+        except Exception as exc:
+            print(f"source sync offset unavailable: {exc}")
+    sync = []
+    for row in rows:
+        if not str(row.get("role", "")).startswith("run"):
+            continue
+        dest = media_dir / row["dest"]
+        if not dest.is_file():
+            continue
+        duration = run_ffprobe_duration(dest)
+        video_start = video_window(dest, duration)[0]
+        offset = 0.0 if fit_start is None else (video_start - fit_start).total_seconds()
+        sync.append({"clip": dest.name, "fit": fit_path.name, "offset_s": offset})
+    if not sync:
+        print("source sync not locked: no run clip")
+        return
+    table = edl.load_or_init(media_dir, f"{date}-{slug}")
+    if table.get("program"):
+        print("source sync already locked")
+    else:
+        edl.save(media_dir, edl.set_source_sync(table, sync))
+        print(f"source sync locked for {len(sync)} run clip(s)")
+    try:
+        todo_list.mark(media_dir, "ingest", "done")
+    except ValueError as exc:
+        print(f"todo ingest not updated: {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":

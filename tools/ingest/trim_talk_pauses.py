@@ -13,8 +13,13 @@ import re
 import shutil
 import statistics
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import program_edl as edl  # noqa: E402
+import todo_list  # noqa: E402
 
 
 # 检测做在人声频段上，全频能量会把风和车当成「还在说话」
@@ -454,6 +459,17 @@ def find_talk_clips(media_dir: Path, targets: set[str]) -> list[Path]:
             )
             if matches:
                 found.append(matches[0])
+    if "run" in targets:
+        found.extend(
+            sorted(
+                p
+                for p in media_dir.glob("*-run-*.mp4")
+                if "hud" not in p.name.lower()
+                and "preview" not in p.name.lower()
+                and "final" not in p.name.lower()
+                and not p.stem.endswith("-raw")
+            )
+        )
     if "preview" in targets:
         hud_dir = media_dir / "hud-renders"
         if hud_dir.is_dir():
@@ -469,6 +485,31 @@ def find_talk_clips(media_dir: Path, targets: set[str]) -> list[Path]:
 
 def raw_path(clip: Path) -> Path:
     return clip.with_name(clip.stem + "-raw" + clip.suffix)
+
+
+def record_keeps(media_dir: Path, plans: list[dict]) -> None:
+    """把句间刀写进时间表。不编码。"""
+    table = edl.load_or_init(media_dir, media_dir.name)
+    rows = []
+    for plan in plans:
+        clip: Path = plan["source"]
+        for start, end in plan["windows"]:
+            rows.append({"clip": clip.name, "src_start_s": float(start), "src_end_s": float(end)})
+    if not rows:
+        print("no keep windows to record")
+        return
+    table = edl.upsert_keeps(table, rows)
+    path = edl.save(media_dir, table)
+    print(f"recorded {len(rows)} keep range(s) -> {path}")
+    if table.get("subs_stale"):
+        try:
+            todo_list.mark(media_dir, "subs", "stale")
+        except ValueError as exc:
+            print(f"todo subs not marked stale: {exc}")
+    try:
+        todo_list.mark(media_dir, "edl", "done")
+    except ValueError as exc:
+        raise SystemExit(f"keeps recorded but todo was not updated: {exc}") from None
 
 
 def apply_clip(plan: dict, dry_run: bool) -> None:
@@ -523,7 +564,12 @@ def main() -> int:
         default="open,close",
         help="Comma list: open,close,preview. preview = hud-renders/*-hud-preview.mp4",
     )
-    parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--apply", action="store_true", help="Encode the trimmed file. Prefer --record")
+    parser.add_argument(
+        "--record",
+        action="store_true",
+        help="Write keep ranges into logs/program.json and do not encode",
+    )
     parser.add_argument(
         "--speech-detect",
         choices=("vad", "band"),
@@ -574,9 +620,11 @@ def main() -> int:
         keep_lead = True
     else:
         keep_lead = True
-    dry_run = not args.apply
+    if args.record and args.apply:
+        raise SystemExit("--record and --apply are mutually exclusive; recording does not encode")
+    dry_run = not args.apply and not args.record
     print(
-        f"Mode: {'APPLY' if args.apply else 'DRY-RUN'}  "
+        f"Mode: {'RECORD' if args.record else 'APPLY' if args.apply else 'DRY-RUN'}  "
         f"detect={args.speech_detect}  "
         f"keep_lead_silence={keep_lead}"
     )
@@ -588,6 +636,7 @@ def main() -> int:
             + ", ".join(f"{a:.3f}-{b:.3f}" for a, b in protect)
             + " (intersecting mid-gaps skipped for mean/outlier, kept in full)"
         )
+    plans = []
     for clip in clips:
         source = raw_path(clip) if raw_path(clip).exists() else clip
         plan = plan_clip(
@@ -598,6 +647,14 @@ def main() -> int:
             protect=protect,
         )
         plan["path"] = clip
+        plan["source"] = source
+        plans.append(plan)
+    if args.record:
+        for plan in plans:
+            apply_clip(plan, dry_run=True)
+        record_keeps(media_dir, plans)
+        return 0
+    for plan in plans:
         apply_clip(plan, dry_run=dry_run)
     return 0
 

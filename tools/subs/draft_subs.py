@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import log_timeline  # noqa: E402
 import subs_core as sc  # noqa: E402
+import todo_list  # noqa: E402
 
 MIN_DUR = 1.0
 HARD_PAUSE = 0.75  # 词间停顿 > 这个：必断
@@ -215,6 +216,10 @@ def _draft(args) -> int:
     draft = wav.with_suffix(".draft.srt")
     sc.write_srt(draft, cues)
     print(f"cues={len(cues)}\n写入 {txt}\n原始初稿 {draft}（不要覆盖）")
+    try:
+        todo_list.mark(_media_dir_from_audio(Path(args.audio)), "subs", "waiting-review")
+    except ValueError as exc:
+        print(f"todo not updated: {exc}", file=sys.stderr)
     if term_fixes:
         from collections import Counter
         print("专名拼写统一（按 episode.md 专名表，只改大小写/空格）：" +

@@ -23,22 +23,23 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
 ```text
 手机 VID_ / DCIM + FIT
   p3-scaffold → episodes/YYYY-MM-DD-slug/episode.md
-  p3-ingest   → ~/Movies/running-content/YYYY-MM-DD-slug/{open,run-*,close,FIT} + assets.md
+  p3-ingest   → 收成 open/run-*/close + FIT
+              → 锁原片↔FIT，句间刀只写进 logs/program.json（不重编码）
   p3-shoes    → -sn / -sk
 
-run-* + FIT + -sk
-  p3-hud      → hud-renders/*-hud-alpha.mov + *-hud-preview.mp4
-  p3-cover    → cover-*.jpg（与 HUD 并行）
+p3-hud --record-only → 鞋、天气、透明层规格记进同一张表，不渲未剪预览
+p3-cover             → cover-*.jpg（与记录 HUD 并行）
 
-HUD preview + open / 数据图段或 close
-  p3-assemble → review-preview.mp4 + 预览画面核对
+冷开场 / 贴图 / 插入写进同一张表
+  p3-assemble → 立刻出低成本 review-preview.mp4（能拷贝就拷贝，不渲 HUD）
 
 review-preview
-  p3-subs     → subtitles.txt → 人工改字 → 对齐/质检；用户确认后 subs: done
+  p3-subs     → 转写。对口型前冻结时间表。之后改刀点必须按新表重对齐
 
-人工确认字幕后
+subs: done，且时间表已冻结、logs/todo.md 允许导出
   final_export.py --confirmed
-              → 原片 + HUD alpha + stats + 字幕 + 响度一次编码
+              → 只给留下的片段渲最终 HUD（默认 qtrle）
+              → 同一张表：裁切、xfade、贴图、烧字幕、响度，一次编码
               → YYYY-MM-DD-run-final.mp4
 
 双链齐
@@ -46,9 +47,11 @@ review-preview
   p3-publish-report → 复盘拷完后立刻出单屏 HTML（清临时仍在 p3-publish）
 ```
 
-**唯一最终导出入口：** `tools/assemble/final_export.py`。它不读取 HUD preview、review preview 或 close-stats 视频；直接读取原片和 HUD alpha。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 不属于新流程。
+时间表在媒体目录 `logs/program.json`。两套时钟：`source_sync` 是原片对 FIT 的偏移，HUD 永远按原片时间取样；`program` 是成片时间，句间刀、冷开场、插入、xfade 只改这张。预览和 `final_export.py` 读同一份。schema 见 `tools/program_edl.py` 模块说明。
 
-**人工字幕门闩不能跳过：** `subtitles.txt` 是唯一源稿。用户确认前保持 `subs: waiting-review`，不能最终导出；用户确认后才写 `subs: done`，再执行 `final_export.py --confirmed`。
+**唯一最终导出入口：** `tools/assemble/final_export.py`。它不读取 HUD preview、review preview 或 close-stats 视频。有 `logs/program.json` 时按那张表裁切并只给留下的区间渲 HUD；没有这张表时仍走旧的整段原片路径。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 不属于新流程。
+
+**人工字幕门闩不能跳过：** `subtitles.txt` 是唯一源稿。用户确认前保持 `subs: waiting-review`，不能最终导出；用户确认后才写 `subs: done`，再执行 `final_export.py --confirmed`。对口型前时间表必须 `frozen`。改了刀点、冷开场或插入段之后，旧字幕作废，必须按新表重对齐，不能假定还对准。
 
 **墙钟日志（硬规则）：** 媒体目录 `logs/timeline.txt`，Asia/Shanghai，`YYYY-MM-DD HH:MM:SS`（不知道秒就不要编）。只追加，不改旧行。`START` / `END` / `FAIL` 各一行；`elapsed` 是这一步的墙钟，并行步不要把子步相加。失败再追加 `logs/failures.md`。没有该步的 `START` 和 `END`（或 `FAIL`）就不算做完。官方脚本会自己写；否则用 `tools/log_timeline.py`：
 
@@ -56,16 +59,22 @@ review-preview
 
 步名：`scaffold` `ingest` `shoes` `cover` `hud-render` `review-preview` `draft-subs` `force-align` `final-export` `pack-upload` `drive-stage` `youtube-upload` `bilibili-upload` `published`。重试是新行。`p3-scaffold` 建期时就建 `logs/`，不要拖到最终导出。`p3-qc` 抽帧不单记一步。
 
+**进度清单（硬规则）：** 同一目录 `logs/todo.md`，和 `timeline.txt` 一起维护，一直到 `published`。这是门闩，不是备忘。状态以这份文件为准，不能只看文件名或 `assets.md` 里写了 done。未写入 todo 不算这一步完成。后面的阶段不能在前面没完成时打勾。官方脚本会写；手补用：
+
+`.venv/bin/python tools/todo_list.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug mark <step> done`
+
+字幕状态是 `waiting-review` / `aligned` / `confirmed`。写成 `confirmed` 必须加 `--confirmed`，而且只有用户明确确认之后才能写。导出、打包、发布会读这份文件：todo 不合法就停。
+
 ## 目标与前置
 
 | 目标 | 最低前置 | 加载 |
 | --- | --- | --- |
 | 只收素材 | 原始视频 | `p3-ingest`（缺目录则先 `p3-scaffold`） |
 | 只记鞋 | 鞋名 + 里程口径 | `p3-shoes` |
-| 只做 HUD | 已命名 `run-*` + FIT + `-sk` | `p3-shoes` → `p3-hud` |
-| 只做预览 | 各段 HUD preview 已渲（有数据图则 close-stats） | `p3-assemble` |
-| 只做字幕 | review preview | `p3-subs` |
-| 最终导出 | `subs: done` + `qc: done` + 用户确认 | `final_export.py` |
+| 只做 HUD | 已命名 `run-*` + FIT + `-sk`，时间表已有原片对齐 | `p3-shoes` → `p3-hud`（只记录，不渲） |
+| 只做预览 | `logs/program.json` 已排好成片时间 | `p3-assemble` |
+| 只做字幕 | 低成本 review preview，且刀点不再改 | `p3-subs` |
+| 最终导出 | `subs: done` + `qc: done` + 用户确认 + 时间表已冻结 + `logs/todo.md` 允许导出 | `final_export.py` |
 | 发布 / 清临时 | 双链或用户说发完了 | `p3-publish` |
 | 发布报告 | 已 published，复盘已拷 | `p3-publish-report` |
 | 只换封面 | 自拍 + 封面句 | `p3-cover` |

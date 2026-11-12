@@ -1,21 +1,22 @@
 ---
 name: p3-assemble
-description: 把已经渲好的 HUD / 数据图片段接成整条审片预览（对得上就 stream copy），拼完抽帧核对；不生成最终成片。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py，不能在这里烧字或修响度。
+description: 按 logs/program.json 立刻拼一条低成本审片预览（能拷贝就拷贝，不渲 HUD），拼完抽帧核对；不生成最终成片。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py，不能在这里烧字或修响度。
 ---
 
 # 画面预览
 
-整条审片预览只拼接已经渲好的片段，用来核对时长、字幕和画面元素在不在。**预览不是最终成片，也不能作为最终导出输入。** 不从原片和 HUD alpha 重压。这不是 60–90 秒发布剪辑。
+有 `logs/program.json` 时，预览只按这张表拼，用来决定刀点并开始转写。**不渲 HUD，不按原片码率粗剪，不烧字幕，不修响度。** 整段能接上就 stream copy；只有被切开的短段才按预览规格轻压（h264 用 crf 23，hevc 用 8M，不是源片大约 49Mbps）。跑步段的原片区间和最终导出是同一份。预览不是最终成片，也不能当作最终导出的输入。
+
+没有这张表时，才退回旧路径：拼接已经渲好的 `*-hud-preview.mp4`。不要为了走旧路径去补渲未剪预览。
 
 产物：`~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4`
 
-官方命令就是 `preview_episode.py`。`--dry-run` 会打印每一段是 `copy` 还是轻转。
+官方命令就是 `preview_episode.py`。`--dry-run` 会打印每一段是 `copy` 还是轻压。
 
 ## 前置
 
-- 每个原始 `run-*` 都有对应的 `hud-renders/*-hud-preview.mp4`。缺了就停，先用 `/p3-hud` 把那段渲出来。不要改走整条重压。
-- `open` 可缺。没有数据图时，`close` 可缺，有就直接接原 `close`。
-- 素材目录里有 stats 图片且有 close 时，必须已经有 `*-close-stats.mp4`（数据图段）。没有就先跑 `tools/assemble/overlay_close_stats.py`。预览接数据图段，不接原 close，也不在整条滤镜里现叠 stats。
+- `logs/program.json` 里原片对齐、句间刀、冷开场和贴图已经入表。缺了就停，不要改去整段重压。
+- 贴图和数据图记在表的 `overlays` 里，预览可以先不叠。不要为了预览先做 `*-close-stats.mp4`。
 - 不要使用或覆盖 `*-run-final.mp4`，不要写 `upload/`。
 
 ## 步骤
@@ -30,13 +31,11 @@ description: 把已经渲好的 HUD / 数据图片段接成整条审片预览（
   --out ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4
 ```
 
-编码：以已渲好的 HUD preview 为模板，能拷贝就拷贝，只轻转对不上的短段，不要为对齐格式去重压长段。短段按 `tools/export-spec.json` 的 preview profile 转。不降分辨率。
-
-脚本会缩短时间轴，对齐最终成片。预览比各段相加短一点是正常的，不要再剪，也不要挪字幕时间。`subtitles.txt` 还没写就不要传 `--subtitles`。
+冷开场进跑步、跑步进 close 的 0.2 秒 xfade，预览只把同样的时长从非跑步那一侧剪掉，不做叠化。成片时长和导出一致。预览比各段相加短一点是正常的。`subtitles.txt` 还没写就不要传 `--subtitles`；传了也只在旁边写同时间轴的外挂，不烧进画面。
 
 ## 核对
 
-至少抽帧检查：open 开头、open→run、跑中 HUD、run→close、close 结尾。缺的段跳过。接缝是硬切，叠化不算过。确认 HUD、stats 和音画没有明显缺元素后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表预览画面人工核对，不代表字幕已确认。下一步是 `/p3-subs`。
+至少抽帧检查：open 开头、open→run、跑中、run→close、close 结尾。缺的段跳过。这条预览默认没有最终质量数据条；接缝是硬切，叠化不算过。确认音画没有明显缺段之后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表预览画面人工核对，不代表字幕已确认。脚本成功时会把 `logs/todo.md` 的 `preview` 标成 done；没标上就不算这步完成。下一步是 `/p3-subs`。
 
 ## 记日志
 

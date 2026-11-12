@@ -57,6 +57,7 @@ Mac upload/  →  Google Drive「跑步成片」/YYYY-MM-DD-slug/  （暂存 mp4
 3. API 还是空的，**不要**把同一条成片再 `cp` 进「跑步成片」。上次第一条还在传，就撞出 `…2.mp4` / `…3.mp4`。
 4. 默认路径始终是 Drive → `DownloadFile` → YouTube API。
 5. 一期只暂存一份：`跑步成片/YYYY-MM-DD-slug/` 里已经有这条成片，就不要再拷。等 API id；要重来，先有意清掉再拷。
+6. `stage_drive_chunks.py` 写完 `drive-stage` 之后，把 `logs/todo.md` 的 `drive` 标成 done。YouTube Data API 公开上传成功、拿到链接之后，再标 `youtube` done。Drive 没完成不能标 YouTube。禁止从 Mac 把成片 CopyToBox 分片。
 
 ## box 上传脚本模式
 

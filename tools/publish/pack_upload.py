@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import shutil
 import sys
@@ -15,6 +16,22 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import log_timeline  # noqa: E402
+import todo_list  # noqa: E402
+
+BILIBILI_DESC_MAX = 2000
+# 这些是制作中间片，不能被当成标题成片搬走。
+EXCLUDED_PARTS = (
+    "-run-",
+    "-raw",
+    "no-burn",
+    "no-subs",
+    "pre-coldopen",
+    "pre-loudnorm",
+    "review-preview",
+    "close-stats",
+    "hud-preview",
+    "truncated",
+)
 
 COVERS = (
     "cover-4x3-1920x1440.jpg",
@@ -25,16 +42,35 @@ SRT_NAME = "subtitles.srt"
 UPLOAD_DIRNAME = "upload"
 
 
+def filename_from_title(title: str) -> str:
+    """macOS 文件名不能含 ASCII /。平台标题仍用原文，文件名里的斜杠换成全角。"""
+    name = title.strip().replace("/", "／").replace("\x00", "")
+    if not name:
+        raise ValueError("empty title")
+    if not name.lower().endswith(".mp4"):
+        name += ".mp4"
+    return name
+
+
+def check_bilibili_desc(text: str, limit: int = BILIBILI_DESC_MAX) -> int:
+    count = len(text)
+    if count > limit:
+        raise SystemExit(f"Bilibili description is {count} characters; limit is {limit}")
+    return count
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def is_excluded_mp4(name: str) -> bool:
     """排除制作片，只留标题改名后的烧字成片。"""
     lower = name.lower()
-    if "-run-" in lower:
-        return True
-    if "-raw" in lower:
-        return True
-    if "no-burn" in lower:
-        return True
-    if "pre-coldopen" in lower or "pre-loudnorm" in lower:
+    if any(part in lower for part in EXCLUDED_PARTS):
         return True
     stem = Path(name).stem.lower()
     if stem.endswith("-open") or stem.endswith("-close") or stem in {"open", "close"}:
@@ -116,15 +152,23 @@ def place_title_mp4(src: Path, dst: Path) -> str:
             src.unlink()
             return "kept upload/ (dropped root link)"
         return "already in upload/"
+    backup: Path | None = None
     if dst.exists() or dst.is_symlink():
-        dst.unlink()
+        backup = dst.with_name(dst.name + ".replacing")
+        if backup.exists():
+            raise SystemExit(f"refusing to replace {dst}; leftover {backup.name}")
+        os.rename(dst, backup)
     try:
         os.rename(src, dst)
-        return "move"
     except OSError as exc:
+        if backup is not None:
+            os.rename(backup, dst)
         raise SystemExit(
             f"Cannot move title mp4 into upload/ (copy forbidden): {src} → {dst}: {exc}"
         ) from exc
+    if backup is not None:
+        backup.unlink()
+    return "move"
 
 
 def hardlink_or_copy_small(src: Path, dst: Path) -> str:
@@ -145,6 +189,10 @@ def pack(media_dir: Path, title_mp4: Path | None = None) -> Path:
     media_dir = media_dir.expanduser().resolve()
     if not media_dir.is_dir():
         raise SystemExit(f"media-dir not a directory: {media_dir}")
+    try:
+        todo_list.assert_pack_allowed(media_dir)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None
 
     title = find_title_mp4(media_dir, title_mp4)
     missing: list[str] = []
@@ -158,7 +206,7 @@ def pack(media_dir: Path, title_mp4: Path | None = None) -> Path:
     srt = resolve_small(media_dir, SRT_NAME)
     if srt is None:
         missing.append(SRT_NAME)
-    if missing:
+    if missing or srt is None:
         raise SystemExit(f"Missing required file(s) in {media_dir}: {', '.join(missing)}")
 
     upload = media_dir / UPLOAD_DIRNAME
@@ -172,7 +220,13 @@ def pack(media_dir: Path, title_mp4: Path | None = None) -> Path:
         print(f"  {c.name}  ← {c}  [{how}]")
     how = hardlink_or_copy_small(srt, upload / SRT_NAME)
     print(f"  {SRT_NAME}  ← {srt}  [{how}]")
-
+    packed = upload / title.name
+    digest = sha256_file(packed)
+    record = media_dir / "logs" / "pack-sha256.txt"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_text(f"{digest}  {packed.name}\n", encoding="utf-8")
+    print(f"  sha256 {digest}  {packed.name}")
+    todo_list.mark(media_dir, "pack-upload", "done")
     return upload
 
 
@@ -180,9 +234,13 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--media-dir",
-        required=True,
         type=Path,
         help="~/Movies/running-content/YYYY-MM-DD-slug",
+    )
+    ap.add_argument("--check-desc", type=Path, help="Refuse if this Bilibili description exceeds 2000 characters")
+    ap.add_argument(
+        "--print-filename",
+        help="Print a macOS-safe mp4 name for a platform title (ASCII / becomes fullwidth) and exit",
     )
     ap.add_argument(
         "--title-mp4",
@@ -191,6 +249,16 @@ def main(argv: list[str] | None = None) -> int:
         help="标题名烧字成片；默认同目录或 upload/ 自动识别",
     )
     args = ap.parse_args(argv)
+    if args.print_filename:
+        print(filename_from_title(args.print_filename))
+        return 0
+    if args.check_desc is not None:
+        count = check_bilibili_desc(args.check_desc.read_text(encoding="utf-8"))
+        print(f"bilibili description {count} characters")
+        if args.media_dir is None:
+            return 0
+    if args.media_dir is None:
+        ap.error("--media-dir is required")
     with log_timeline.span(args.media_dir, "pack-upload"):
         pack(args.media_dir, args.title_mp4)
     return 0

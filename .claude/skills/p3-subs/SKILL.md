@@ -45,7 +45,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 
 ## 前置
 
-需要 `YYYY-MM-DD-review-preview.mp4`（或等长的 HUD preview 时间线）。没有则先 `/p3-assemble`。预览只供转写、人工校对和字幕轴确认；最终导出会重新读取原始片段与 HUD alpha。只改字不重转写。
+需要按 `logs/program.json` 拼出来的 `YYYY-MM-DD-review-preview.mp4`。没有则先 `/p3-assemble`。预览和最终导出共用这张表。只改字不重转写。对口型之前先冻结时间表（`program_edl.py freeze`）；`force_align.py` 在表还没冻时会自己冻。冻上之后若改了刀点、冷开场或插入段，表会变成 `subs_stale`，必须按新表重跑对齐，不能把旧字幕套到新成片上。
 
 依赖（一次）：`.venv/bin/pip install -r tools/subs/requirements.txt`。Apple Silicon 上 pip 直接装，CPU 跑。模型首次运行自动从 ModelScope 拉到 `~/Movies/running-content/.models/faster-whisper-large-v3-turbo/`（约 1.6 GB），不连 Hugging Face。
 
@@ -92,7 +92,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 3. **代词贴下一句主语。** 「之后的表现吧我 / 昨天…」错；对的是「看一下之后的表现吧」/「我昨天在看直播的时候」。
 4. **语义单元别拆开。** 「精神 / 图腾吧」应并成「精神图腾吧」；双音节词组、专名、固定搭配同一条。
 5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → `txt_to_subs.py --media-dir auto`。预览仍叫 review-preview 时，脚本另拷同名 `.srt` 供 IINA。
-6. **冷开场 prepend：** 新流程暂不把预览剪辑当最终时间线。若原片段发生变化，重新渲 HUD alpha、生成审片预览并重新对齐字幕；不要只改预览文件制造隐藏 offset。
+6. **改刀点：** 改的是 `logs/program.json`，然后按新表重出预览、重对齐。不要只改预览文件制造隐藏 offset。冷开场和插入段只推成片时间，不改后面跑步段的原片对齐。
 
 txt 一行一条，时间是成片轴：
 
@@ -112,7 +112,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 - 这一轮用户**抽听核对、改错字**即可；优先改 `subtitles.txt`，时间不要动。保持单行。
 
-没说改好之前，`assets.md` 写 `subs: waiting-review`。
+没说改好之前，`assets.md` 写 `subs: waiting-review`。`draft_subs.py` 会把 `logs/todo.md` 的字幕状态写成 `waiting-review`（预览还没入账时写不上，要补）。写不上就不算这步完成。
 
 ## 改好字之后：对口型
 
@@ -140,7 +140,15 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
    - 对完扫一遍：单行；用词跟口播；没有被改写成另一种说法。
    - preview 时长变了（重渲 HUD），对着新成片重抽 wav、重跑这一步。
 
-`check_subs.py` 机器过门之后，把硬失败行列给人；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。agent 不得自行写 `subs: done`。
+`check_subs.py` 机器过门之后，把硬失败行列给人；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。同时：
+
+```bash
+.venv/bin/python tools/todo_list.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  mark subs confirmed --confirmed
+```
+
+agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_align.py` 只把 todo 标到 `aligned`。
 
 然后生成外挂（对齐会改时间，不要提前生成）：
 

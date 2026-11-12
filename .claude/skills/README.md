@@ -32,8 +32,8 @@
   p3-scaffold     建 episodes/YYYY-MM-DD-slug
   p3-ingest       VID_ / FIT → open/run-*/close
   p3-shoes        training/logs/shoes.md，算出 -sk
-  p3-hud          overlay + 单段 HUD preview（整条预览会拼接它），并行封面
-  p3-assemble     拼接 HUD preview / 数据图段成整条审片预览 + 抽帧核对（不出最终片）
+  p3-hud          只记录 HUD 数据（鞋 / 天气 / qtrle），不渲未剪预览
+  p3-assemble     按 program.json 拼低成本审片预览 + 抽帧核对（不出最终片）
   p3-subs         字幕（转写→人改→对齐→人工确认）
   final_export.py  从原片一次叠 HUD/stats、拼接、烧字幕、响度并导出
   p3-loudness     已废弃（响度随 final_export 一次编码）
@@ -54,10 +54,11 @@
 
 ```text
 p3-library / p3-topic / p3-scaffold
-  → ingest → shoes → hud ∥ cover
-  → assemble（一次生成整条预览；抽帧真源在 assemble）
-  → subs（转写与人工确认）
-  → final_export（字幕、响度、画面一次最终编码）
+  → ingest（锁原片时钟，句间刀只记表）→ shoes → hud 记录 ∥ cover
+  → 冷开场 / 贴图 / 插入入表
+  → assemble（按同一张表出低成本预览）
+  → subs（对口型前冻结；人工确认）
+  → final_export（留下的片段才渲 HUD，字幕、响度、画面一次编码）
   → （可选）p3-bilibili / p3-youtube 自动上传；均不挡、不嵌入 publish
   → publish（published 门闩 / 复盘日志上 box / 清临时真源）
   → p3-publish-report（复盘拷完后的单屏 HTML）

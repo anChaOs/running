@@ -27,6 +27,8 @@ sys.path.insert(0, str(TOOLS_DIR / "assemble"))
 sys.path.insert(0, str(TOOLS_DIR / "subs"))
 
 import log_timeline
+import program_edl as edl
+import todo_list
 from export_spec import PREVIEW_SPEC, ExportSpec, video_codec_args
 # 和最终导出用同一套 stats 图片判定，这样「有数据图却没有 close-stats」的失败条件和最终会叠的静帧一致。
 # XFADE 只用来对齐时间轴，不在这里重压叠化。
@@ -738,6 +740,122 @@ def write_subtitle_sidecar(subtitles: Path, output: Path) -> Path:
     return dest
 
 
+def build_program_preview_commands(
+    actions: list[dict],
+    sources: dict[str, Path],
+    output: Path,
+    work_dir: Path,
+    *,
+    copy_codec: str,
+) -> list[list[str]]:
+    """按时间表出预览命令。能拷贝的段不重编；切开的段只轻压，不烧字幕、不修响度。"""
+    list_path = work_dir / "concat.txt"
+    commands: list[list[str]] = []
+    any_copy = any(action["mode"] == "copy" for action in actions)
+    codec = copy_codec if any_copy else "h264"
+    for index, action in enumerate(actions):
+        if action["mode"] == "copy":
+            continue
+        source = sources[action["clip"]]
+        dest = work_dir / f"{index:02d}-{Path(action['clip']).stem}-norm.mp4"
+        start = float(action["src_start_s"]) + float(action["trim_head_s"])
+        end = float(action["src_end_s"]) - float(action["trim_tail_s"])
+        commands.append(
+            [
+                "ffmpeg", "-y", "-nostdin", "-hide_banner",
+                "-i", str(source),
+                "-vf", f"trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS,fps=30,format=yuv420p",
+                "-af", f"atrim=start={start:.6f}:end={end:.6f},asetpts=PTS-STARTPTS",
+                *edl.light_video_args(codec),
+                "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
+                str(dest),
+            ]
+        )
+    commands.append(build_concat_cmd(list_path, output))
+    return commands
+
+
+def program_preview_inputs(actions: list[dict], sources: dict[str, Path], work_dir: Path) -> list[Path]:
+    paths: list[Path] = []
+    for index, action in enumerate(actions):
+        if action["mode"] == "copy":
+            paths.append(sources[action["clip"]])
+        else:
+            paths.append(work_dir / f"{index:02d}-{Path(action['clip']).stem}-norm.mp4")
+    return paths
+
+
+def _preview_from_program(args, media_dir: Path) -> int:
+    """低成本预览。不渲 HUD，不按原片码率粗剪，刀点和导出是同一张表。"""
+    table = edl.load_media(media_dir)
+    problems = edl.validate(table)
+    if problems:
+        raise SystemExit("program timeline: " + "; ".join(problems))
+    if not table["program"]:
+        raise SystemExit("program timeline has no segments")
+    episode = str(table.get("episode") or media_dir.name)
+    output = Path(args.out).expanduser().resolve() if args.out else media_dir / f"{episode[:10]}-review-preview.mp4"
+    reject_preview_output(output)
+    sources: dict[str, Path] = {}
+    durations: dict[str, float] = {}
+    codecs: dict[str, str] = {}
+    for seg in table["program"]:
+        clip = seg["clip"]
+        if clip in sources:
+            continue
+        path = media_dir / clip
+        if not path.is_file():
+            raise SystemExit(f"program clip not found: {path}")
+        sources[clip] = path
+        durations[clip] = probe_duration(path)
+        codecs[clip] = probe_streams(path).vcodec
+    actions = edl.preview_actions(table, durations)
+    copy_actions = [action for action in actions if action["mode"] == "copy"]
+    copy_codec = codecs[copy_actions[0]["clip"]] if copy_actions else "h264"
+    work_dir = output.parent / f".{output.stem}.preview-work"
+    commands = build_program_preview_commands(
+        actions, sources, output, work_dir, copy_codec=copy_codec,
+    )
+    print(f"preview from program.json segments={len(actions)} copy={len(copy_actions)}")
+    for action in actions:
+        print(f"  {action['mode']:12} {action['id']} {action['clip']} {action['src_start_s']:.3f}-{action['src_end_s']:.3f} {action['reason']}")
+    for cmd in commands:
+        print("$", " ".join(shlex.quote(part) for part in cmd))
+    if any("subtitles=" in part or "loudnorm" in part for cmd in commands for part in cmd):
+        raise SystemExit("program preview must not burn subtitles or normalize loudness")
+    subtitles = Path(args.subtitles).expanduser().resolve() if args.subtitles else None
+    if subtitles is not None and not subtitles.is_file():
+        raise SystemExit(f"subtitles not found: {subtitles}")
+    if args.dry_run:
+        if subtitles is not None:
+            print(f"sidecar={output.with_suffix('.srt')}")
+        return 0
+    if work_dir.exists():
+        shutil.rmtree(work_dir)
+    work_dir.mkdir(parents=True)
+    try:
+        (work_dir / "concat.txt").write_text(
+            concat_list_text(program_preview_inputs(actions, sources, work_dir)),
+            encoding="utf-8",
+        )
+        try:
+            for cmd in commands:
+                subprocess.run(cmd, check=True)
+        except BaseException:
+            output.unlink(missing_ok=True)
+            raise
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
+    if subtitles is not None:
+        write_subtitle_sidecar(subtitles, output)
+    print(f"Wrote {output}")
+    try:
+        todo_list.mark(media_dir, "preview", "done")
+    except ValueError as exc:
+        raise SystemExit(f"preview file written but todo was not updated: {exc}") from None
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--media-dir", required=True)
@@ -757,6 +875,8 @@ def main(argv: list[str] | None = None) -> int:
 def _preview(args, media_dir: Path) -> int:
     if not media_dir.is_dir():
         raise SystemExit(f"media dir not found: {media_dir}")
+    if edl.program_path(media_dir).is_file():
+        return _preview_from_program(args, media_dir)
     cut = discover_preview_cut(media_dir)
     output = Path(args.out).expanduser().resolve() if args.out else media_dir / f"{cut.date}-review-preview.mp4"
     reject_preview_output(output)

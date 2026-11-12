@@ -20,10 +20,13 @@ TOOLS_DIR = Path(__file__).resolve().parents[1]
 ASSEMBLE_DIR = Path(__file__).resolve().parent
 SUBS_DIR = TOOLS_DIR / "subs"
 sys.path.insert(0, str(TOOLS_DIR))
+sys.path.insert(0, str(TOOLS_DIR / "hud"))
 sys.path.insert(0, str(SUBS_DIR))
 sys.path.insert(0, str(ASSEMBLE_DIR))
 
 import log_timeline
+import program_edl as edl
+import todo_list
 from export_spec import (
     FINAL_SPEC,
     ExportSpec,
@@ -607,8 +610,249 @@ def main(argv: list[str] | None = None) -> int:
         return wall.rc
 
 
+PROGRAM_SOURCE_FORBIDDEN = (
+    "hud-preview",
+    "review-preview",
+    "close-stats",
+    "run-final",
+    "no-subs",
+    "truncated",
+    "no-burn",
+)
+
+
+def _program_alpha_mode(job: dict, durations: dict[str, float]) -> str:
+    full = durations.get(job["clip"])
+    if full is None:
+        return "kept"
+    if job["src_start_s"] <= 0.02 and job["src_end_s"] >= full - 0.02:
+        return "full"
+    return "kept"
+
+
+def build_program_filter(
+    table: dict,
+    alpha_modes: list[str],
+    overlay_count: int,
+    ass: Path | None,
+    spec: ExportSpec = FINAL_SPEC,
+    measured: dict[str, str] | None = None,
+    apply_loudness: bool = True,
+) -> str:
+    """按时间表裁切、叠 HUD、转场、贴图、烧字幕、响度。预览用的是同一组原片区间。"""
+    slices = edl.export_slices(table)
+    fps = spec.timeline.fps
+    width, height = spec.timeline.width, spec.timeline.height
+    parts: list[str] = []
+    video_labels: list[str] = []
+    audio_labels: list[str] = []
+    durations: list[float] = []
+    for index, sl in enumerate(slices):
+        start = float(sl["src_start_s"])
+        end = float(sl["src_end_s"])
+        dur = end - start
+        durations.append(dur)
+        parts.append(
+            f"[{index}:v]trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS,"
+            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,fps={fps},settb=1/{fps},format=yuv420p,setsar=1[v{index}]"
+        )
+        parts.append(
+            f"[{index}:a]atrim=start={start:.6f}:end={end:.6f},asetpts=PTS-STARTPTS,"
+            f"aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo,"
+            f"aresample=async=1:first_pts=0,apad=whole_dur={dur:.6f},atrim=0:{dur:.6f}[a{index}]"
+        )
+        video_labels.append(f"v{index}")
+        audio_labels.append(f"a{index}")
+
+    hud_slices = [sl for sl in slices if sl["hud"]]
+    if len(alpha_modes) != len(hud_slices):
+        raise ValueError("HUD alpha count does not match hud slices")
+    alpha_base = len(slices)
+    hud_at = 0
+    for index, sl in enumerate(slices):
+        if not sl["hud"]:
+            continue
+        mode = alpha_modes[hud_at]
+        alpha_index = alpha_base + hud_at
+        hud_at += 1
+        if mode == "full":
+            trim = f"trim=start={sl['src_start_s']:.6f}:end={sl['src_end_s']:.6f},setpts=PTS-STARTPTS"
+        else:
+            trim = f"trim=duration={durations[index]:.6f},setpts=PTS-STARTPTS"
+        parts.append(f"[{alpha_index}:v]{trim},fps={fps},format=rgba[ha{index}]")
+        parts.append(f"[{video_labels[index]}][ha{index}]overlay=eof_action=pass:shortest=0:format=auto[vh{index}]")
+        video_labels[index] = f"vh{index}"
+
+    fades = {item["before_id"]: float(item["duration_s"]) for item in table.get("transitions", [])}
+    vcur, acur = video_labels[0], audio_labels[0]
+    acc = durations[0]
+    for index in range(1, len(slices)):
+        fade = fades.get(slices[index]["id"], 0.0)
+        if fade:
+            offset = max(0.0, acc - fade)
+            parts.append(
+                f"[{vcur}][{video_labels[index]}]xfade=transition=fade:duration={fade:.6f}:offset={offset:.6f}[vx{index}]"
+            )
+            parts.append(f"[{acur}][{audio_labels[index]}]acrossfade=d={fade:.6f}[ax{index}]")
+            acc = acc + durations[index] - fade
+        else:
+            parts.append(f"[{vcur}][{video_labels[index]}]concat=n=2:v=1:a=0[vx{index}]")
+            parts.append(f"[{acur}][{audio_labels[index]}]concat=n=2:v=0:a=1[ax{index}]")
+            acc += durations[index]
+        vcur, acur = f"vx{index}", f"ax{index}"
+
+    overlay_base = alpha_base + len(hud_slices)
+    for k, ov in enumerate(table.get("overlays") or []):
+        nxt = f"vov{k}"
+        parts.append(_program_overlay_chain(overlay_base + k, ov, k, vcur, nxt, height=height))
+        vcur = nxt
+    if overlay_count != len(table.get("overlays") or []):
+        raise ValueError("overlay input count does not match the program")
+    if ass is not None:
+        parts.append(
+            f"[{vcur}]subtitles={escape_filter_path(ass)}:fontsdir={escape_filter_path(SUBTITLE_FONTS_DIR)}:charenc=UTF-8[v]"
+        )
+    else:
+        parts.append(f"[{vcur}]format=yuv420p[v]")
+    if apply_loudness:
+        parts.append(f"[{acur}]{loudness_filter(spec, measured)}[a]")
+    else:
+        parts.append(f"[{acur}]aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo[a]")
+    return ";".join(parts)
+
+
+def _program_overlay_chain(index: int, ov: dict, k: int, vin: str, vout: str, *, height: int) -> str:
+    start = float(ov["program_start_s"])
+    end = float(ov["program_end_s"])
+    span = end - start
+    if ov.get("role") == "stats":
+        scale = f"scale=-2:{max(320, int(height * 0.82))}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa=0.82"
+        x = ov.get("x") or "40"
+        y = ov.get("y") or "(H-h)/2"
+    else:
+        scale = "format=yuva420p"
+        if ov.get("width"):
+            scale = f"scale={int(ov['width'])}:-2,format=yuva420p"
+        opacity = float(ov.get("opacity") or 1)
+        if opacity < 1:
+            scale += f",colorchannelmixer=aa={opacity:.3f}"
+        x = ov.get("x") or "0"
+        y = ov.get("y") or "0"
+    return (
+        f"[{index}:v]{scale},trim=duration={span:.6f},setpts=PTS-STARTPTS+{start:.6f}/TB[ol{k}];"
+        f"[{vin}][ol{k}]overlay=x={x}:y={y}:eof_action=pass:format=auto"
+        f":enable='between(t,{start:.6f},{end:.6f})'[{vout}]"
+    )
+
+
+def program_input_args(
+    media_dir: Path,
+    table: dict,
+    alpha_paths: list[Path],
+    spec: ExportSpec = FINAL_SPEC,
+) -> list[str]:
+    args: list[str] = []
+    for sl in edl.export_slices(table):
+        args.extend(["-i", str(media_dir / sl["clip"])])
+    for path in alpha_paths:
+        args.extend(["-i", str(path)])
+    fps = spec.timeline.fps
+    for ov in table.get("overlays") or []:
+        span = float(ov["program_end_s"]) - float(ov["program_start_s"])
+        asset = media_dir / ov["asset"]
+        args.extend(["-loop", "1", "-framerate", str(fps), "-t", f"{span:.6f}", "-i", str(asset)])
+    return args
+
+
+def _reject_program_source(name: str) -> None:
+    if any(part in name for part in PROGRAM_SOURCE_FORBIDDEN):
+        raise SystemExit(f"program timeline cannot use encoded intermediate: {name}")
+
+
+def _export_from_program(args, media_dir: Path) -> int:
+    import final_qc
+    import render_running_hud as hud
+
+    episode_dir = Path(args.episode_dir).expanduser().resolve()
+    subtitles = Path(args.subtitles).expanduser().resolve() if args.subtitles else episode_dir / "subtitles.txt"
+    table = edl.load_media(media_dir)
+    if not args.confirmed:
+        raise SystemExit("Final export requires --confirmed after manual subtitle review")
+    if not subtitles.is_file():
+        raise SystemExit(f"subtitles.txt not found: {subtitles}")
+    parse_txt(subtitles)
+    status = read_status(episode_dir)
+    if not status.get("preview", "").startswith("done"):
+        raise SystemExit("Final export requires assets.md preview: done")
+    if not status.get("subs", "").startswith("done"):
+        raise SystemExit("Final export requires assets.md subs: done after user confirmation")
+    if not status.get("qc", "").startswith("done"):
+        raise SystemExit("Final export requires preview qc: done before final export")
+    problems = edl.validate(table, require_frozen=True)
+    if problems:
+        raise SystemExit("program timeline: " + "; ".join(problems))
+    try:
+        todo_list.assert_export_allowed(media_dir)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None
+    for sl in edl.export_slices(table):
+        _reject_program_source(sl["clip"])
+        if not (media_dir / sl["clip"]).is_file() and not args.dry_run:
+            raise SystemExit(f"program clip not found: {media_dir / sl['clip']}")
+    output = Path(args.out).expanduser().resolve()
+    if output.exists() and not args.dry_run:
+        raise SystemExit(f"Refusing to overwrite existing final output: {output}")
+    durations = {}
+    for sl in edl.export_slices(table):
+        path = media_dir / sl["clip"]
+        if path.is_file() and sl["clip"] not in durations:
+            durations[sl["clip"]] = probe_duration(path)
+    jobs = edl.hud_jobs(table)
+    modes = [_program_alpha_mode(job, durations) for job in jobs]
+    alpha_paths = hud.export_alphas(media_dir, table, durations, dry_run=args.dry_run)
+    if len(alpha_paths) != len(jobs):
+        raise SystemExit("HUD alpha plan does not match kept run slices")
+    ass = None if args.no_subtitles else make_ass(subtitles)
+    try:
+        plan_args = program_input_args(media_dir, table, alpha_paths)
+        plan = InputPlan(tuple(plan_args), len(edl.export_slices(table)), (), (), 0.0)
+        first = build_program_filter(table, modes, len(table.get("overlays") or []), ass, measured=None)
+        measured = None if args.dry_run else measure_loudness(plan, first)
+        final_graph = build_program_filter(
+            table, modes, len(table.get("overlays") or []), ass, measured=measured,
+        )
+        cmd = build_encode_cmd(plan, final_graph, output, test_codec=args.test_codec)
+        print("$", " ".join(cmd), flush=True)
+        if args.dry_run:
+            return 0
+        subprocess.run(cmd, check=True)
+        print(f"Wrote {output}", flush=True)
+        info = final_qc.probe_final(output)
+        loudness = final_qc.measure_integrated_lufs(output)
+        codec = args.test_codec or FINAL_SPEC.vcodec
+        tag = None if args.test_codec else FINAL_SPEC.tag
+        qc_problems = final_qc.check_final(
+            info,
+            expected_duration=edl.program_duration(table),
+            loudness_i=loudness,
+            video_codec="h264" if codec == "libx264" else "hevc",
+            video_tag=tag,
+        )
+        if qc_problems:
+            raise SystemExit("final QC failed: " + "; ".join(qc_problems))
+        todo_list.mark(media_dir, "final-export", "done")
+        todo_list.mark(media_dir, "final-qc", "done")
+    finally:
+        if ass is not None:
+            ass.unlink(missing_ok=True)
+    return 0
+
+
 def _export_episode(args) -> int:
     media_dir = Path(args.media_dir).expanduser().resolve()
+    if edl.program_path(media_dir).is_file():
+        return _export_from_program(args, media_dir)
     episode_dir = Path(args.episode_dir).expanduser().resolve()
     subtitles = Path(args.subtitles).expanduser().resolve() if args.subtitles else episode_dir / "subtitles.txt"
     sources = discover_sources(media_dir)

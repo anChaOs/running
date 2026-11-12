@@ -135,32 +135,21 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-variant.xm
 ```bash
 .venv/bin/python tools/hud/render_running_hud.py \
   --media-dir ~/Movies/running-content/2026-04-23-first-video \
-  --overlay-only \
-  --preview \
+  --record-only \
+  --weather-city shanghai \
   -sn Cumulus \
   -sk 642
 ```
 
-这条命令会：
+这条只把鞋、天气和透明层规格写进 `logs/program.json`。不要加 `--preview`：那会在渲透明层的同时把未剪原片再压一遍。最终导出才给留下的区间渲透明层。
 
-- 在 `media-dir` 中寻找 `*-run-data.fit`
-- 自动处理 `*-run-*.mp4`（不处理 `open` / `close`）
-- 渲透明 HUD 层
-- 再按统一 preview 规格叠成可看的审片文件。整条审片预览拼接这些文件；最终导出不读取它们
-
-```text
-hud-renders/YYYY-MM-DD-run-a-hud-alpha.mov      # ProRes 4444 透明层
-hud-renders/YYYY-MM-DD-run-a-hud-preview.mp4    # 整条审片预览直接拼接；最终导出不读取
-```
-
-默认编码是 **ProRes 4444**（剪映专业版能认 alpha）。文件会比较大。若体积太大，可改：
+默认透明层编码是 **qtrle**（QuickTime Animation。比 ProRes 4444 小；alpha 是无损压缩。开发机没有媒体盘，没有做实机画质对比）。导出画面不能接受，或剪映要 ProRes 时：
 
 ```bash
+--overlay-only --overlay-profile prores4444
+
 # PNG-in-MOV，透明区域多时通常更小
 --overlay-only --overlay-profile png
-
-# QuickTime Animation，体积更小，剪映兼容性不如 ProRes
---overlay-only --overlay-profile qtrle
 ```
 
 不加 `--overlay-only` 时，仍会把 HUD 直接烤进 `*-hud.mp4`（旧行为）。FIT 对齐逻辑两种模式相同：`--use-fit-only --video-time-end file-modified`。

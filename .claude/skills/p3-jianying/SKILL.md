@@ -10,7 +10,7 @@ description: 60–90 秒发布剪辑走剪映，不走全长成片脚本。用�
 ## 前置
 
 - 原片：`open` / `run-*` / `close`
-- HUD 透明层：`hud-renders/*-hud-alpha.mov`（不要用 preview 再叠一层）
+- HUD 透明层：最终导出写在 `hud-renders/qtrle/*-hud-alpha.mov`。剪映认不了 qtrle 时，单独用 `--overlay-profile prores4444` 渲，不要用 preview 再叠一层
 - 可选：`episodes/.../subtitles.txt` 当听写底稿（仓库不留 srt），剪映里会重切时长
 
 ## 注意
