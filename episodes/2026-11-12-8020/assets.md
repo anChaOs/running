@@ -54,7 +54,7 @@
 - close-stats: done（`2026-11-12-close-stats.mp4`，stats-01/02 均分叠在 close 左侧）
 - preview: done（`2026-11-12-review-preview.mp4` 19:12.75，墙钟 1m17s；run-a..e stream copy，open / close-stats 轻转并剪 0.2s xfade）
 - qc: done（抽帧核过 open 开头、open→run、跑中 HUD、run-e→close、close 数据图两张与结尾）
-- subs: waiting-review（初稿 260 条，已校对明显错字并做切条自检；未对口型、未写简介）
+- subs: done（368 条已对口型并经用户确认；外挂已写入媒体目录 subtitles.srt 与 2026-11-12-review-preview.srt）
 - loudness: pending
 - burn: deprecated
 - final: pending
