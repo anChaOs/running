@@ -18,5 +18,5 @@ media: ~/Movies/running-content/YYYY-MM-DD-topic/
 ## 文件
 
 - `plan.md`：拍摄 / 发布计划
-- `talk.md`：边跑边说提纲
+- `talk.md`：边跑边说可念口播
 - `assets.md`：素材索引（模板 `templates/assets.md`）

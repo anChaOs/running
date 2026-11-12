@@ -45,15 +45,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `tools/subs/` | 字幕初稿、强制对齐、质检门；txt 收成外挂 SRT 与烧字 ASS（都不进 git） |
 | `.claude/skills/` | 按需加载；主题库 `p3-library`，选题 `p3-topic`，成片入口 `p3-episode`，归档 `p3-archive` |
 
-新一期用 `templates/episode.md`。口播可用 `templates/run-talk-video.md`。知识页用 `templates/wiki-page.md`，规则见 `knowledge/CLAUDE.md`。
+新一期用 `templates/episode.md`。口播写在该期 `talk.md`，默认可念稿。知识页用 `templates/wiki-page.md`，规则见 `knowledge/CLAUDE.md`。
 
 `episode.md` 的 status：`idea` → `planned` → `shot` → `hud` → `edited` → `published`。
 
 ## 工作流
 
 ```text
-inbox 碎片 / 灵光一闪 → skill `p3-library` 进主题库 → 有拍摄日 skill `p3-topic` 定题和口播卡 → 建 episodes/YYYY-MM-DD-slug/
-  → talk.md 口播提纲 → 拍跑前/跑中/跑后/B-roll，拿到当天 FIT
+inbox 碎片 / 灵光一闪 → skill `p3-library` 进主题库 → 有拍摄日 skill `p3-topic` 定题和可念口播 → 建 episodes/YYYY-MM-DD-slug/
+  → talk.md 可念口播 → 拍跑前/跑中/跑后/B-roll，拿到当天 FIT
   → 收进 ~/Movies/running-content/YYYY-MM-DD-slug/ 并统一命名
   → 成片走 skill `p3-episode`（按需：ingest / 鞋账本 / HUD / 拼接核对 / 字幕）
   → 或进剪映做 60–90 秒发布剪辑（skill `p3-jianying`）
@@ -71,7 +71,7 @@ inbox 碎片 / 灵光一闪 → skill `p3-library` 进主题库 → 有拍摄日
 默认产出：
 
 - 文案 → 可直接口播拍摄的视频版，写入该期 `talk.md` / `script.md`
-- 选题 → 标题、核心观点、适合平台、展开角度、这条不讲什么
+- 选题 → 按拍摄分段的可念口播；标题和观点用几句人话放在前面
 - 知识整理 → ingest 进 `knowledge/wiki/`（先读 `wiki/index.md`）
 - 复盘 → 训练、身体反馈、内容表现、下一步动作
 

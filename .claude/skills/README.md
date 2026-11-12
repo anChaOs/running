@@ -27,7 +27,7 @@
 .claude/skills/
   README.md
   p3-library      备选主题库（还没拍摄日）
-  p3-topic        选题对谈 → 选题 + 分段口播卡
+  p3-topic        选题对谈 → 按拍摄分段的可念口播
   p3-episode      成片调度
   p3-scaffold     建 episodes/YYYY-MM-DD-slug
   p3-ingest       VID_ / FIT → open/run-*/close

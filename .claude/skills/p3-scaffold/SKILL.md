@@ -19,7 +19,7 @@ description: 新建一期 episodes/YYYY-MM-DD-slug 和 episode.md。用户说建
 
 1. 列 `episodes/`，按日期撞车时把现有 `episode.md` 标题给用户看，问是续做还是新 slug。
 2. 从 `templates/episode.md` 建 `episodes/YYYY-MM-DD-slug/episode.md`。
-3. 需要口播卡再拷 `templates/run-talk-video.md` → `talk.md`；素材索引用 `templates/assets.md`。空壳 `talk.md` 里也加上简介占位：`等字幕完成并校准后再写。不要按本口播卡写。` 不要写简介正文。
+3. `talk.md` 放这期可念口播。还没有口播时，文件里只留简介占位：`等字幕完成并校准后再写。不要按本口播卡写。` 不要写简介正文。素材索引用 `templates/assets.md`。
 4. `episode.md` 的 `专名：` 行：talk.md 里已经出现的产品名、人名、英文缩写先填上（顿号分隔），没有就留模板占位。p3-subs 会自动读这行。
 5. `status` 先 `planned`；素材进目录后再改 `shot`。
 6. 建空的媒体目录，并同时建 `logs/`。选题落盘、建期都要建，不要标成可选，也不要等到导出：
