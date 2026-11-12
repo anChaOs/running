@@ -352,6 +352,33 @@ class ClockTest(unittest.TestCase):
         self.assertAlmostEqual(stats[-1]["program_end_s"], close["program_start_s"] + edl.seg_duration(close))
         self.assertEqual(edl.validate(table), [])
 
+    def test_close_stats_span_sentence_cuts_on_close(self) -> None:
+        table = edl.empty_program("2026-01-02-demo")
+        edl.set_source_sync(table, [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}])
+        edl.upsert_keeps(
+            table,
+            [
+                {"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 4.0},
+                {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 10.0},
+                {"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 3.0},
+                {"clip": "2026-01-02-close.mp4", "src_start_s": 4.0, "src_end_s": 8.0},
+            ],
+        )
+        edl.record_hud(table, shoe_name="Fly", shoe_km_after=100.0, weather_city="shanghai")
+        edl.add_close_stats(table, ["stats-01.jpg", "stats-02.jpg"])
+        closes = [seg for seg in table["program"] if seg["type"] == "close"]
+        self.assertEqual(len(closes), 2)
+        stats = [ov for ov in table["overlays"] if ov.get("role") == "stats"]
+        self.assertEqual(len(stats), 2)
+        start = closes[0]["program_start_s"]
+        end = closes[-1]["program_start_s"] + edl.seg_duration(closes[-1])
+        self.assertAlmostEqual(end - start, 7.0)
+        self.assertAlmostEqual(stats[0]["program_start_s"], start)
+        self.assertAlmostEqual(stats[0]["program_end_s"], start + 3.5)
+        self.assertAlmostEqual(stats[-1]["program_start_s"], start + 3.5)
+        self.assertAlmostEqual(stats[-1]["program_end_s"], end)
+        self.assertEqual(edl.validate(table), [])
+
 
 class SameTableTest(unittest.TestCase):
     def test_preview_commands_stay_light_and_export_burns(self) -> None:

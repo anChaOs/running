@@ -311,16 +311,23 @@ def signatures_match(got: object, want: object) -> bool:
 
 
 def add_close_stats(table: dict, assets: list[str]) -> dict:
-    """把数据图按 close 在成片上的时长均分，写进 overlays。不改刀点。"""
-    closes = [seg for seg in table.get("program", []) if seg["type"] == "close"]
-    if len(closes) != 1:
-        raise ValueError("close stats need exactly one close segment")
+    """把数据图按 close 在成片上的时长均分，写进 overlays。不改刀点。
+
+    句间刀会把 close 切成多段。数据图覆盖整块 close，不是只盖第一段。
+    """
+    program = table.get("program") or []
+    idxs = [i for i, seg in enumerate(program) if seg["type"] == "close"]
+    if not idxs:
+        raise ValueError("close stats need a close segment")
+    if idxs != list(range(idxs[0], idxs[-1] + 1)):
+        raise ValueError("close stats need one contiguous close block")
     if not assets:
         raise ValueError("close stats need at least one image")
     table["overlays"] = [ov for ov in table.get("overlays", []) if ov.get("role") != "stats"]
-    seg = closes[0]
-    start = float(seg["program_start_s"])
-    end = start + seg_duration(seg)
+    first = program[idxs[0]]
+    last = program[idxs[-1]]
+    start = float(first["program_start_s"])
+    end = float(last["program_start_s"]) + seg_duration(last)
     step = (end - start) / len(assets)
     for index, asset in enumerate(assets):
         ov_end = end if index == len(assets) - 1 else start + (index + 1) * step
