@@ -40,7 +40,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 1. 写两边链接进 `episode.md`「发布」栏，`status=published`
 2. **立刻合并该期 episode PR 进 `main`**（squash；可删远程分支）；不要等用户再点合
-3. **复盘日志上 box**（下一节，必做；不要等清临时确认）
+3. **复盘日志上 box**（下一节，必做；不要等清临时确认）。拷完立刻 `/p3-publish-report`
 4. 再按下文列清临时清单（体积）→ 用户确认 → 进废纸篓（禁止 `rm`）
 
 抖音短链不挡本步；有了再补写「抖音：」。
@@ -86,6 +86,7 @@ Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上�
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
 | 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
 | `logs/` | 制作日志。复盘已拷到 box；本地留到满 7 天归档，清临时不删 |
+| `publish-report.html` | 发布报告，在素材目录。清临时不删 |
 
 仓库只保留 `subtitles.txt`，清理媒体临时文件时不要改它。跑鞋账本一律不动。
 
@@ -113,6 +114,10 @@ Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上�
 2. **进废纸篓，禁止 `rm`。** 在 macOS 上把确认要删的路径 **move 进废纸篓**（`mv … ~/.Trash/`，或已安装的 `trash` CLI）。同名冲突时先改名再移入。
 3. 清完把实际移入废纸篓的路径与腾出的体积报给用户。
 4. 这里**不要**整夹归档或删掉整个媒体目录；满 7 天整夹搬走走 `p3-archive`。
+
+## 记日志
+
+`pack_upload.py` 会写 `pack-upload`。写上 `published` 时用 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start published`，再 `end`。脚本或 helper 已写的行不要重复；失败用 `fail`。
 
 ## 完成后
 

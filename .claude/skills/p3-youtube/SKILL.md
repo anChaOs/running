@@ -18,7 +18,6 @@ description: 把本期 upload/ 成片经 Google Drive「跑步成片」暂存到
 ## 不要做的事
 
 - 不要默认 `unlisted` / `private`（必须 **public**，除非用户当场改口）
-- 不要把 ~2G 成片默认拆成多片 `CopyToBox` 从 Mac 拷进 box（慢、占用户机；仅当 Drive API 明确失败或超时、且用户允许时的应急，见下）。等 Drive 或正在下载时不要并行开分片
 - 不要把 Finder / 本机 `ls`（含 `local-*`）当成「拷完」；API 还空时不要把同一条成片再 `cp` 进「跑步成片」
 - 不要在缺 `token.json` / 缺成片 / 缺 16:9 封面时硬传
 - 不要因外挂字幕失败而回滚已公开的成片（字幕缺 scope 时可后补）
@@ -47,7 +46,7 @@ Mac upload/  →  Google Drive「跑步成片」/YYYY-MM-DD-slug/  （暂存 mp4
              →  成功后：Drive 本期暂存进废纸篓；写 episode.md YouTube 链
 ```
 
-大文件走 Drive，**不要**默认 Mac→box 直拷。`CopyToBox` 单文件常有约 **100MiB** 上限；整段成片应整文件经 Drive。
+大文件整段经 Drive 下载到 box，不要从用户电脑把成片直拷进 box。
 
 ### 暂存完成门（硬门）
 
@@ -56,16 +55,8 @@ Mac upload/  →  Google Drive「跑步成片」/YYYY-MM-DD-slug/  （暂存 mp4
 1. **拷完**只认 Drive API `list` / `search` 返回本期 mp4，并带**稳定云端 item id**；体积对得上更好。
 2. 本机 DriveFS 路径可见（Finder / `ls`，包括 `local-*` 占位）**不算完成**。
 3. API 还是空的，**不要**把同一条成片再 `cp` 进「跑步成片」。上次第一条还在传，就撞出 `…2.mp4` / `…3.mp4`。
-4. **不要**一边等 Drive、或正在从 Drive 下载，一边开 Mac→box 分片 `CopyToBox`。两条路选一条。默认仍是 Drive → `DownloadFile` → YouTube API。分片只在 Drive **明确失败或超时之后**，而且不能两头同时跑。
+4. 默认路径始终是 Drive → `DownloadFile` → YouTube API。
 5. 一期只暂存一份：`跑步成片/YYYY-MM-DD-slug/` 里已经有这条成片，就不要再拷。等 API id；要重来，先有意清掉再拷。
-
-### 应急 fallback（仅当 Drive API 确认没有本期 mp4，且默认路径已失败或超时）
-
-Drive API `list` / `search` 仍没有稳定 item id，又确认失败或超时、用户也同意：可以把成片 **分片** `CopyToBox` 到 box 再拼接。先停掉还在等的 Drive 下载，不要两条路一起跑。注意：
-
-- 这仍占用用户 Mac 做传输；速度可能只有约 0.4–0.5 MB/s，2G 级要很久
-- **仍不是**在 Mac 上调 YouTube API；API 上传必须留在 box
-- 拼完校验体积/时长后再传；用完删 box 临时分片
 
 ## box 上传脚本模式
 
@@ -98,6 +89,10 @@ Drive API `list` / `search` 仍没有稳定 item id，又确认失败或超时�
 - 若 403 `insufficientPermissions` / 缺 **`youtube.force-ssl`**：记一笔，**视频照样 public**；告知用户可在 Studio 手挂或下次扩 scope 重授权
 - 不要为字幕失败重新上传整片
 
+## 记日志
+
+`tools/publish/stage_drive_chunks.py` 在源文件位于 `upload/` 时会写 `drive-stage`；不在 `upload/` 时用 helper 补记。box 上的 YouTube 上传没有仓库脚本：开始 `start youtube-upload`，成功 `end`，失败 `fail`（`.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug`）。已有的行不要重复。
+
 ## 成功后
 
 1. 把 `https://youtu.be/…` 写入该期 `episode.md`「发布」栏「YouTube：」（B 站仍空则 **不要** 改 `published`）
@@ -115,6 +110,5 @@ Drive API `list` / `search` 仍没有稳定 item id，又确认失败或超时�
 
 - bot 云电脑浏览器打开 YouTube Studio 常 TLS 超时；**不要**靠 Studio 网页上传。Data API / googleapis 上传端点从 box 可达。
 - 从 Mac 直调 API 曾能用，但违背「Mac 关机也能发」；用户已要求：**未经当场允许不得用其电脑传 YouTube**。
-- Drive 暂存丢失时用过 Mac 分片 `CopyToBox`（约 90MB/片）再拼接——仅应急，默认仍走 Drive `DownloadFile`。
-- 2026-11-06：Finder / `ls` 当成拷完，API 还空就再 `cp`，撞出 `…2.mp4` / `…3.mp4`，同时又开分片。暂存完成只认 Drive API 的稳定 item id，两条路不要并行。
+- 2026-11-06：Finder / `ls` 当成拷完，API 还空就再 `cp`，撞出 `…2.mp4` / `…3.mp4`。暂存完成只认 Drive API 的稳定 item id。
 - captions 缺 `youtube.force-ssl` 时整片仍可 public；不要把字幕当成上传门闩。

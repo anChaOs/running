@@ -22,10 +22,19 @@ description: 新建一期 episodes/YYYY-MM-DD-slug 和 episode.md。用户说建
 3. 需要口播卡再拷 `templates/run-talk-video.md` → `talk.md`；素材索引用 `templates/assets.md`。空壳 `talk.md` 里也加上简介占位：`等字幕完成并校准后再写。不要按本口播卡写。` 不要写简介正文。
 4. `episode.md` 的 `专名：` 行：talk.md 里已经出现的产品名、人名、英文缩写先填上（顿号分隔），没有就留模板占位。p3-subs 会自动读这行。
 5. `status` 先 `planned`；素材进目录后再改 `shot`。
-6. 建空的媒体目录。选题落盘、建期都要建，不要标成可选：
+6. 建空的媒体目录，并同时建 `logs/`。选题落盘、建期都要建，不要标成可选，也不要等到导出：
 
 ```bash
-mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug
+mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug/logs
+```
+
+还没有 `logs/timeline.txt` 时，先写一行 `# YYYY-MM-DD-slug timeline (Asia/Shanghai)`。再用 helper 记 `scaffold`（已有这条 `END` 就不要再记）：
+
+```bash
+.venv/bin/python tools/log_timeline.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start scaffold
+.venv/bin/python tools/log_timeline.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug end scaffold
 ```
 
 ## 完成后

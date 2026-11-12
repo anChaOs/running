@@ -48,6 +48,10 @@ HUD：
 
 把新行写入场次表，更新「当前读数」。同一天只记上场那双鞋。数字保留两位小数，和 HUD 显示一致。
 
+## 记日志
+
+没有脚本挂钩。账本记完用 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start shoes`，再 `end shoes`。失败用 `fail`。已有这条就不要再写。
+
 ## 完成后
 
 账本写好后立刻推荐下一步，把当前期的 `-sn` / `-sk` 填进提示词。

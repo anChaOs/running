@@ -71,13 +71,17 @@ hud-renders/YYYY-MM-DD-run-a-hud-preview.mp4
 weather-hourly.json
 ```
 
-`*-hud-preview.mp4` 只用于审片；最终导出直接使用原始 run 片段和对应 alpha，不读取 preview。
+`*-hud-preview.mp4` 是单段审片文件，也是整条审片预览的输入。最终导出直接使用原始 run 片段和对应 alpha，不读取 preview。
 
 预览只用于人工检查和字幕校对。不要对 `hud-preview` 做会改变时长的粗剪：最终导出会重新读取原始 `run-*` 与 HUD alpha，单独裁预览会造成字幕轴漂移。若需要裁句间停顿，必须先把同一 EDL 应用于原片和 alpha；本次不走该路径。
 
 口播检测与停顿门槛在 `tools/ingest/trim_talk_pauses.py`（默认 Silero VAD）。对比旧能量门限加 `--speech-detect band`。skill 不复述剪停顿算法；**跑流程只调脚本看输出，不要为执行去 Read 源码**（改算法 / 排错除外）。
 
-多段 `run-*` 默认 `--jobs 2` 并行渲（可改；`-j 1` 串行）；失败看 `hud-renders/*-hud-render.log` 定位哪条 clip。整条审片预览由 `/p3-assemble` 从原片和 alpha 一次生成；`*-hud-preview.mp4` 只用于单段检查。最终导出使用原片和 `*-hud-alpha.mov`。`--preview` 先渲透明层，再按 preview profile 生成单段检查文件，alpha 是最终导出的中间层。不走剪映可以不理 alpha。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
+多段 `run-*` 默认 `--jobs 2` 并行渲（可改；`-j 1` 串行）；失败看 `hud-renders/*-hud-render.log` 定位哪条 clip。整条审片预览由 `/p3-assemble` 拼接这些 `*-hud-preview.mp4`（以及 open / 数据图段或 close）；缺了对应 preview 就先补渲，不要整条从原片和 alpha 重压。最终导出使用原片和 `*-hud-alpha.mov`，不读取 preview。`--preview` 先渲透明层，再按 preview profile 生成单段文件，alpha 是最终导出的中间层。不走剪映可以不理 alpha。单片段检查加 `--clips YYYY-MM-DD-run-a.mp4`。
+
+## 记日志
+
+`render_running_hud.py` 正式渲染会写 `hud-render`（含并行 clip 的实际墙钟；`--dry-run` 不写）。脚本已写就不要再记。失败由脚本写 `FAIL`。
 
 ## 完成
 
