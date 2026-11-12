@@ -58,4 +58,4 @@
 - loudness: done（final_export 一次编码内的 loudnorm；pass 1 因只 map [a] 绑定失败 rc=234，实际为单次 dynamic，output_i=-15.91 TP=-1.50）
 - burn: deprecated
 - final: done（`2026-11-12-run-final.mp4` 1152.600s / 34578 帧，3.8GiB；含 run-e 16周图与 close 数据图；已按 skill 烧硬字幕，并外挂 subtitles.srt 与 2026-11-12-run-final.srt；无字幕版留在 2026-11-12-run-final-no-subs.mp4，截断的第一次导出留在 2026-11-12-run-final-truncated.mp4）
-- upload: pending
+- upload: ready（`upload/80／20是什么？强度课跑崩了.mp4` 3.8G，文件名斜杠为全角／，因 macOS 不能用 ASCII /；平台标题仍用 plan.md 的 80/20；三封面硬链 + 官方 subtitles.srt）
