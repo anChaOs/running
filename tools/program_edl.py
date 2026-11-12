@@ -13,8 +13,12 @@ schema version 1
   再加上 source_sync.offset_s 才是 FIT 时间。绝不拿 program 时间去查 FIT。
 - overlays[]: 贴图。asset、program_start_s、program_end_s，可带 x/y/width/opacity/fade。
   手写的图必须带上量取时的成片时长；对不上，或之后时间表变了，就拒绝导出。
-- transitions[]: 只在导出时做。xfade 的 at_program_s 等于下一段的 program_start_s，
-  两段重叠 duration_s，成片因此变短。
+- transitions[]: 只在导出时做。两种，不要混：
+  xfade：冷开场进第一段跑、最后一段跑进 close。at_program_s 等于下一段的
+  program_start_s，两段重叠 duration_s（默认 0.2s），成片因此变短。
+  wind：不同原片的跑步段接缝。不重叠、不缩短总时长。duration_s 默认 0.08s，
+  导出时落到整数帧，把上一段的尾巴和下一段的开头换成风刮，并在接缝前叠 whoosh。
+  同一条原片上的句间刀仍是硬切。插入段默认硬切；insert.transition 为 wind 或 xfade 才过渡。
 - inserts[]: 外部视频或图文。不套跑步 HUD，只把后面的成片时间往后推。
 - lead: 可选。冷开场若取自某段跑步原片，写在这里，用那段自己的原片时间画 HUD。
 - hud: 记录鞋、天气、透明层规格。recorded=true 表示只记了数据，还没渲。
@@ -33,6 +37,7 @@ import todo_list
 VERSION = 1
 PROGRAM_FILENAME = "program.json"
 XFADE_S = 0.2
+WIND_S = 0.08
 DEFAULT_OVERLAY_PROFILE = "qtrle"
 # 手写贴图允许的成片时长误差。小于一次 0.2s xfade，大于容器时长的零头。
 OVERLAY_DURATION_TOLERANCE_S = 0.15
@@ -57,6 +62,7 @@ def empty_program(episode: str) -> dict:
         "inserts": [],
         "lead": None,
         "xfade_s": XFADE_S,
+        "wind_s": WIND_S,
         "hud": {"recorded": False, "overlay_profile": DEFAULT_OVERLAY_PROFILE},
     }
 
@@ -245,12 +251,16 @@ def add_insert(table: dict, insert: dict) -> dict:
     start = _finite(insert["src_start_s"], "insert src_start_s")
     end = _finite(insert["src_end_s"], "insert src_end_s")
     _check_range(start, end, "insert")
+    transition = insert.get("transition") or "cut"
+    if transition not in {"cut", "wind", "xfade"}:
+        raise ValueError(f"insert transition must be cut, wind, or xfade, not {transition}")
     row = {
         "id": str(insert["id"]),
         "clip": str(insert["clip"]),
         "src_start_s": start,
         "src_end_s": end,
         "after_id": str(insert["after_id"]),
+        "transition": transition,
     }
     inserts = [item for item in table.get("inserts", []) if item["id"] != row["id"]]
     inserts.append(row)
@@ -378,18 +388,50 @@ def _segment_from_keep(keep: dict, index: int) -> dict:
 
 
 def default_fades(segments: list[dict], xfade: float) -> list[float]:
-    """只在冷开场进第一段跑、以及最后一段跑进 close 时重叠。句间刀和插入是硬切。"""
+    """冷开场进第一段跑、最后一段跑进 close，以及明确要求 xfade 的插入段，才重叠。
+
+    跑步段之间的风刮不在这里。风刮不缩短成片。
+    """
     fades = [0.0] * len(segments)
     run_idx = [i for i, seg in enumerate(segments) if seg["type"] == "run"]
-    if not run_idx or xfade <= 0:
-        return fades
-    first = run_idx[0]
-    last = run_idx[-1]
-    if first > 0 and segments[first - 1]["type"] == "cold_open":
-        fades[first] = xfade
-    if last + 1 < len(segments) and segments[last + 1]["type"] == "close":
-        fades[last + 1] = xfade
+    if run_idx and xfade > 0:
+        first = run_idx[0]
+        last = run_idx[-1]
+        if first > 0 and segments[first - 1]["type"] == "cold_open":
+            fades[first] = xfade
+        if last + 1 < len(segments) and segments[last + 1]["type"] == "close":
+            fades[last + 1] = xfade
+    if xfade > 0:
+        for index, seg in enumerate(segments):
+            if seg["type"] == "insert" and seg.get("transition") == "xfade":
+                fades[index] = xfade
     return fades
+
+
+def wind_seams(placed: list[dict], wind_s: float) -> list[dict]:
+    """不同原片的跑步段接缝记风刮。同一条原片的句间刀、以及没点名的插入段，保持硬切。"""
+    if wind_s <= 0:
+        return []
+    seams = []
+    for index in range(1, len(placed)):
+        prev, seg = placed[index - 1], placed[index]
+        explicit = seg["type"] == "insert" and seg.get("transition") == "wind"
+        auto = (
+            prev["type"] == "run"
+            and seg["type"] == "run"
+            and prev["clip"] != seg["clip"]
+        )
+        if not explicit and not auto:
+            continue
+        seams.append(
+            {
+                "type": "wind",
+                "at_program_s": float(seg["program_start_s"]),
+                "duration_s": float(wind_s),
+                "before_id": seg["id"],
+            }
+        )
+    return seams
 
 
 def reflow(segments: list[dict], fades: list[float]) -> tuple[list[dict], list[dict]]:
@@ -458,13 +500,15 @@ def _rebuild(table: dict) -> dict:
                 "src_end_s": float(insert["src_end_s"]),
                 "program_start_s": 0.0,
                 "hud": False,
+                "transition": insert.get("transition") or "cut",
             },
         )
         ids.add(insert["id"])
-    xfade = float(table.get("xfade_s") or XFADE_S)
-    placed, transitions = reflow(segments, default_fades(segments, xfade))
+    xfade = float(table.get("xfade_s") if table.get("xfade_s") is not None else XFADE_S)
+    wind_s = float(table.get("wind_s") if table.get("wind_s") is not None else WIND_S)
+    placed, overlaps = reflow(segments, default_fades(segments, xfade))
     table["program"] = placed
-    table["transitions"] = transitions
+    table["transitions"] = overlaps + wind_seams(placed, wind_s)
     return table
 
 
@@ -611,6 +655,7 @@ def _expected_layout(table: dict) -> tuple[list[dict], list[dict]]:
         "lead": table.get("lead"),
         "inserts": table.get("inserts", []),
         "xfade_s": table.get("xfade_s", XFADE_S),
+        "wind_s": table.get("wind_s", WIND_S),
         "program": [],
         "transitions": [],
     }
@@ -748,6 +793,10 @@ def preview_actions(table: dict, durations: dict[str, float]) -> list[dict]:
     return actions
 
 
+def wind_transitions(table: dict) -> list[dict]:
+    return [item for item in table.get("transitions", []) if item.get("type") == "wind"]
+
+
 def export_slices(table: dict, fps: int = 30) -> list[dict]:
     """和预览同一组落帧后的原片区间。"""
     return [
@@ -808,7 +857,11 @@ def frame_timeline(table: dict, fps: int = 30) -> list[dict]:
     """
     if fps <= 0:
         raise ValueError("fps must be positive")
-    fades = {item["before_id"]: float(item["duration_s"]) for item in table.get("transitions", [])}
+    fades = {
+        item["before_id"]: float(item["duration_s"])
+        for item in table.get("transitions", [])
+        if item.get("type", "xfade") == "xfade"
+    }
     placed: list[dict] = []
     acc = 0
     for index, sl in enumerate(program_slices(table)):
@@ -897,6 +950,7 @@ def main(argv: list[str] | None = None) -> int:
     ins_p.add_argument("--start", type=float, required=True)
     ins_p.add_argument("--end", type=float, required=True)
     ins_p.add_argument("--after-id", required=True)
+    ins_p.add_argument("--transition", choices=("cut", "wind", "xfade"), default="cut")
 
     ov_p = sub.add_parser("overlay")
     ov_p.add_argument("--asset", required=True)
@@ -954,6 +1008,13 @@ def main(argv: list[str] | None = None) -> int:
             save(media, add_close_stats(table, assets))
         elif args.cmd == "layout":
             table = load_media(media)
+            if not table.get("frozen"):
+                before = [round(float(seg["program_start_s"]), 4) for seg in table.get("program", [])]
+                _rebuild(table)
+                after = [round(float(seg["program_start_s"]), 4) for seg in table.get("program", [])]
+                if before and before != after:
+                    table["subs_stale"] = True
+                save(media, table)
             if not any(seg["type"] == "run" for seg in table.get("program", [])):
                 raise SystemExit("program has no run segment")
             structural = [item for item in validate(table) if "stale" not in item]
@@ -981,6 +1042,7 @@ def main(argv: list[str] | None = None) -> int:
             save(media, add_insert(table, {
                 "id": args.id, "clip": args.clip, "src_start_s": args.start,
                 "src_end_s": args.end, "after_id": args.after_id,
+                "transition": args.transition,
             }))
         elif args.cmd == "overlay":
             table = load_media(media)

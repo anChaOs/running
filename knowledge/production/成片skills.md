@@ -9,7 +9,7 @@
 | `p3-hud` | 只把鞋、天气、透明层规格记进时间表 | `logs/program.json` 的 `hud` |
 | `p3-assemble` | 按时间表拼低成本审片预览并核对 | `*-review-preview.mp4`、`qc/` |
 | `p3-subs` | 转写、人工改字、force_align、质检门；对口型前冻结时间表 | `subtitles.txt`、外挂 SRT |
-| `final_export.py` | 确认后按同一张表裁切、渲留下片段的 HUD、叠贴图、烧字幕、响度，一次编码 | `*-run-final.mp4` |
+| `final_export.py` | 确认后按同一张表裁切、渲留下片段的 HUD、xfade、跑步段风刮和 whoosh、叠贴图、烧字幕、响度，一次编码 | `*-run-final.mp4` |
 | `p3-publish` | 双链、发布状态、复盘日志、清临时 | `published`、box 复盘 |
 | `p3-publish-report` | 复盘拷完后的发布报告 | 单屏 `publish-report.html` |
 | `p3-bilibili` / `p3-youtube` | 独立上传拿平台链接 | BV / YouTube URL |

@@ -333,6 +333,13 @@ def wind_chain(src: str, dst: str, duration: float, width: int, height: int, fps
 
 
 def mix_whoosh(audio_label: str, whoosh_index: int, delays_ms: list[int], volume: float = 0.85) -> str:
+    if len(delays_ms) == 1:
+        delay = delays_ms[0]
+        return (
+            f"[{whoosh_index}:a]aformat=sample_rates=48000:channel_layouts=stereo,"
+            f"adelay=delays={delay}:all=1,volume={volume:.3f}[wd0];"
+            f"[{audio_label}][wd0]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[amixed]"
+        )
     labels = "".join(f"[w{i}]" for i in range(len(delays_ms)))
     parts = [f"[{whoosh_index}:a]aformat=sample_rates=48000:channel_layouts=stereo,asplit={len(delays_ms)}{labels}"]
     mixed = f"[{audio_label}]"
@@ -630,6 +637,50 @@ def _program_alpha_mode(job: dict, durations: dict[str, float]) -> str:
     return "kept"
 
 
+def _program_wind_visual(
+    parts: list[str],
+    src: str,
+    frames: int,
+    wind_n: int,
+    want_in: bool,
+    want_out: bool,
+    tag: str,
+    fps: int,
+    width: int,
+    height: int,
+) -> str:
+    """把一段的头/尾换成和旧 transition_graph 一样的风刮。时长不变。"""
+    if wind_n < 1 or frames <= wind_n * 2 + 1 or not (want_in or want_out):
+        return src
+    wind_t = format_frames(wind_n, fps)
+    wind_time = frames_to_time(wind_n, fps)
+    body_end = frames - wind_n
+    if want_in and want_out:
+        parts.append(f"[{src}]split=3[{tag}h][{tag}m][{tag}t]")
+        parts.append(f"[{tag}h]trim=duration={wind_t},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}hr]")
+        parts.append(
+            f"[{tag}m]trim=start={wind_t}:end={format_frames(body_end, fps)},"
+            f"setpts=PTS-STARTPTS,settb=1/{fps}[{tag}body]"
+        )
+        parts.append(f"[{tag}t]trim=start={format_frames(body_end, fps)},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}tr]")
+        parts.append(wind_chain(f"{tag}hr", f"{tag}hi", wind_time, width, height, fps, "in"))
+        parts.append(wind_chain(f"{tag}tr", f"{tag}to", wind_time, width, height, fps, "out"))
+        parts.append(f"[{tag}hi][{tag}body][{tag}to]concat=n=3:v=1:a=0,fps={fps},settb=1/{fps}[{tag}p]")
+    elif want_out:
+        parts.append(f"[{src}]split=2[{tag}m][{tag}t]")
+        parts.append(f"[{tag}m]trim=duration={format_frames(body_end, fps)},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}body]")
+        parts.append(f"[{tag}t]trim=start={format_frames(body_end, fps)},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}tr]")
+        parts.append(wind_chain(f"{tag}tr", f"{tag}to", wind_time, width, height, fps, "out"))
+        parts.append(f"[{tag}body][{tag}to]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[{tag}p]")
+    else:
+        parts.append(f"[{src}]split=2[{tag}h][{tag}m]")
+        parts.append(f"[{tag}h]trim=duration={wind_t},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}hr]")
+        parts.append(f"[{tag}m]trim=start={wind_t},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}body]")
+        parts.append(wind_chain(f"{tag}hr", f"{tag}hi", wind_time, width, height, fps, "in"))
+        parts.append(f"[{tag}hi][{tag}body]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[{tag}p]")
+    return f"{tag}p"
+
+
 def build_program_filter(
     table: dict,
     alpha_modes: list[str],
@@ -686,7 +737,25 @@ def build_program_filter(
         parts.append(f"[{video_labels[index]}][ha{index}]overlay=eof_action=pass:shortest=0:format=auto[vh{index}]")
         video_labels[index] = f"vh{index}"
 
+    winds = {item["before_id"]: item for item in edl.wind_transitions(table)}
+    wind_out = {}
+    for index, sl in enumerate(timeline[:-1]):
+        nxt = timeline[index + 1]["id"]
+        if nxt in winds:
+            wind_out[sl["id"]] = winds[nxt]
+    for index, sl in enumerate(timeline):
+        incoming = winds.get(sl["id"])
+        outgoing = wind_out.get(sl["id"])
+        if not incoming and not outgoing:
+            continue
+        wind_n = max(1, snap_frames(float((incoming or outgoing)["duration_s"]), fps))
+        video_labels[index] = _program_wind_visual(
+            parts, video_labels[index], int(sl["frames"]), wind_n,
+            bool(incoming), bool(outgoing), f"rw{index}", fps, width, height,
+        )
+
     vcur, acur = video_labels[0], audio_labels[0]
+    whoosh_delays: list[int] = []
     for index in range(1, len(timeline)):
         fade_n = int(timeline[index]["fade_frames"])
         if fade_n:
@@ -698,13 +767,23 @@ def build_program_filter(
             )
             parts.append(f"[{acur}][{audio_labels[index]}]acrossfade=d={fade_t:.6f}[ax{index}]")
         else:
+            wind = winds.get(timeline[index]["id"])
+            if wind:
+                wind_n = max(1, snap_frames(float(wind["duration_s"]), fps))
+                seam = int(timeline[index]["program_start_frame"])
+                whoosh_delays.append(max(0, round(frames_to_time(max(0, seam - wind_n), fps) * 1000)))
             parts.append(
                 f"[{vcur}][{video_labels[index]}]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[vx{index}]"
             )
             parts.append(f"[{acur}][{audio_labels[index]}]concat=n=2:v=0:a=1[ax{index}]")
         vcur, acur = f"vx{index}", f"ax{index}"
 
-    overlay_base = alpha_base + len(hud_slices)
+    n_whoosh = 1 if winds else 0
+    whoosh_index = alpha_base + len(hud_slices) if n_whoosh else None
+    if whoosh_index is not None and whoosh_delays:
+        parts.append(mix_whoosh(acur, whoosh_index, whoosh_delays))
+        acur = "amixed"
+    overlay_base = alpha_base + len(hud_slices) + n_whoosh
     for k, ov in enumerate(table.get("overlays") or []):
         nxt = f"vov{k}"
         parts.append(_program_overlay_chain(overlay_base + k, ov, k, vcur, nxt, height=height))
@@ -759,6 +838,10 @@ def program_input_args(
         args.extend(["-i", str(media_dir / sl["clip"])])
     for path in alpha_paths:
         args.extend(["-i", str(path)])
+    if edl.wind_transitions(table):
+        if not WHOOSH_PATH.is_file():
+            raise SystemExit(f"wind transitions need whoosh audio: {WHOOSH_PATH}")
+        args.extend(["-i", str(WHOOSH_PATH)])
     fps = spec.timeline.fps
     for ov in table.get("overlays") or []:
         span = float(ov["program_end_s"]) - float(ov["program_start_s"])

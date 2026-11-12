@@ -250,6 +250,98 @@ class ClockTest(unittest.TestCase):
         problems = edl.validate(table)
         self.assertTrue(any("refusing to drop" in item for item in problems))
 
+    def test_wind_between_different_run_clips_does_not_shorten(self) -> None:
+        table = edl.empty_program("2026-01-02-demo")
+        edl.set_source_sync(
+            table,
+            [
+                {"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0},
+                {"clip": "2026-01-02-run-b.mp4", "fit": "run.fit", "offset_s": 10.0},
+            ],
+        )
+        edl.upsert_keeps(
+            table,
+            [
+                {"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 4.0},
+                {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 6.0},
+                {"clip": "2026-01-02-run-b.mp4", "src_start_s": 0.0, "src_end_s": 5.0},
+                {"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 3.0},
+            ],
+        )
+        winds = edl.wind_transitions(table)
+        self.assertEqual(len(winds), 1)
+        self.assertEqual(winds[0]["type"], "wind")
+        self.assertEqual(winds[0]["before_id"], "2026-01-02-run-b-1")
+        self.assertAlmostEqual(winds[0]["duration_s"], edl.WIND_S)
+        run_b = next(seg for seg in table["program"] if seg["id"] == "2026-01-02-run-b-1")
+        self.assertAlmostEqual(winds[0]["at_program_s"], run_b["program_start_s"])
+        self.assertAlmostEqual(edl.program_duration(table), 4 + 6 + 5 + 3 - 2 * edl.XFADE_S)
+        self.assertEqual(edl.validate(table), [])
+        actions = edl.preview_actions(
+            table,
+            {
+                "2026-01-02-open.mp4": 4.0,
+                "2026-01-02-run-a.mp4": 6.0,
+                "2026-01-02-run-b.mp4": 5.0,
+                "2026-01-02-close.mp4": 3.0,
+            },
+        )
+        run_actions = [row for row in actions if row["type"] == "run"]
+        self.assertTrue(all(row["trim_head_s"] == 0 and row["trim_tail_s"] == 0 for row in run_actions))
+
+    def test_same_clip_keeps_and_inserts_do_not_get_wind(self) -> None:
+        table = edl.empty_program("2026-01-02-demo")
+        edl.set_source_sync(
+            table,
+            [
+                {"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0},
+                {"clip": "2026-01-02-run-b.mp4", "fit": "run.fit", "offset_s": 8.0},
+            ],
+        )
+        edl.upsert_keeps(
+            table,
+            [
+                {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 3.0},
+                {"clip": "2026-01-02-run-a.mp4", "src_start_s": 4.0, "src_end_s": 6.0},
+            ],
+        )
+        self.assertEqual(edl.wind_transitions(table), [])
+        edl.add_insert(
+            table,
+            {
+                "id": "card",
+                "clip": "card.mp4",
+                "src_start_s": 0.0,
+                "src_end_s": 2.0,
+                "after_id": "2026-01-02-run-a-1",
+            },
+        )
+        self.assertEqual(edl.wind_transitions(table), [])
+        edl.upsert_keeps(
+            table,
+            [
+                {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 3.0},
+                {"clip": "2026-01-02-run-b.mp4", "src_start_s": 0.0, "src_end_s": 3.0},
+            ],
+        )
+        edl.add_insert(
+            table,
+            {
+                "id": "card",
+                "clip": "card.mp4",
+                "src_start_s": 0.0,
+                "src_end_s": 2.0,
+                "after_id": "2026-01-02-run-a-1",
+                "transition": "wind",
+            },
+        )
+        winds = edl.wind_transitions(table)
+        self.assertEqual([item["before_id"] for item in winds], ["card"])
+        self.assertFalse(any(item["type"] == "xfade" for item in table["transitions"]))
+        card = next(seg for seg in table["program"] if seg["id"] == "card")
+        nxt = next(seg for seg in table["program"] if seg["id"] == "2026-01-02-run-b-1")
+        self.assertAlmostEqual(nxt["program_start_s"], card["program_start_s"] + 2.0)
+
     def test_close_stats_share_the_close_segment(self) -> None:
         table = _ready()
         edl.add_close_stats(table, ["stats-01.jpg", "stats-02.jpg"])
@@ -322,7 +414,7 @@ class SameTableTest(unittest.TestCase):
         self.assertIn(f"offset={offset:.6f}", graph)
         self.assertNotIn("offset=209.936", graph)
         self.assertEqual(graph.count("xfade="), 2)
-        self.assertNotIn("dblur", graph)
+        self.assertEqual(graph.count("dblur="), 38)
 
     def test_published_close_xfade_matches_frame_offset(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
@@ -346,9 +438,12 @@ class SameTableTest(unittest.TestCase):
         graph = final_export.build_program_filter(table, ["full"] * 5, 0, Path("/tmp/cues.ass"), apply_loudness=False)
         self.assertIn("xfade=transition=fade:duration=0.200000:offset=893.333333", graph)
         self.assertEqual(graph.count("xfade="), 2)
-        self.assertNotIn("dblur", graph)
-        self.assertNotIn("0.066667", graph)
+        self.assertEqual(len(edl.wind_transitions(table)), 4)
+        self.assertIn("trim=duration=0.066667", graph)
+        self.assertIn("dblur=angle=0:radius=46", graph)
+        self.assertIn("adelay=delays=", graph)
         self.assertIn("subtitles=", graph)
+        self.assertAlmostEqual(edl.frame_program_duration(table), 1152.6)
 
     def test_ffmpeg_keeps_close_when_source_times_are_off_the_frame_grid(self) -> None:
         if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
@@ -372,6 +467,7 @@ class SameTableTest(unittest.TestCase):
                     check=True,
                 )
             table = edl.empty_program("2026-01-02-demo")
+            table["wind_s"] = 0
             runs = [name for name in names if "-run-" in name]
             edl.set_source_sync(table, [{"clip": name, "fit": "run.fit", "offset_s": 0.0} for name in runs])
             edl.upsert_keeps(table, [{"clip": name, "src_start_s": 0.0, "src_end_s": dur} for name in names])
@@ -392,6 +488,61 @@ class SameTableTest(unittest.TestCase):
             )
             actual = final_export.probe_duration(out)
         self.assertLess(abs(actual - expected), 0.15)
+
+    def test_ffmpeg_wind_does_not_shorten_two_runs(self) -> None:
+        if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+            self.skipTest("ffmpeg not installed")
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for name, color in (("2026-01-02-run-a.mp4", "red"), ("2026-01-02-run-b.mp4", "blue")):
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                        "-f", "lavfi", "-i", f"color=c={color}:s=160x90:r=30:d=1",
+                        "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=1",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                        str(root / name),
+                    ],
+                    check=True,
+                )
+            table = edl.empty_program("2026-01-02-demo")
+            edl.set_source_sync(
+                table,
+                [
+                    {"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0},
+                    {"clip": "2026-01-02-run-b.mp4", "fit": "run.fit", "offset_s": 1.0},
+                ],
+            )
+            edl.upsert_keeps(
+                table,
+                [
+                    {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 1.0},
+                    {"clip": "2026-01-02-run-b.mp4", "src_start_s": 0.0, "src_end_s": 1.0},
+                ],
+            )
+            for seg in table["program"]:
+                seg["hud"] = False
+            self.assertEqual(len(edl.wind_transitions(table)), 1)
+            graph = final_export.build_program_filter(table, [], 0, None, apply_loudness=False)
+            self.assertIn("dblur=", graph)
+            self.assertNotIn("xfade=", graph)
+            out = root / "out.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    *final_export.program_input_args(root, table, []),
+                    "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                    str(out),
+                ],
+                check=True,
+            )
+            actual = final_export.probe_duration(out)
+        self.assertAlmostEqual(edl.frame_program_duration(table), 2.0)
+        self.assertLess(abs(actual - 2.0), 0.05)
 
 
 class TodoTest(unittest.TestCase):

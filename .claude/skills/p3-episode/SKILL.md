@@ -39,7 +39,7 @@ review-preview
 subs: done，且时间表已冻结、logs/todo.md 允许导出
   final_export.py --confirmed
               → 只给留下的片段渲最终 HUD（默认 qtrle）
-              → 同一张表：裁切、xfade、贴图、烧字幕、响度，一次编码
+              → 同一张表：裁切、xfade、跑步段风刮和 whoosh、贴图、烧字幕、响度，一次编码
               → YYYY-MM-DD-run-final.mp4
 
 双链齐
@@ -47,7 +47,14 @@ subs: done，且时间表已冻结、logs/todo.md 允许导出
   p3-publish-report → 复盘拷完后立刻出单屏 HTML（清临时仍在 p3-publish）
 ```
 
-时间表在媒体目录 `logs/program.json`。两套时钟：`source_sync` 是原片对 FIT 的偏移，HUD 永远按原片时间取样；`program` 是成片时间，句间刀、冷开场、插入、xfade 只改这张。预览和 `final_export.py` 读同一份。schema 见 `tools/program_edl.py` 模块说明。
+时间表在媒体目录 `logs/program.json`。两套时钟：`source_sync` 是原片对 FIT 的偏移，HUD 永远按原片时间取样；`program` 是成片时间，句间刀、冷开场、插入、转场只改这张。预览和 `final_export.py` 读同一份。schema 见 `tools/program_edl.py` 模块说明。
+
+两种过渡不要混：
+
+- `xfade`：冷开场进第一段跑、最后一段跑进 close。默认 0.2 秒，两段重叠，成片变短。
+- `wind`：不同原片的跑步段接缝。默认 0.08 秒，不重叠、不缩短总时长。确认导出时落到整数帧，画风刮并叠 `whoosh.wav`。同一条原片里的句间刀仍是硬切。插入段默认硬切；要过渡就在插入上写 `transition: wind` 或 `xfade`。
+
+预览不画风刮，只保证时长和导出一致。
 
 手写贴图的秒数如果是从某一条成片上量的，必须带上当时的成片时长。差过 0.15 秒就拒绝写入。之后刀点、冷开场或插入改了表，导出也会拒绝，直到按新表重放这张图。数据图用 `close-stats`，按 close 段均分，不手写秒数。
 
