@@ -423,6 +423,53 @@ def test_overlay_time_rejects_nonfinite_and_negative() -> None:
     assert ok["t0"] == 1.0 and ok["t1"] == 2.0
 
 
+
+def test_wind_and_xfade_snap_to_whole_frames() -> None:
+    assert final.snap_frames(0.08, 30) == 2
+    assert final.wind_frames(30) == 2
+    assert final.format_frames(2, 30) == "0.066667"
+    assert final.xfade_frames(30) == 6
+    assert final.format_frames(6, 30) == "0.200000"
+    # 24fps overlay tests already exist; 0.08s -> 2 frames there too
+    assert final.wind_frames(24) == 2
+    assert final.xfade_frames(24) == 5
+
+
+def test_five_run_close_xfade_keeps_full_close() -> None:
+    # 2026-11-12-8020 durations: 0.08s wind at 30fps used to shrink vpre by 0.4s,
+    # so close xfade offset sat past the first input and close was dropped.
+    durations = [86.4, 201.866667, 111.8, 113.4, 116.333333, 263.933333, 259.266667]
+    vpre, close_at, total = final.pre_close_timeline(durations, True, True, 30)
+    fade = final.xfade_frames(30)
+    assert vpre == close_at + fade
+    assert close_at == 26800
+    assert vpre == 26806
+    assert total == 34578
+    assert abs(total / 30 - 1152.6) < 1e-9
+
+
+def test_five_run_graph_uses_frame_aligned_winds() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        runs = tuple(root / f"run-{name}.mp4" for name in "abcde")
+        sources = final.SourceSet(
+            root / "open.mp4",
+            runs,
+            root / "close.mp4",
+            tuple(root / f"run-{name}-hud-alpha.mov" for name in "abcde"),
+            (root / "2026-01-01-stats-01.png",),
+        )
+        durations = [86.4, 201.866667, 111.8, 113.4, 116.333333, 263.933333, 259.266667]
+        plan = final.build_input_plan(sources, durations, FINAL_SPEC)
+        graph = final.build_filter_graph(sources, durations, plan, ass=None, apply_loudness=False)
+        assert "trim=duration=0.080000" not in graph
+        assert "d=0.080000" not in graph
+        assert "trim=duration=0.066667" in graph
+        assert "xfade=transition=fade:duration=0.200000:offset=893.333333" in graph
+        # first run out-only tail starts at (6056-2)/30
+        assert "trim=start=201.800000" in graph
+
+
 if __name__ == "__main__":
     test_specs()
     test_4k_timeline_loads_from_config()
@@ -436,4 +483,7 @@ if __name__ == "__main__":
     test_review_preview_rejected_as_source_and_overlay()
     test_final_rejects_intermediate_overlays_before_input_plan()
     test_overlay_time_rejects_nonfinite_and_negative()
+    test_wind_and_xfade_snap_to_whole_frames()
+    test_five_run_close_xfade_keeps_full_close()
+    test_five_run_graph_uses_frame_aligned_winds()
     print("ok test_export_spec")

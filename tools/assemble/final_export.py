@@ -186,12 +186,12 @@ def load_timeline_overlays(
     """按 assemble 的 overlays.json 约定解析到成片时间轴。没有配置就返回空列表。"""
     ov_file = assemble.find_overlays_file(media_dir, explicit)
     if ov_file is None:
-        print("Overlays: none")
+        print("Overlays: none", flush=True)
         return []
     close_start, total = assemble.timeline(durations, has_open, has_close)
     loaded = assemble.load_overlays(ov_file, media_dir, file_gate=reject_encoded_intermediate)
     resolved = assemble.resolve_overlays(loaded, close_start, total)
-    print(f"Overlays: {ov_file}")
+    print(f"Overlays: {ov_file}", flush=True)
     for ov in resolved:
         print(
             f"  #{ov['n']} {ov['file'].name}  {assemble.fmt_ts(ov['t0'])} → {assemble.fmt_ts(ov['t1'])}"
@@ -260,6 +260,54 @@ def loudness_filter(spec: ExportSpec, measured: dict[str, str] | None = None) ->
     )
 
 
+
+def snap_frames(seconds: float, fps: int) -> int:
+    """把秒数落到最近的整数帧；时间轴和 trim 都用这个口径。"""
+    return max(0, int(round(float(seconds) * fps)))
+
+
+def frames_to_time(frames: int, fps: int) -> float:
+    return frames / fps
+
+
+def format_frames(frames: int, fps: int) -> str:
+    return f"{frames_to_time(frames, fps):.6f}"
+
+
+def wind_frames(fps: int) -> int:
+    """0.08s 在 30fps 上不是整数帧；必须先对齐，否则 trim/color/overlay 各截一截。"""
+    return max(1, snap_frames(WIND, fps))
+
+
+def xfade_frames(fps: int) -> int:
+    return max(1, snap_frames(XFADE, fps))
+
+
+def pre_close_timeline(
+    durations: list[float],
+    has_open: bool,
+    has_close: bool,
+    fps: int,
+) -> tuple[int, int | None, int]:
+    """(vpre 帧数, close xfade 起点帧, 成片总帧数)。
+
+    风刮按帧切开再拼回去，长度必须等于源片段帧数；close xfade 的 offset
+    也必须用这个对齐后的 vpre，不能再用未对齐的浮点时长。
+    """
+    counts = [snap_frames(duration, fps) for duration in durations]
+    run_start = 1 if has_open else 0
+    run_end = len(counts) - 1 if has_close else len(counts)
+    run_counts = counts[run_start:run_end]
+    if not run_counts:
+        raise ValueError("At least one run clip is required")
+    fade = xfade_frames(fps)
+    vpre = (counts[0] - fade if has_open else 0) + sum(run_counts)
+    if not has_close:
+        return vpre, None, vpre
+    close_at = max(0, vpre - fade)
+    return vpre, close_at, close_at + counts[-1]
+
+
 def wind_chain(src: str, dst: str, duration: float, width: int, height: int, fps: int, direction: str) -> str:
     """在 run 接缝处保留旧流程的横向风刮转场。"""
     t = f"{duration:.6f}"
@@ -312,67 +360,86 @@ def transition_graph(
     if not run_indices:
         raise ValueError("At least one run clip is required")
 
+    fade_n = xfade_frames(fps)
+    wind_n = wind_frames(fps)
+    fade_t = format_frames(fade_n, fps)
+    wind_t = format_frames(wind_n, fps)
+    counts = [snap_frames(duration, fps) for duration in durations]
+
     processed: list[tuple[str, str]] = []
     whoosh_delays: list[int] = []
-    do_wind = len(run_indices) >= 2 and WIND > 0.03
+    do_wind = len(run_indices) >= 2 and wind_n >= 1
     for j, index in enumerate(run_indices):
-        duration = durations[index]
+        frames = counts[index]
         video = video_labels[index]
-        if not do_wind or duration <= WIND * 2 + 0.05:
+        if not do_wind or frames <= wind_n * 2 + 1:
             processed.append((video, audio_labels[index]))
             continue
         tag = f"r{j}"
         want_in = j != 0
         want_out = j != len(run_indices) - 1
+        body_end = frames - wind_n
         if want_in and want_out:
             parts.append(f"[{video}]split=3[{tag}h][{tag}m][{tag}t]")
-            parts.append(f"[{tag}h]trim=duration={WIND:.6f},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}hr]")
-            parts.append(f"[{tag}m]trim=start={WIND:.6f}:end={duration - WIND:.6f},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}body]")
-            parts.append(f"[{tag}t]trim=start={duration - WIND:.6f},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}tr]")
-            parts.append(wind_chain(f"{tag}hr", f"{tag}hi", WIND, width, height, fps, "in"))
-            parts.append(wind_chain(f"{tag}tr", f"{tag}to", WIND, width, height, fps, "out"))
+            parts.append(f"[{tag}h]trim=duration={wind_t},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}hr]")
+            parts.append(
+                f"[{tag}m]trim=start={wind_t}:end={format_frames(body_end, fps)},"
+                f"setpts=PTS-STARTPTS,settb=1/{fps}[{tag}body]"
+            )
+            parts.append(f"[{tag}t]trim=start={format_frames(body_end, fps)},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}tr]")
+            parts.append(wind_chain(f"{tag}hr", f"{tag}hi", frames_to_time(wind_n, fps), width, height, fps, "in"))
+            parts.append(wind_chain(f"{tag}tr", f"{tag}to", frames_to_time(wind_n, fps), width, height, fps, "out"))
             parts.append(f"[{tag}hi][{tag}body][{tag}to]concat=n=3:v=1:a=0,fps={fps},settb=1/{fps}[{tag}p]")
         elif want_out:
             parts.append(f"[{video}]split=2[{tag}m][{tag}t]")
-            parts.append(f"[{tag}m]trim=duration={duration - WIND:.6f},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}body]")
-            parts.append(f"[{tag}t]trim=start={duration - WIND:.6f},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}tr]")
-            parts.append(wind_chain(f"{tag}tr", f"{tag}to", WIND, width, height, fps, "out"))
+            parts.append(f"[{tag}m]trim=duration={format_frames(body_end, fps)},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}body]")
+            parts.append(f"[{tag}t]trim=start={format_frames(body_end, fps)},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}tr]")
+            parts.append(wind_chain(f"{tag}tr", f"{tag}to", frames_to_time(wind_n, fps), width, height, fps, "out"))
             parts.append(f"[{tag}body][{tag}to]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[{tag}p]")
         else:
             parts.append(f"[{video}]split=2[{tag}h][{tag}m]")
-            parts.append(f"[{tag}h]trim=duration={WIND:.6f},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}hr]")
-            parts.append(f"[{tag}m]trim=start={WIND:.6f},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}body]")
-            parts.append(wind_chain(f"{tag}hr", f"{tag}hi", WIND, width, height, fps, "in"))
+            parts.append(f"[{tag}h]trim=duration={wind_t},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}hr]")
+            parts.append(f"[{tag}m]trim=start={wind_t},setpts=PTS-STARTPTS,settb=1/{fps}[{tag}body]")
+            parts.append(wind_chain(f"{tag}hr", f"{tag}hi", frames_to_time(wind_n, fps), width, height, fps, "in"))
             parts.append(f"[{tag}hi][{tag}body]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[{tag}p]")
         processed.append((f"{tag}p", audio_labels[index]))
 
     first_video, first_audio = processed[0]
     if has_open:
-        offset = max(0.0, durations[0] - XFADE)
+        offset_n = max(0, counts[0] - fade_n)
         parts.append(f"[{video_labels[0]}]fps={fps},settb=1/{fps}[openf]")
-        parts.append(f"[openf][{first_video}]xfade=transition=fade:duration={XFADE}:offset={offset:.6f},settb=1/{fps}[vcur]")
-        parts.append(f"[{audio_labels[0]}][{first_audio}]acrossfade=d={XFADE}[acur]")
+        parts.append(
+            f"[openf][{first_video}]xfade=transition=fade:duration={fade_t}:offset={format_frames(offset_n, fps)},"
+            f"settb=1/{fps}[vcur]"
+        )
+        parts.append(f"[{audio_labels[0]}][{first_audio}]acrossfade=d={fade_t}[acur]")
         vcur, acur = "vcur", "acur"
-        acc = durations[0] + durations[run_indices[0]] - XFADE
+        acc_n = counts[0] + counts[run_indices[0]] - fade_n
     else:
         vcur, acur = first_video, first_audio
-        acc = durations[run_indices[0]]
+        acc_n = counts[run_indices[0]]
 
     for step, (next_video, next_audio) in enumerate(processed[1:], start=1):
         if do_wind:
-            whoosh_delays.append(max(0, round((acc - WIND) * 1000)))
+            whoosh_delays.append(max(0, round(frames_to_time(max(0, acc_n - wind_n), fps) * 1000)))
         parts.append(f"[{vcur}][{next_video}]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[vc{step}]")
         parts.append(f"[{acur}][{next_audio}]concat=n=2:v=0:a=1[ac{step}]")
         vcur, acur = f"vc{step}", f"ac{step}"
-        acc += durations[run_indices[step]]
+        acc_n += counts[run_indices[step]]
 
     if has_close:
         close_index = len(durations) - 1
-        offset = max(0.0, acc - XFADE)
+        vpre_n, offset_n, _total_n = pre_close_timeline(durations, has_open, has_close, fps)
+        if acc_n != vpre_n:
+            raise ValueError(f"vpre frame count drifted: acc={acc_n} timeline={vpre_n}")
+        offset_n = offset_n or 0
         parts.append(f"[{vcur}]fps={fps},settb=1/{fps}[vpre]")
         parts.append(f"[{video_labels[close_index]}]fps={fps},settb=1/{fps}[vclose]")
-        parts.append(f"[vpre][vclose]xfade=transition=fade:duration={XFADE}:offset={offset:.6f},settb=1/{fps}[vxf]")
-        parts.append(f"[{acur}][{audio_labels[close_index]}]acrossfade=d={XFADE}[aclose]")
+        parts.append(
+            f"[vpre][vclose]xfade=transition=fade:duration={fade_t}:offset={format_frames(offset_n, fps)},"
+            f"settb=1/{fps}[vxf]"
+        )
+        parts.append(f"[{acur}][{audio_labels[close_index]}]acrossfade=d={fade_t}[aclose]")
         vcur, acur = "vxf", "aclose"
 
     if whoosh_index is not None and whoosh_delays:
@@ -498,7 +565,16 @@ def build_encode_cmd(
 def measure_loudness(plan: InputPlan, graph: str) -> dict[str, str] | None:
     cmd = ["ffmpeg", "-hide_banner", "-nostats", *plan.args, "-filter_complex", graph, "-map", "[a]", "-f", "null", "-"]
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    return parse_loudnorm(proc.stderr) if proc.returncode == 0 else None
+    if proc.returncode != 0:
+        tail = "\n".join(proc.stderr.splitlines()[-8:])
+        print(f"Loudnorm pass 1 failed: rc={proc.returncode}", flush=True)
+        if tail:
+            print(tail, flush=True)
+        return None
+    measured = parse_loudnorm(proc.stderr)
+    if measured is None:
+        print("Loudnorm pass 1: could not parse loudnorm JSON", flush=True)
+    return measured
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -514,8 +590,17 @@ def main(argv: list[str] | None = None) -> int:
         help="叠加层配置 JSON。默认找 <media-dir>/overlays.json，再找 episodes/<媒体目录名>/overlays.json",
     )
     parser.add_argument("--no-overlays", action="store_true", help="有 overlays.json 也不叠")
+    parser.add_argument(
+        "--no-subtitles",
+        action="store_true",
+        help="不烧硬字幕。默认仍按当前 skill 在一次编码里烧 ASS；需要只出外挂 SRT 时加这个开关。",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except (AttributeError, OSError):
+        pass
     media_dir = Path(args.media_dir).expanduser().resolve()
     with log_timeline.span(media_dir, "final-export", enabled=not args.dry_run) as wall:
         wall.rc = _export_episode(args)
@@ -540,20 +625,23 @@ def _export_episode(args) -> int:
         explicit=args.overlays,
     )
     plan = build_input_plan(sources, durations, FINAL_SPEC, overlays)
-    ass = make_ass(subtitles)
+    ass = None if args.no_subtitles else make_ass(subtitles)
     try:
         first_graph = build_filter_graph(sources, durations, plan, ass, measured=None, overlays=overlays)
         measured = None if args.dry_run else measure_loudness(plan, first_graph)
         if measured is not None:
-            print(f"Loudnorm pass 1: I={measured['input_i']} TP={measured['input_tp']}")
+            print(f"Loudnorm pass 1: I={measured['input_i']} TP={measured['input_tp']}", flush=True)
+        elif not args.dry_run:
+            print("Loudnorm pass 1 skipped; encode will use single-pass loudnorm", flush=True)
         final_graph = build_filter_graph(sources, durations, plan, ass, measured=measured, overlays=overlays)
         cmd = build_encode_cmd(plan, final_graph, output, test_codec=args.test_codec)
-        print("$", " ".join(cmd))
+        print("$", " ".join(cmd), flush=True)
         if not args.dry_run:
             subprocess.run(cmd, check=True)
-            print(f"Wrote {output}")
+            print(f"Wrote {output}", flush=True)
     finally:
-        ass.unlink(missing_ok=True)
+        if ass is not None:
+            ass.unlink(missing_ok=True)
     return 0
 
 
