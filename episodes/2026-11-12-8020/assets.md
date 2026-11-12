@@ -51,8 +51,9 @@
 - hud: done（-sn 惊碳Fly，-sk 1441.20；shanghai 天气 31.2304,121.4737，本场约 13–14°C；file-modified；run-a..e 均有 alpha+preview）
 - cover: done（自拍 `1794439525476.jpg` rembg 抠图 `cover-work/person-cutout.png` + AI 晨晖跑道底 `cover-work/bg.jpg`；封面句改为「80/20 是什么？」，断行 `80/20|是什么？`；三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`；字号均过门）
 - trim: done（run-a..e 激进粗剪，保留强度课开头留白；同一 EDL 切原片 + HUD alpha，raw 在 *-raw；HUD preview 另按同一剪点切）
-- preview: pending
-- qc: pending
+- close-stats: done（`2026-11-12-close-stats.mp4`，stats-01/02 均分叠在 close 左侧）
+- preview: done（`2026-11-12-review-preview.mp4` 19:12.75，墙钟 1m17s；run-a..e stream copy，open / close-stats 轻转并剪 0.2s xfade）
+- qc: done（抽帧核过 open 开头、open→run、跑中 HUD、run-e→close、close 数据图两张与结尾）
 - subs: pending
 - loudness: pending
 - burn: deprecated

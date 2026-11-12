@@ -2,7 +2,7 @@
 date: 2026-11-12
 slug: 8020
 title: 80/20是什么？强度课跑崩了
-status: hud
+status: preview
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-12-8020/
 ---
