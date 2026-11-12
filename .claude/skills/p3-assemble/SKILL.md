@@ -1,17 +1,17 @@
 ---
 name: p3-assemble
-description: 按 logs/program.json 立刻拼一条低成本审片预览（能拷贝就拷贝，不渲 HUD），拼完抽帧核对；不生成最终成片。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py，不能在这里烧字或修响度。
+description: 按 logs/program.json 用输入 seek + stream copy 立刻拼一条审片预览（不重编码、不渲 HUD），拼完抽帧核对；不生成最终成片。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py，不能在这里烧字或修响度。
 ---
 
 # 画面预览
 
-有 `logs/program.json` 时，预览只按这张表拼，用来决定刀点并开始转写。**不渲 HUD，不按原片码率粗剪，不烧字幕，不修响度。** 整段能接上就 stream copy；只有被切开的短段才按预览规格轻压（h264 用 crf 23，hevc 用 8M，不是源片大约 49Mbps）。跑步段的原片区间和最终导出是同一份。预览不是最终成片，也不能当作最终导出的输入。
+有 `logs/program.json` 时，预览只按这张表用输入 seek + stream copy 把留下的区间接起来，用来决定刀点并开始转写。**不渲 HUD，不重编码，不烧字幕，不修响度。** 切开的段也是 copy，不用 trim 滤镜，也不走 libx264 / `hevc_videotoolbox`。切口落在前一个关键帧，允许比成片稍长，不要为了帧精确改回轻压。跑步段的原片区间和最终导出是同一份。预览不是最终成片，也不能当作最终导出的输入。
 
 没有这张表时，才退回旧路径：拼接已经渲好的 `*-hud-preview.mp4`。不要为了走旧路径去补渲未剪预览。
 
 产物：`~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4`
 
-官方命令就是 `preview_episode.py`。`--dry-run` 会打印每一段是 `copy` 还是轻压。
+官方命令就是 `preview_episode.py`。`--dry-run` 会打印每一段的 copy 区间（`seek=input`）。
 
 ## 前置
 
@@ -31,9 +31,9 @@ description: 按 logs/program.json 立刻拼一条低成本审片预览（能拷
   --out ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4
 ```
 
-冷开场进跑步、跑步进 close 的 0.2 秒 xfade，预览只把同样的时长从非跑步那一侧剪掉，不做叠化。不同原片的跑步接缝在导出时有 0.08 秒风刮和 whoosh，那不缩短总时长，预览这里仍是硬切，不要把这 0.08 秒当成 xfade 剪掉。成片时长和导出一致。预览比各段相加短一点，短的是那两处 xfade。`subtitles.txt` 还没写就不要传 `--subtitles`；传了也只在旁边写同时间轴的外挂，不烧进画面。
+冷开场进跑步、跑步进 close 的 0.2 秒 xfade，预览只把同样的时长从非跑步那一侧的 copy 区间里剪掉，不做叠化。不同原片的跑步接缝在导出时有 0.08 秒风刮和 whoosh，那不缩短总时长，预览这里仍是硬切，不要把这 0.08 秒当成 xfade 剪掉。预览时长允许比时间表长：copy 的起点落在前一个关键帧，多出来的是关键帧到切点之间的原片，不是把丢掉的句间停顿整段接回去。明显短于时间表才算丢段。`subtitles.txt` 还没写就不要传 `--subtitles`；传了也只在旁边写同时间轴的外挂，不烧进画面。
 
-和 HEVC 原片 stream copy 混接时，切开的段用 `hevc_videotoolbox` 8M。参数对不齐时 concat copy 会失败并停。不要改回按源片大约 49Mbps 重压，也不要改走 `assemble_episode.py`。
+每段都是 `ffmpeg -ss <start> -to <end> -i <原片> -c copy`，再 `-c copy` 接成一条。不要改回「先打开整文件、用 trim 滤镜从 0 解码、再 libx264」。编码实在接不上时 concat 会失败并停。不要把切开的段一律重编码；若要补救，只重编码接不上的那一段，也不要改走 `assemble_episode.py`。
 
 ## 核对
 

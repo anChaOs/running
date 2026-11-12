@@ -628,6 +628,15 @@ PROGRAM_SOURCE_FORBIDDEN = (
 )
 
 
+# 小于一帧的起点当成从片头开始，不 seek，滤镜仍用原片绝对时间。
+_SEEK_EPSILON_S = 1e-4
+
+
+def source_is_seeked(start_s: float) -> bool:
+    """切开的原片在 -i 前 seek。从片头开始的段不 seek，避免改掉已对齐的帧边界。"""
+    return float(start_s) > _SEEK_EPSILON_S
+
+
 def _program_alpha_mode(job: dict, durations: dict[str, float]) -> str:
     full = durations.get(job["clip"])
     if full is None:
@@ -705,13 +714,18 @@ def build_program_filter(
         end = float(sl["src_end_s"])
         dur = sl["frames"] / fps
         durations.append(dur)
+        # 输入 -ss 把时间戳拨回 0，滤镜改从 0 量到本段时长。从片头开始的段仍用原片绝对时间。
+        if source_is_seeked(start):
+            trim_start, trim_end = 0.0, dur
+        else:
+            trim_start, trim_end = start, end
         parts.append(
-            f"[{index}:v]trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS,"
+            f"[{index}:v]trim=start={trim_start:.6f}:end={trim_end:.6f},setpts=PTS-STARTPTS,"
             f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,fps={fps},settb=1/{fps},format=yuv420p,setsar=1[v{index}]"
         )
         parts.append(
-            f"[{index}:a]atrim=start={start:.6f}:end={end:.6f},asetpts=PTS-STARTPTS,"
+            f"[{index}:a]atrim=start={trim_start:.6f}:end={trim_end:.6f},asetpts=PTS-STARTPTS,"
             f"aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo,"
             f"aresample=async=1:first_pts=0,apad=whole_dur={dur:.6f},atrim=0:{dur:.6f}[a{index}]"
         )
@@ -835,6 +849,10 @@ def program_input_args(
 ) -> list[str]:
     args: list[str] = []
     for sl in edl.export_slices(table, spec.timeline.fps):
+        start = float(sl["src_start_s"])
+        if source_is_seeked(start):
+            # 只解码切点附近。和滤镜里「seek 之后从 0 量」是一对，不能只改一边。
+            args.extend(["-ss", f"{start:.6f}"])
         args.extend(["-i", str(media_dir / sl["clip"])])
     for path in alpha_paths:
         args.extend(["-i", str(path)])

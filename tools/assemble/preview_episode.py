@@ -18,6 +18,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -508,15 +509,37 @@ def duration_slack(segments: int) -> float:
     return min(DURATION_SLACK_S, 0.06 + 0.01 * segments)
 
 
+# 输入 seek + stream copy 的起点落在前一个关键帧。手机 HEVC 的 GOP 常见 1–8 秒，
+# 每段都可能比时间表长这么多。偏长是预期，不因此改回重编码。
+# 偏短才当丢段：copy 的 -to 只在包边界上少一点点。
+COPY_PREVIEW_GOP_SLACK_S = 8.0
+COPY_PREVIEW_SHORT_FRAME_S = 0.05
+
+
+def program_preview_duration_bounds(expected_duration: float, segments: int) -> tuple[float, float]:
+    """copy 预览允许的时长区间（含端点外的拒绝线，调用方用开区间比较）。"""
+    count = max(int(segments), 1)
+    short_slack = max(1.5, COPY_PREVIEW_SHORT_FRAME_S * count)
+    long_slack = COPY_PREVIEW_GOP_SLACK_S * count
+    return expected_duration - short_slack, expected_duration + long_slack
+
+
 def assert_program_preview_duration(output: Path, expected_duration: float, segments: int) -> None:
-    """成片时长要和时间表的落帧时长接近。差出一段，说明 concat 把片段弄丢了。"""
+    """copy 预览会比时间表长一个关键帧量级。明显偏短才拒绝，不为帧精确重编码。"""
     actual = probe_duration(output)
-    slack = max(duration_slack(segments), 0.03 * segments)
-    if abs(actual - expected_duration) > slack:
+    low, high = program_preview_duration_bounds(expected_duration, segments)
+    drift = actual - expected_duration
+    if actual < low or actual > high:
         raise SystemExit(
             f"Review preview duration {actual:.3f}s != program timeline {expected_duration:.3f}s "
-            f"(drift {actual - expected_duration:+.3f}s, slack {slack:.3f}s). "
-            "Refusing a drifted preview. Do not recompress the rough cut at source bitrate."
+            f"(drift {drift:+.3f}s, allowed {low - expected_duration:+.3f}..{high - expected_duration:+.3f}s). "
+            "Copy cuts land on the previous keyframe and may run long. "
+            "A short preview means a segment was dropped. Do not re-encode to chase frame accuracy."
+        )
+    if abs(drift) > 0.25:
+        print(
+            f"preview duration {actual:.3f}s vs timeline {expected_duration:.3f}s "
+            f"(drift {drift:+.3f}s, keyframe seek, not re-encoded)"
         )
 
 
@@ -752,53 +775,83 @@ def write_subtitle_sidecar(subtitles: Path, output: Path) -> Path:
     return dest
 
 
+PREVIEW_COPY_JOBS = 4
+
+
+def program_preview_part(work_dir: Path, index: int, clip: str) -> Path:
+    return work_dir / f"{index:04d}-{Path(clip).stem}.mp4"
+
+
+def copy_range_command(source: Path, dest: Path, start: float, end: float) -> list[str]:
+    """输入 seek 后 stream copy 这一段。-ss 和 -to 都在 -i 前面，不从文件头解码。"""
+    return [
+        "ffmpeg", "-y", "-nostdin", "-hide_banner",
+        "-ss", f"{start:.6f}",
+        "-to", f"{end:.6f}",
+        "-i", str(source),
+        "-map", "0:v:0",
+        "-map", "0:a:0",
+        "-c", "copy",
+        "-avoid_negative_ts", "make_zero",
+        str(dest),
+    ]
+
+
 def build_program_preview_commands(
     actions: list[dict],
     sources: dict[str, Path],
     output: Path,
     work_dir: Path,
-    *,
-    copy_codec: str,
 ) -> list[list[str]]:
-    """按时间表出预览命令。能拷贝的段不重编；切开的段只轻压，不烧字幕、不修响度。"""
+    """按时间表把留下的区间拷出来再接成一条。不重编码，不烧字幕，不修响度。"""
     list_path = work_dir / "concat.txt"
     commands: list[list[str]] = []
-    any_copy = any(action["mode"] == "copy" for action in actions)
-    codec = copy_codec if any_copy else "h264"
     for index, action in enumerate(actions):
-        if action["mode"] == "copy":
-            continue
-        source = sources[action["clip"]]
-        dest = work_dir / f"{index:02d}-{Path(action['clip']).stem}-norm.mp4"
+        if action.get("mode") != "copy":
+            raise SystemExit(
+                f"program preview refuses to re-encode {action.get('id')} ({action.get('mode')}). "
+                "Kept ranges are stream-copied from an input seek."
+            )
         start = float(action["src_start_s"]) + float(action["trim_head_s"])
         end = float(action["src_end_s"]) - float(action["trim_tail_s"])
-        commands.append(
-            [
-                "ffmpeg", "-y", "-nostdin", "-hide_banner",
-                "-i", str(source),
-                "-vf", f"trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS,fps=30,format=yuv420p",
-                "-af", f"atrim=start={start:.6f}:end={end:.6f},asetpts=PTS-STARTPTS",
-                *edl.light_video_args(codec),
-                "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-ac", "2",
-                str(dest),
-            ]
-        )
+        if end <= start:
+            raise SystemExit(f"program preview range is empty for {action['id']}")
+        dest = program_preview_part(work_dir, index, action["clip"])
+        commands.append(copy_range_command(sources[action["clip"]], dest, start, end))
     commands.append(build_concat_cmd(list_path, output))
     return commands
 
 
-def program_preview_inputs(actions: list[dict], sources: dict[str, Path], work_dir: Path) -> list[Path]:
-    paths: list[Path] = []
-    for index, action in enumerate(actions):
-        if action["mode"] == "copy":
-            paths.append(sources[action["clip"]])
-        else:
-            paths.append(work_dir / f"{index:02d}-{Path(action['clip']).stem}-norm.mp4")
-    return paths
+def program_preview_inputs(actions: list[dict], work_dir: Path) -> list[Path]:
+    return [
+        program_preview_part(work_dir, index, action["clip"])
+        for index, action in enumerate(actions)
+    ]
+
+
+def _run_program_preview_commands(commands: list[list[str]]) -> None:
+    """各段 copy 并行。concat 等片段都落盘后再跑。"""
+    if len(commands) <= 1:
+        for cmd in commands:
+            subprocess.run(cmd, check=True)
+        return
+    cuts, concat = commands[:-1], commands[-1]
+    workers = min(PREVIEW_COPY_JOBS, len(cuts))
+    errors: list[Exception] = []
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(subprocess.run, cmd, check=True) for cmd in cuts]
+        for fut in as_completed(futures):
+            try:
+                fut.result()
+            except Exception as exc:
+                errors.append(exc)
+    if errors:
+        raise errors[0]
+    subprocess.run(concat, check=True)
 
 
 def _preview_from_program(args, media_dir: Path) -> int:
-    """低成本预览。不渲 HUD，不按原片码率粗剪，刀点和导出是同一张表。"""
+    """按时间表 stream copy 出预览。不渲 HUD，不重编码，不烧字幕，不修响度。"""
     table = edl.load_media(media_dir)
     problems = edl.validate(table)
     if problems:
@@ -809,8 +862,6 @@ def _preview_from_program(args, media_dir: Path) -> int:
     output = Path(args.out).expanduser().resolve() if args.out else media_dir / f"{episode[:10]}-review-preview.mp4"
     reject_preview_output(output)
     sources: dict[str, Path] = {}
-    durations: dict[str, float] = {}
-    codecs: dict[str, str] = {}
     for seg in table["program"]:
         clip = seg["clip"]
         if clip in sources:
@@ -819,22 +870,22 @@ def _preview_from_program(args, media_dir: Path) -> int:
         if not path.is_file():
             raise SystemExit(f"program clip not found: {path}")
         sources[clip] = path
-        durations[clip] = probe_duration(path)
-        codecs[clip] = probe_streams(path).vcodec
-    actions = edl.preview_actions(table, durations)
+        # 确认每条原片只有一条视频和一条音频，copy 接不上就在开切之前停。
+        probe_streams(path)
+    actions = edl.preview_actions(table)
     copy_actions = [action for action in actions if action["mode"] == "copy"]
-    copy_codec = codecs[copy_actions[0]["clip"]] if copy_actions else "h264"
     work_dir = output.parent / f".{output.stem}.preview-work"
-    commands = build_program_preview_commands(
-        actions, sources, output, work_dir, copy_codec=copy_codec,
-    )
-    print(f"preview from program.json segments={len(actions)} copy={len(copy_actions)}")
+    commands = build_program_preview_commands(actions, sources, output, work_dir)
+    print(f"preview from program.json segments={len(actions)} copy={len(copy_actions)} seek=input")
     for action in actions:
         print(f"  {action['mode']:12} {action['id']} {action['clip']} {action['src_start_s']:.3f}-{action['src_end_s']:.3f} {action['reason']}")
     for cmd in commands:
         print("$", " ".join(shlex.quote(part) for part in cmd))
     if any("subtitles=" in part or "loudnorm" in part for cmd in commands for part in cmd):
         raise SystemExit("program preview must not burn subtitles or normalize loudness")
+    encoded = " ".join(part for cmd in commands for part in cmd)
+    if "libx264" in encoded or "trim=start=" in encoded or "hevc_videotoolbox" in encoded:
+        raise SystemExit("program preview must stream-copy with input seek, not re-encode")
     subtitles = Path(args.subtitles).expanduser().resolve() if args.subtitles else None
     if subtitles is not None and not subtitles.is_file():
         raise SystemExit(f"subtitles not found: {subtitles}")
@@ -849,12 +900,11 @@ def _preview_from_program(args, media_dir: Path) -> int:
     work_dir.mkdir(parents=True)
     try:
         (work_dir / "concat.txt").write_text(
-            concat_list_text(program_preview_inputs(actions, sources, work_dir)),
+            concat_list_text(program_preview_inputs(actions, work_dir)),
             encoding="utf-8",
         )
         try:
-            for cmd in commands:
-                subprocess.run(cmd, check=True)
+            _run_program_preview_commands(commands)
             assert_program_preview_duration(output, edl.frame_program_duration(table), len(actions))
         except BaseException:
             output.unlink(missing_ok=True)

@@ -785,19 +785,13 @@ def preview_presentation(table: dict, fps: int = 30) -> list[dict]:
     return out
 
 
-def preview_actions(table: dict, durations: dict[str, float]) -> list[dict]:
-    """整段且格式能接上的记 copy。只有被切开的段才轻压，不按原片码率重压长段。"""
-    actions = []
-    for sl in preview_presentation(table):
-        full = durations.get(sl["clip"])
-        partial = full is None or sl["src_start_s"] > 0.02 or sl["src_end_s"] < full - 0.02
-        boundary = sl["trim_head_s"] > 0 or sl["trim_tail_s"] > 0
-        if partial or boundary:
-            reason = "kept-range" if partial else "xfade-boundary"
-            actions.append({**sl, "mode": "preview-crf", "reason": reason})
-        else:
-            actions.append({**sl, "mode": "copy", "reason": ""})
-    return actions
+def preview_actions(table: dict) -> list[dict]:
+    """每段都 copy，包括句间刀切开的区间。
+
+    切口由输入 seek 落到前一个关键帧，预览允许比时间表稍长。
+    不因为没接到片尾就改去重编码。
+    """
+    return [{**sl, "mode": "copy", "reason": ""} for sl in preview_presentation(table)]
 
 
 def wind_transitions(table: dict) -> list[dict]:
@@ -910,7 +904,7 @@ def frame_program_duration(table: dict, fps: int = 30) -> float:
 
 
 def light_video_args(target_codec: str) -> list[str]:
-    """轻压。禁止靠近原片的 49Mbps。"""
+    """单段实在无法 copy 时的轻压上限。预览默认不走这里。禁止靠近原片的 49Mbps。"""
     if target_codec in {"hevc", "h265"}:
         return ["-c:v", "hevc_videotoolbox", "-b:v", "8M", "-tag:v", "hvc1"]
     return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]

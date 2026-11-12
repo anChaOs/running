@@ -447,8 +447,98 @@ def _alpha_matches(path: Path, profile: str) -> bool:
     return codec == expected or codec.startswith(expected)
 
 
+# 和渲染器默认 --jobs、已发布期次用过的并行度一致。每段缓存目录按文件名分开。
+HUD_EXPORT_JOBS = 2
+
+
+def hud_keep_trim_cmd(src: Path, dest: Path, start: float, end: float) -> list[str]:
+    """输入 seek 后只编码留下的区间。裁片时长等于切点之差，mtime 才能把 FIT 对回原片。
+
+    copy 会停在关键帧上，时长一变，HUD 取样就偏，所以这里仍编码。
+    """
+    if end <= start:
+        raise ValueError(f"HUD keep range is empty: {start:.6f}..{end:.6f}")
+    length = end - start
+    return [
+        "ffmpeg", "-y", "-nostdin", "-hide_banner",
+        "-ss", f"{start:.6f}",
+        "-i", str(src),
+        "-t", f"{length:.6f}",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:a", "aac", "-b:a", "128k",
+        str(dest),
+    ]
+
+
+def _trim_keep_for_hud(src: Path, dest: Path, start: float, end: float, duration: float) -> None:
+    """裁出留下的区间，并把 mtime 设成原片时间上的结束点，HUD 才不会按成片时间取样。"""
+    subprocess.run(hud_keep_trim_cmd(src, dest, start, end), check=True)
+    mtime = edl.kept_alpha_mtime(src.stat().st_mtime, duration, end)
+    os.utime(dest, (mtime, mtime))
+
+
+def _trim_keeps(trims: list[tuple[Path, Path, float, float, float]]) -> None:
+    if not trims:
+        return
+    workers = min(HUD_EXPORT_JOBS, len(trims))
+
+    def _one(item: tuple[Path, Path, float, float, float]) -> None:
+        src, piece, start, end, full = item
+        _trim_keep_for_hud(src, piece, start, end, full)
+
+    if workers == 1:
+        for item in trims:
+            _one(item)
+        return
+    errors: list[Exception] = []
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="hud-trim") as pool:
+        futures = [pool.submit(_one, item) for item in trims]
+        for fut in as_completed(futures):
+            try:
+                fut.result()
+            except Exception as exc:
+                errors.append(exc)
+    if errors:
+        raise errors[0]
+
+
+def overlay_render_argv(
+    *,
+    render_dir: Path,
+    clips: list[str],
+    output_dir: Path,
+    fit: Path,
+    hud: dict,
+    weather: Path,
+    profile: str,
+    jobs: int,
+) -> list[str]:
+    argv = [
+        "--media-dir", str(render_dir),
+        "--fit", str(fit),
+        "--clips", *clips,
+        "--overlay-only",
+        "--overlay-profile", profile,
+        "--output-dir", str(output_dir),
+        "-sn", str(hud.get("shoe_name") or "Secret Shoe"),
+        "-sk", str(hud.get("shoe_km_after") or 0),
+        "-j", str(jobs),
+    ]
+    if weather.is_file():
+        argv.extend(["--weather-json", str(weather)])
+    elif hud.get("weather_city"):
+        argv.extend(["--weather-city", str(hud["weather_city"])])
+    else:
+        argv.append("--no-weather")
+    argv.extend(["--video-end-time-mode", str(hud.get("video_end_time_mode") or "file-modified")])
+    return argv
+
+
 def export_alphas(media_dir: Path, table: dict, durations: dict[str, float], *, dry_run: bool) -> list[Path]:
-    """只给留下的区间渲 qtrle（或表里记的规格）透明层。已有同名文件就复用，避免重跑。"""
+    """只给留下的区间渲透明层。已有同名文件就复用。
+
+    切开的区间用输入 seek 裁出来，同一目录的多段一起渲，默认 2 路。
+    """
     hud = table.get("hud") or {}
     if not hud.get("recorded"):
         raise SystemExit("HUD data is not recorded on the program timeline")
@@ -458,6 +548,9 @@ def export_alphas(media_dir: Path, table: dict, durations: dict[str, float], *, 
     fit = fits[0] if fits else media_dir / "run-data.fit"
     weather = media_dir / "weather-hourly.json"
     paths: list[Path] = []
+    groups: dict[tuple[Path, Path, str], list[str]] = {}
+    trims: list[tuple[Path, Path, float, float, float]] = []
+    expected: list[Path] = []
     for job in edl.hud_jobs(table):
         src = media_dir / job["clip"]
         full = durations.get(job["clip"])
@@ -476,52 +569,39 @@ def export_alphas(media_dir: Path, table: dict, durations: dict[str, float], *, 
             _log(f"reuse {dest.name}")
             continue
         if dry_run:
-            _log(f"would render {dest.name} from {job['src_start_s']:.3f}-{job['src_end_s']:.3f} profile={job['overlay_profile']}")
+            _log(
+                f"would render {dest.name} from {job['src_start_s']:.3f}-{job['src_end_s']:.3f} "
+                f"profile={job['overlay_profile']}"
+            )
             continue
         render_dir.mkdir(parents=True, exist_ok=True)
         if not is_full:
             piece = render_dir / clip_name
-            _trim_keep_for_hud(src, piece, float(job["src_start_s"]), float(job["src_end_s"]), float(full or 0))
-        argv = [
-            "--media-dir", str(render_dir),
-            "--fit", str(fit),
-            "--clips", clip_name,
-            "--overlay-only",
-            "--overlay-profile", str(job["overlay_profile"]),
-            "--output-dir", str(dest.parent),
-            "-sn", str(hud.get("shoe_name") or "Secret Shoe"),
-            "-sk", str(hud.get("shoe_km_after") or 0),
-            "-j", "1",
-        ]
-        if weather.is_file():
-            argv.extend(["--weather-json", str(weather)])
-        elif hud.get("weather_city"):
-            argv.extend(["--weather-city", str(hud["weather_city"])])
-        else:
-            argv.append("--no-weather")
-        argv.extend(["--video-end-time-mode", str(hud.get("video_end_time_mode") or "file-modified")])
+            trims.append((src, piece, float(job["src_start_s"]), float(job["src_end_s"]), float(full or 0)))
+        groups.setdefault((render_dir, dest.parent, profile), []).append(clip_name)
+        expected.append(dest)
+    if dry_run:
+        return paths
+    _trim_keeps(trims)
+    for (render_dir, output_dir, profile), clips in groups.items():
+        argv = overlay_render_argv(
+            render_dir=render_dir,
+            clips=clips,
+            output_dir=output_dir,
+            fit=fit,
+            hud=hud,
+            weather=weather,
+            profile=profile,
+            jobs=HUD_EXPORT_JOBS,
+        )
         # 不走 main()：那会再记一条 hud-render。这段渲染的墙钟算在 final-export 里。
         rc = _render_main(_parse_args(argv))
         if rc:
-            raise SystemExit(f"HUD render failed for {clip_name}")
+            raise SystemExit(f"HUD render failed for {render_dir}")
+    for dest in expected:
         if not dest.is_file():
             raise SystemExit(f"HUD alpha missing: {dest}")
     return paths
-
-
-def _trim_keep_for_hud(src: Path, dest: Path, start: float, end: float, duration: float) -> None:
-    """裁出留下的区间，并把 mtime 设成原片时间上的结束点，HUD 才不会按成片时间取样。"""
-    cmd = [
-        "ffmpeg", "-y", "-hide_banner", "-i", str(src),
-        "-vf", f"trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS",
-        "-af", f"atrim=start={start:.6f}:end={end:.6f},asetpts=PTS-STARTPTS",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-        "-c:a", "aac", "-b:a", "128k",
-        str(dest),
-    ]
-    subprocess.run(cmd, check=True)
-    mtime = edl.kept_alpha_mtime(src.stat().st_mtime, duration, end)
-    os.utime(dest, (mtime, mtime))
 
 
 def main(argv: list[str] | None = None) -> int:

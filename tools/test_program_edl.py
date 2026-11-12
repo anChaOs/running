@@ -115,12 +115,7 @@ class ClockTest(unittest.TestCase):
     def test_preview_and_export_share_source_ranges(self) -> None:
         table = _ready()
         edl.add_overlay(table, {"asset": "stats.jpg", "program_start_s": 20.0, "program_end_s": 24.0, "role": "stats"})
-        durations = {
-            "2026-01-02-open.mp4": 8.0,
-            "2026-01-02-run-a.mp4": 12.3,
-            "2026-01-02-close.mp4": 6.0,
-        }
-        preview = edl.preview_actions(table, durations)
+        preview = edl.preview_actions(table)
         export = edl.export_slices(table)
         self.assertEqual(
             [(row["clip"], row["src_start_s"], row["src_end_s"]) for row in preview],
@@ -128,9 +123,7 @@ class ClockTest(unittest.TestCase):
         )
         self.assertEqual([edl.frame_range(row["src_start_s"], row["src_end_s"]) for row in preview],
                          [edl.frame_range(row["src_start_s"], row["src_end_s"]) for row in export])
-        modes = {row["id"]: row["mode"] for row in preview}
-        self.assertEqual(modes["2026-01-02-run-a-1"], "copy")
-        self.assertEqual(modes["2026-01-02-open-1"], "preview-crf")
+        self.assertTrue(all(row["mode"] == "copy" for row in preview))
         self.assertNotIn("49", " ".join(edl.light_video_args("hevc")))
         self.assertNotIn("prores", " ".join(edl.light_video_args("h264")))
         jobs = edl.hud_jobs(table)
@@ -139,7 +132,7 @@ class ClockTest(unittest.TestCase):
         self.assertEqual(jobs[0]["src_start_s"], 0.0)
         self.assertEqual(jobs[0]["src_end_s"], 12.3)
 
-    def test_partial_run_is_not_stream_copied(self) -> None:
+    def test_partial_run_is_stream_copied(self) -> None:
         table = edl.empty_program("2026-01-02-demo")
         edl.set_source_sync(table, [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}])
         edl.upsert_keeps(
@@ -148,9 +141,9 @@ class ClockTest(unittest.TestCase):
                 {"clip": "2026-01-02-run-a.mp4", "src_start_s": 1.0, "src_end_s": 4.0},
             ],
         )
-        actions = edl.preview_actions(table, {"2026-01-02-run-a.mp4": 20.0})
-        self.assertEqual(actions[0]["mode"], "preview-crf")
-        self.assertEqual(actions[0]["reason"], "kept-range")
+        actions = edl.preview_actions(table)
+        self.assertEqual(actions[0]["mode"], "copy")
+        self.assertNotEqual(actions[0]["reason"], "kept-range")
 
     def test_freeze_blocks_cuts_and_stales_subtitles(self) -> None:
         table = _ready()
@@ -277,15 +270,7 @@ class ClockTest(unittest.TestCase):
         self.assertAlmostEqual(winds[0]["at_program_s"], run_b["program_start_s"])
         self.assertAlmostEqual(edl.program_duration(table), 4 + 6 + 5 + 3 - 2 * edl.XFADE_S)
         self.assertEqual(edl.validate(table), [])
-        actions = edl.preview_actions(
-            table,
-            {
-                "2026-01-02-open.mp4": 4.0,
-                "2026-01-02-run-a.mp4": 6.0,
-                "2026-01-02-run-b.mp4": 5.0,
-                "2026-01-02-close.mp4": 3.0,
-            },
-        )
+        actions = edl.preview_actions(table)
         run_actions = [row for row in actions if row["type"] == "run"]
         self.assertTrue(all(row["trim_head_s"] == 0 and row["trim_tail_s"] == 0 for row in run_actions))
 
@@ -393,33 +378,129 @@ class SameTableTest(unittest.TestCase):
         self.assertIn("subtitles=", graph)
         self.assertIn("loudnorm", graph)
         self.assertIn("xfade=", graph)
-        actions = edl.preview_actions(
-            table,
-            {
-                "2026-01-02-open.mp4": 8.0,
-                "2026-01-02-run-a.mp4": 12.3,
-                "2026-01-02-close.mp4": 6.0,
-            },
-        )
+        actions = edl.preview_actions(table)
         commands = preview_episode.build_program_preview_commands(
             actions,
             {row["clip"]: Path("/media") / row["clip"] for row in actions},
             Path("/tmp/review-preview.mp4"),
             Path("/tmp/work"),
-            copy_codec="hevc",
         )
         blob = " ".join(" ".join(cmd) for cmd in commands)
         self.assertNotIn("49M", blob)
         self.assertNotIn("prores", blob)
         self.assertNotIn("loudnorm", blob)
         self.assertNotIn("subtitles=", blob)
-        self.assertIn("8M", blob)
-        self.assertIn("copy", blob)
+        self.assertNotIn("libx264", blob)
+        self.assertNotIn("hevc_videotoolbox", blob)
+        self.assertNotIn("trim=start=", blob)
+        self.assertNotIn("preview-crf", blob)
+        cuts, concat = commands[:-1], commands[-1]
+        self.assertEqual(len(cuts), len(actions))
+        # open 尾、close 头按 xfade 从 copy 区间里剪掉，跑步段不动。
+        expected = {
+            "2026-01-02-open.mp4": ("0.000000", "7.800000"),
+            "2026-01-02-run-a.mp4": ("0.000000", "12.300000"),
+            "2026-01-02-close.mp4": ("0.200000", "6.000000"),
+        }
+        for action, cmd in zip(actions, cuts, strict=True):
+            ss = cmd.index("-ss")
+            to = cmd.index("-to")
+            src = cmd.index("-i")
+            self.assertLess(ss, src)
+            self.assertLess(to, src)
+            self.assertEqual(cmd[cmd.index("-c") + 1], "copy")
+            self.assertEqual((cmd[ss + 1], cmd[to + 1]), expected[action["clip"]])
+        self.assertIn("concat", concat)
+        self.assertIn("copy", concat)
+        low, high = preview_episode.program_preview_duration_bounds(1152.6, 130)
+        self.assertGreater(high - 1152.6, 3.9)
+        self.assertLess(high - 1152.6, 1152.6)
+        self.assertGreater(1152.6 - low, 0.5)
+        self.assertLess(1152.6 - low, 30.0)
         slices = [(row["clip"], row["src_start_s"], row["src_end_s"]) for row in actions]
         self.assertEqual(slices, [(row["clip"], row["src_start_s"], row["src_end_s"]) for row in edl.export_slices(table)])
         self.assertEqual(graph.count("xfade="), 2)
         self.assertNotIn("dblur", graph)
         self.assertNotIn("whoosh", graph)
+
+    def test_kept_range_preview_uses_input_seek_copy(self) -> None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "hud"))
+        import preview_episode
+        import render_running_hud as hud
+
+        table = edl.empty_program("2026-01-02-demo")
+        edl.set_source_sync(table, [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}])
+        edl.upsert_keeps(
+            table,
+            [{"clip": "2026-01-02-run-a.mp4", "src_start_s": 12.5, "src_end_s": 18.25}],
+        )
+        actions = edl.preview_actions(table)
+        self.assertEqual(actions[0]["mode"], "copy")
+        commands = preview_episode.build_program_preview_commands(
+            actions,
+            {"2026-01-02-run-a.mp4": Path("/media/2026-01-02-run-a.mp4")},
+            Path("/tmp/review-preview.mp4"),
+            Path("/tmp/work"),
+        )
+        cut = commands[0]
+        blob = " ".join(cut)
+        start = float(actions[0]["src_start_s"])
+        end = float(actions[0]["src_end_s"])
+        self.assertGreater(start, 12.0)
+        self.assertLess(end, 18.3)
+        self.assertLess(cut.index("-ss"), cut.index("-i"))
+        self.assertLess(cut.index("-to"), cut.index("-i"))
+        self.assertEqual(cut[cut.index("-ss") + 1], f"{start:.6f}")
+        self.assertEqual(cut[cut.index("-to") + 1], f"{end:.6f}")
+        self.assertNotEqual(cut[cut.index("-ss") + 1], "0.000000")
+        self.assertEqual(cut[cut.index("-c") + 1], "copy")
+        self.assertNotIn("trim=", blob)
+        self.assertNotIn("libx264", blob)
+        self.assertNotIn("atrim=", blob)
+
+        keep = hud.hud_keep_trim_cmd(Path("/media/run.mp4"), Path("/tmp/keep.mp4"), 12.5, 18.25)
+        keep_blob = " ".join(keep)
+        self.assertLess(keep.index("-ss"), keep.index("-i"))
+        self.assertEqual(keep[keep.index("-ss") + 1], "12.500000")
+        self.assertGreater(keep.index("-t"), keep.index("-i"))
+        self.assertEqual(keep[keep.index("-t") + 1], "5.750000")
+        self.assertNotIn("trim=", keep_blob)
+        self.assertNotIn("atrim=", keep_blob)
+        self.assertIn("libx264", keep)
+        argv = hud.overlay_render_argv(
+            render_dir=Path("/media/keeps"),
+            clips=["a.mp4", "b.mp4"],
+            output_dir=Path("/media/out"),
+            fit=Path("/media/run.fit"),
+            hud={"shoe_name": "Fly", "shoe_km_after": 10, "weather_city": "shanghai"},
+            weather=Path("/media/weather-hourly.json"),
+            profile="qtrle",
+            jobs=hud.HUD_EXPORT_JOBS,
+        )
+        self.assertGreaterEqual(hud.HUD_EXPORT_JOBS, 2)
+        self.assertEqual(argv[argv.index("-j") + 1], "2")
+        self.assertNotEqual(argv[argv.index("-j") + 1], "1")
+
+    def test_export_seeks_cut_sources_and_trims_from_zero(self) -> None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        table = edl.empty_program("2026-01-02-demo")
+        edl.set_source_sync(table, [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}])
+        edl.upsert_keeps(
+            table,
+            [{"clip": "2026-01-02-run-a.mp4", "src_start_s": 8.0, "src_end_s": 12.0}],
+        )
+        for seg in table["program"]:
+            seg["hud"] = False
+        args = final_export.program_input_args(Path("/media"), table, [])
+        self.assertLess(args.index("-ss"), args.index("-i"))
+        self.assertEqual(args[args.index("-ss") + 1], "8.000000")
+        graph = final_export.build_program_filter(table, [], 0, None, apply_loudness=False)
+        self.assertIn("trim=start=0.000000:end=4.000000", graph)
+        self.assertIn("atrim=start=0.000000:end=4.000000", graph)
+        self.assertNotIn("trim=start=8.000000", graph)
 
     def test_unaligned_keeps_do_not_push_close_xfade_past_the_picture(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
