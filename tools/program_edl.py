@@ -12,6 +12,7 @@ schema version 1
   hud 为真时，成片时间 t 的数据取样在 src_start_s + (t - program_start_s)，
   再加上 source_sync.offset_s 才是 FIT 时间。绝不拿 program 时间去查 FIT。
 - overlays[]: 贴图。asset、program_start_s、program_end_s，可带 x/y/width/opacity/fade。
+  手写的图必须带上量取时的成片时长；对不上，或之后时间表变了，就拒绝导出。
 - transitions[]: 只在导出时做。xfade 的 at_program_s 等于下一段的 program_start_s，
   两段重叠 duration_s，成片因此变短。
 - inserts[]: 外部视频或图文。不套跑步 HUD，只把后面的成片时间往后推。
@@ -33,6 +34,8 @@ VERSION = 1
 PROGRAM_FILENAME = "program.json"
 XFADE_S = 0.2
 DEFAULT_OVERLAY_PROFILE = "qtrle"
+# 手写贴图允许的成片时长误差。小于一次 0.2s xfade，大于容器时长的零头。
+OVERLAY_DURATION_TOLERANCE_S = 0.15
 ROLE_ORDER = {"cold_open": 0, "run": 1, "close": 2}
 
 
@@ -257,6 +260,46 @@ def add_insert(table: dict, insert: dict) -> dict:
     return table
 
 
+def layout_signature(table: dict) -> list[list]:
+    """贴图落笔时的成片分段。之后刀点、冷开场或插入一变，这张签名就对不上。"""
+    signature = []
+    for seg in table.get("program", []):
+        signature.append(
+            [
+                str(seg["id"]),
+                round(float(seg["program_start_s"]), 3),
+                round(float(seg["src_start_s"]), 3),
+                round(float(seg["src_end_s"]), 3),
+            ]
+        )
+    return signature
+
+
+def _normalize_signature(signature: object) -> list[list]:
+    if not isinstance(signature, list):
+        return []
+    normalized = []
+    for row in signature:
+        if not isinstance(row, (list, tuple)) or len(row) != 4:
+            return []
+        try:
+            normalized.append(
+                [
+                    str(row[0]),
+                    round(float(row[1]), 3),
+                    round(float(row[2]), 3),
+                    round(float(row[3]), 3),
+                ]
+            )
+        except (TypeError, ValueError):
+            return []
+    return normalized
+
+
+def signatures_match(got: object, want: object) -> bool:
+    return _normalize_signature(got) == _normalize_signature(want)
+
+
 def add_close_stats(table: dict, assets: list[str]) -> dict:
     """把数据图按 close 在成片上的时长均分，写进 overlays。不改刀点。"""
     closes = [seg for seg in table.get("program", []) if seg["type"] == "close"]
@@ -264,6 +307,7 @@ def add_close_stats(table: dict, assets: list[str]) -> dict:
         raise ValueError("close stats need exactly one close segment")
     if not assets:
         raise ValueError("close stats need at least one image")
+    table["overlays"] = [ov for ov in table.get("overlays", []) if ov.get("role") != "stats"]
     seg = closes[0]
     start = float(seg["program_start_s"])
     end = start + seg_duration(seg)
@@ -284,20 +328,38 @@ def add_close_stats(table: dict, assets: list[str]) -> dict:
     return table
 
 
-def add_overlay(table: dict, overlay: dict) -> dict:
-    """贴图只占成片时间，不改刀点，也不把字幕标过期。"""
+def add_overlay(table: dict, overlay: dict, *, expect_duration_s: float | None = None) -> dict:
+    """贴图只占成片时间，不改刀点，也不把字幕标过期。
+
+    手写的图（不是按 close 算出来的数据图）必须声明量取时的成片时长。
+    和当前表差过容差就拒绝写入，避免把另一条成片的秒数套过来。
+    """
     start = _finite(overlay["program_start_s"], "overlay program_start_s")
     end = _finite(overlay["program_end_s"], "overlay program_end_s")
     _check_range(start, end, "overlay")
+    role = overlay.get("role")
+    if role != "stats" and expect_duration_s is None:
+        raise ValueError("graphic overlay requires expect_duration_s from the cut it was measured on")
+    if expect_duration_s is not None:
+        got = program_duration(table)
+        want = _finite(expect_duration_s, "expect_duration_s")
+        if abs(got - want) > OVERLAY_DURATION_TOLERANCE_S:
+            raise ValueError(
+                f"overlay {overlay.get('asset')} was measured on a {want:.3f}s cut "
+                f"but this program is {got:.3f}s; refusing a misplaced graphic"
+            )
     row = {
         "asset": str(overlay["asset"]),
         "program_start_s": start,
         "program_end_s": end,
+        "authored_signature": layout_signature(table),
     }
     for key in ("x", "y", "width", "opacity", "fade_in", "fade_out", "role"):
         if overlay.get(key) is not None:
             row[key] = overlay[key]
-    table.setdefault("overlays", []).append(row)
+    overlays = [ov for ov in table.get("overlays", []) if ov.get("asset") != row["asset"]]
+    overlays.append(row)
+    table["overlays"] = overlays
     return table
 
 
@@ -516,7 +578,12 @@ def validate(table: dict, *, require_frozen: bool = False) -> list[str]:
             problems.append(f"run clip {seg['clip']} has no source sync")
     _check_keep_partition(table, problems)
     total = program_duration(table) if program else 0.0
+    current_signature = layout_signature(table)
     for ov in table.get("overlays", []):
+        if "authored_signature" not in ov:
+            problems.append(f"overlay {ov.get('asset')} has no timeline signature; place it again before export")
+        elif not signatures_match(ov.get("authored_signature"), current_signature):
+            problems.append(f"overlay {ov.get('asset')} no longer matches the program timeline; refusing export")
         try:
             start = _finite(ov["program_start_s"], "overlay start")
             end = _finite(ov["program_end_s"], "overlay end")
@@ -527,6 +594,10 @@ def validate(table: dict, *, require_frozen: bool = False) -> list[str]:
             problems.append(f"overlay {ov.get('asset')} ends before it starts")
         elif program and end > total + 1e-3:
             problems.append(f"overlay {ov.get('asset')} extends past the program")
+    try:
+        frame_timeline(table)
+    except ValueError as exc:
+        problems.append(str(exc))
     if require_frozen and not table.get("frozen"):
         problems.append("program is not frozen")
     if table.get("subs_stale"):
@@ -635,24 +706,30 @@ def program_slices(table: dict) -> list[dict]:
     ]
 
 
-def preview_presentation(table: dict) -> list[dict]:
+def preview_presentation(table: dict, fps: int = 30) -> list[dict]:
     """预览不做叠化，只把 xfade 的时长从非跑步那一侧剪掉，让成片时长和导出一致。
 
-    跑步段的原片区间不动。这样对着预览对过的字幕，导出时跑步段不会错位。
+    跑步段的原片区间不动。窗口和 xfade 都落到和导出同一组整数帧上。
     """
-    slices = program_slices(table)
-    fades = {item["before_id"]: float(item["duration_s"]) for item in table.get("transitions", [])}
+    timeline = frame_timeline(table, fps)
     out = []
-    for index, sl in enumerate(slices):
-        trim_head = 0.0
-        trim_tail = 0.0
-        fade_in = fades.get(sl["id"], 0.0)
-        fade_out = fades.get(slices[index + 1]["id"], 0.0) if index + 1 < len(slices) else 0.0
-        if fade_in and sl["type"] != "run":
-            trim_head = fade_in
-        if fade_out and sl["type"] != "run":
-            trim_tail = fade_out
-        out.append({**sl, "trim_head_s": trim_head, "trim_tail_s": trim_tail})
+    for index, sl in enumerate(timeline):
+        trim_head = sl["fade_frames"] / fps if sl["fade_frames"] and sl["type"] != "run" else 0.0
+        next_fade = timeline[index + 1]["fade_frames"] if index + 1 < len(timeline) else 0
+        trim_tail = next_fade / fps if next_fade and sl["type"] != "run" else 0.0
+        out.append(
+            {
+                "id": sl["id"],
+                "type": sl["type"],
+                "clip": sl["clip"],
+                "src_start_s": sl["src_start_s"],
+                "src_end_s": sl["src_end_s"],
+                "program_start_s": sl["program_start_frame"] / fps,
+                "hud": bool(sl["hud"]),
+                "trim_head_s": trim_head,
+                "trim_tail_s": trim_tail,
+            }
+        )
     return out
 
 
@@ -671,15 +748,27 @@ def preview_actions(table: dict, durations: dict[str, float]) -> list[dict]:
     return actions
 
 
-def export_slices(table: dict) -> list[dict]:
-    return program_slices(table)
+def export_slices(table: dict, fps: int = 30) -> list[dict]:
+    """和预览同一组落帧后的原片区间。"""
+    return [
+        {
+            "id": sl["id"],
+            "type": sl["type"],
+            "clip": sl["clip"],
+            "src_start_s": sl["src_start_s"],
+            "src_end_s": sl["src_end_s"],
+            "program_start_s": sl["program_start_frame"] / fps,
+            "hud": bool(sl["hud"]),
+        }
+        for sl in frame_timeline(table, fps)
+    ]
 
 
-def hud_jobs(table: dict) -> list[dict]:
-    """导出时只给留下的、要画 HUD 的区间渲透明层。"""
+def hud_jobs(table: dict, fps: int = 30) -> list[dict]:
+    """导出时只给留下的、要画 HUD 的区间渲透明层。区间和画面裁切是同一组帧。"""
     profile = table.get("hud", {}).get("overlay_profile") or DEFAULT_OVERLAY_PROFILE
     jobs = []
-    for sl in program_slices(table):
+    for sl in frame_timeline(table, fps):
         if not sl["hud"]:
             continue
         jobs.append(
@@ -705,6 +794,59 @@ def frame_range(start: float, end: float, fps: int = 30) -> tuple[int, int]:
     if end_frame <= start_frame:
         raise ValueError("range is shorter than one frame")
     return start_frame, end_frame
+
+
+def snap_frames(seconds: float, fps: int = 30) -> int:
+    return max(0, int(round(float(seconds) * fps)))
+
+
+def frame_timeline(table: dict, fps: int = 30) -> list[dict]:
+    """原片窗口和 xfade 都落到整数帧。
+
+    xfade 的 offset 用这一帧数，不用未对齐的浮点累计。浮点 offset 一旦
+    越过 fps 滤镜实际吐出的长度，下一段（常见是 close）会被丢掉。
+    """
+    if fps <= 0:
+        raise ValueError("fps must be positive")
+    fades = {item["before_id"]: float(item["duration_s"]) for item in table.get("transitions", [])}
+    placed: list[dict] = []
+    acc = 0
+    for index, sl in enumerate(program_slices(table)):
+        start_f, end_f = frame_range(sl["src_start_s"], sl["src_end_s"], fps)
+        count = end_f - start_f
+        fade_n = 0
+        if index:
+            fade = fades.get(sl["id"], 0.0)
+            if fade > 0:
+                fade_n = max(1, snap_frames(fade, fps))
+                if fade_n >= acc:
+                    raise ValueError(
+                        f"xfade of {fade_n} frames before {sl['id']} is longer than the "
+                        f"previous {acc} frames; refusing to drop {sl['id']}"
+                    )
+        program_start = 0 if index == 0 else acc - fade_n
+        placed.append(
+            {
+                **sl,
+                "src_start_s": start_f / fps,
+                "src_end_s": end_f / fps,
+                "src_start_frame": start_f,
+                "src_end_frame": end_f,
+                "frames": count,
+                "fade_frames": fade_n,
+                "program_start_frame": program_start,
+            }
+        )
+        acc = program_start + count
+    return placed
+
+
+def frame_program_duration(table: dict, fps: int = 30) -> float:
+    timeline = frame_timeline(table, fps)
+    if not timeline:
+        return 0.0
+    last = timeline[-1]
+    return (last["program_start_frame"] + last["frames"]) / fps
 
 
 def light_video_args(target_codec: str) -> list[str]:
@@ -765,6 +907,12 @@ def main(argv: list[str] | None = None) -> int:
     ov_p.add_argument("--width", type=int)
     ov_p.add_argument("--opacity", type=float)
     ov_p.add_argument("--role", choices=("stats", "graphic"))
+    ov_p.add_argument(
+        "--expect-duration",
+        type=float,
+        required=True,
+        help="Duration in seconds of the cut these overlay times were measured on. Refuses if this program differs by more than 0.15s",
+    )
 
     stats_p = sub.add_parser("close-stats")
     stats_p.add_argument("--assets", required=True, help="Comma-separated image names, in order")
@@ -839,7 +987,7 @@ def main(argv: list[str] | None = None) -> int:
             save(media, add_overlay(table, {
                 "asset": args.asset, "program_start_s": args.start, "program_end_s": args.end,
                 "x": args.x, "y": args.y, "width": args.width, "opacity": args.opacity, "role": args.role,
-            }))
+            }, expect_duration_s=args.expect_duration))
         elif args.cmd == "freeze":
             table = load_media(media)
             save(media, freeze(table))

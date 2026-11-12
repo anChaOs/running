@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
-"""时间表的两套时钟、预览/导出同一张表、todo 门闩。不依赖媒体盘。"""
+"""时间表的两套时钟、预览/导出同一张表、todo 门闩。不依赖媒体盘。
+
+有 ffmpeg 时再用合成片确认 close 没被 xfade 丢掉。
+"""
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -175,6 +180,76 @@ class ClockTest(unittest.TestCase):
         self.assertEqual(edl.validate(loaded), [])
         self.assertAlmostEqual(edl.program_duration(loaded), 8 + 12.3 + 6 - 2 * edl.XFADE_S)
 
+    def test_graphic_overlay_refuses_another_cuts_times(self) -> None:
+        table = _ready()
+        graphic = {
+            "asset": "16week.jpg",
+            "program_start_s": 10.0,
+            "program_end_s": 12.0,
+            "role": "graphic",
+        }
+        with self.assertRaises(ValueError) as missing:
+            edl.add_overlay(table, graphic)
+        self.assertIn("expect_duration", str(missing.exception))
+        with self.assertRaises(ValueError) as wrong:
+            edl.add_overlay(table, graphic, expect_duration_s=1152.6)
+        self.assertIn("refusing", str(wrong.exception))
+        edl.add_overlay(table, graphic, expect_duration_s=edl.program_duration(table))
+        self.assertEqual(edl.validate(table), [])
+        with tempfile.TemporaryDirectory() as td:
+            edl.save(td, table)
+            self.assertEqual(edl.validate(edl.load_media(td)), [])
+        edl.upsert_keeps(table, [{"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 4.0}])
+        problems = edl.validate(table)
+        self.assertTrue(any("no longer matches" in item for item in problems))
+
+    def test_published_cut_keeps_close_on_the_frame_grid(self) -> None:
+        # 2026-11-12-8020 的七段时长。#90 里 close 被浮点 xfade 丢掉；新表只有冷开场和 close 做 0.2s。
+        durations = [
+            ("2026-11-12-open.mp4", 86.4),
+            ("2026-11-12-run-a.mp4", 201.866667),
+            ("2026-11-12-run-b.mp4", 111.8),
+            ("2026-11-12-run-c.mp4", 113.4),
+            ("2026-11-12-run-d.mp4", 116.333333),
+            ("2026-11-12-run-e.mp4", 263.933333),
+            ("2026-11-12-close.mp4", 259.266667),
+        ]
+        table = edl.empty_program("2026-11-12-8020")
+        edl.set_source_sync(
+            table,
+            [
+                {"clip": name, "fit": "2026-11-12-run-data.fit", "offset_s": 0.0}
+                for name, _dur in durations
+                if "-run-" in name
+            ],
+        )
+        edl.upsert_keeps(
+            table,
+            [{"clip": name, "src_start_s": 0.0, "src_end_s": dur} for name, dur in durations],
+        )
+        timeline = edl.frame_timeline(table)
+        self.assertEqual([seg["fade_frames"] for seg in timeline], [0, 6, 0, 0, 0, 0, 6])
+        close = timeline[-1]
+        self.assertEqual(close["program_start_frame"], 26800)
+        self.assertEqual(close["frames"], 7778)
+        self.assertEqual(close["program_start_frame"] + close["frames"], 34578)
+        self.assertAlmostEqual(edl.frame_program_duration(table), 1152.6)
+        self.assertLess(close["program_start_frame"], close["program_start_frame"] + close["fade_frames"])
+
+    def test_short_open_cannot_xfade_away_the_next_segment(self) -> None:
+        table = edl.empty_program("2026-01-02-demo")
+        edl.set_source_sync(table, [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}])
+        edl.upsert_keeps(
+            table,
+            [
+                {"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 0.21},
+                {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 5.0},
+                {"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 5.0},
+            ],
+        )
+        problems = edl.validate(table)
+        self.assertTrue(any("refusing to drop" in item for item in problems))
+
     def test_close_stats_share_the_close_segment(self) -> None:
         table = _ready()
         edl.add_close_stats(table, ["stats-01.jpg", "stats-02.jpg"])
@@ -223,6 +298,100 @@ class SameTableTest(unittest.TestCase):
         self.assertIn("copy", blob)
         slices = [(row["clip"], row["src_start_s"], row["src_end_s"]) for row in actions]
         self.assertEqual(slices, [(row["clip"], row["src_start_s"], row["src_end_s"]) for row in edl.export_slices(table)])
+        self.assertEqual(graph.count("xfade="), 2)
+        self.assertNotIn("dblur", graph)
+        self.assertNotIn("whoosh", graph)
+
+    def test_unaligned_keeps_do_not_push_close_xfade_past_the_picture(self) -> None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        table = edl.empty_program("2026-01-02-demo")
+        runs = [f"2026-01-02-run-{index:02d}.mp4" for index in range(20)]
+        edl.set_source_sync(table, [{"clip": name, "fit": "run.fit", "offset_s": 0.0} for name in runs])
+        rows = [{"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 10.016}]
+        rows.extend({"clip": name, "src_start_s": 0.0, "src_end_s": 10.016} for name in runs)
+        rows.append({"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 10.016})
+        edl.upsert_keeps(table, rows)
+        close = edl.frame_timeline(table)[-1]
+        graph = final_export.build_program_filter(
+            table, ["full"] * len(runs), 0, None, apply_loudness=False,
+        )
+        offset = close["program_start_frame"] / 30
+        self.assertAlmostEqual(offset, 209.6)
+        self.assertIn(f"offset={offset:.6f}", graph)
+        self.assertNotIn("offset=209.936", graph)
+        self.assertEqual(graph.count("xfade="), 2)
+        self.assertNotIn("dblur", graph)
+
+    def test_published_close_xfade_matches_frame_offset(self) -> None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        durations = [
+            ("2026-11-12-open.mp4", 86.4),
+            ("2026-11-12-run-a.mp4", 201.866667),
+            ("2026-11-12-run-b.mp4", 111.8),
+            ("2026-11-12-run-c.mp4", 113.4),
+            ("2026-11-12-run-d.mp4", 116.333333),
+            ("2026-11-12-run-e.mp4", 263.933333),
+            ("2026-11-12-close.mp4", 259.266667),
+        ]
+        table = edl.empty_program("2026-11-12-8020")
+        edl.set_source_sync(
+            table,
+            [{"clip": name, "fit": "fit.fit", "offset_s": 0.0} for name, _dur in durations if "-run-" in name],
+        )
+        edl.upsert_keeps(table, [{"clip": name, "src_start_s": 0.0, "src_end_s": dur} for name, dur in durations])
+        graph = final_export.build_program_filter(table, ["full"] * 5, 0, Path("/tmp/cues.ass"), apply_loudness=False)
+        self.assertIn("xfade=transition=fade:duration=0.200000:offset=893.333333", graph)
+        self.assertEqual(graph.count("xfade="), 2)
+        self.assertNotIn("dblur", graph)
+        self.assertNotIn("0.066667", graph)
+        self.assertIn("subtitles=", graph)
+
+    def test_ffmpeg_keeps_close_when_source_times_are_off_the_frame_grid(self) -> None:
+        if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+            self.skipTest("ffmpeg not installed")
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        dur = 0.349
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            names = ["2026-01-02-open.mp4", *[f"2026-01-02-run-{i:02d}.mp4" for i in range(20)], "2026-01-02-close.mp4"]
+            for name in names:
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                        "-f", "lavfi", "-i", f"color=c=blue:s=160x90:r=30:d={dur}",
+                        "-f", "lavfi", "-i", f"sine=frequency=440:sample_rate=48000:duration={dur}",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                        str(root / name),
+                    ],
+                    check=True,
+                )
+            table = edl.empty_program("2026-01-02-demo")
+            runs = [name for name in names if "-run-" in name]
+            edl.set_source_sync(table, [{"clip": name, "fit": "run.fit", "offset_s": 0.0} for name in runs])
+            edl.upsert_keeps(table, [{"clip": name, "src_start_s": 0.0, "src_end_s": dur} for name in names])
+            for seg in table["program"]:
+                seg["hud"] = False
+            expected = edl.frame_program_duration(table)
+            graph = final_export.build_program_filter(table, [], 0, None, apply_loudness=False)
+            out = root / "out.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    *final_export.program_input_args(root, table, []),
+                    "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                    str(out),
+                ],
+                check=True,
+            )
+            actual = final_export.probe_duration(out)
+        self.assertLess(abs(actual - expected), 0.15)
 
 
 class TodoTest(unittest.TestCase):

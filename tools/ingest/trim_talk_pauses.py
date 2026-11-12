@@ -651,6 +651,14 @@ def main() -> int:
         plans.append(plan)
     if args.record:
         for plan in plans:
+            source = Path(plan["source"])
+            named = Path(plan["path"])
+            if source != named:
+                raise SystemExit(
+                    f"{named.name} has {source.name} beside it. "
+                    "--record keeps the named file's clock; a -raw next to it would point HUD at the wrong clip. "
+                    "Move the raw aside, or record from the file source sync already names."
+                )
             apply_clip(plan, dry_run=True)
         record_keeps(media_dir, plans)
         return 0

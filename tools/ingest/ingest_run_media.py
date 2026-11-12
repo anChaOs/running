@@ -591,6 +591,9 @@ def _lock_source_sync(media_dir: Path, date: str, slug: str, rows: list[dict]) -
             fit_start = fit_window(fit_path)[0]
         except Exception as exc:
             print(f"source sync offset unavailable: {exc}")
+    if fit_start is None:
+        print("source sync not locked: FIT start time is missing")
+        return
     sync = []
     for row in rows:
         if not str(row.get("role", "")).startswith("run"):
@@ -600,7 +603,7 @@ def _lock_source_sync(media_dir: Path, date: str, slug: str, rows: list[dict]) -
             continue
         duration = run_ffprobe_duration(dest)
         video_start = video_window(dest, duration)[0]
-        offset = 0.0 if fit_start is None else (video_start - fit_start).total_seconds()
+        offset = (video_start - fit_start).total_seconds()
         sync.append({"clip": dest.name, "fit": fit_path.name, "offset_s": offset})
     if not sync:
         print("source sync not locked: no run clip")

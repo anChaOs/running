@@ -157,7 +157,7 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
   --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto
 ```
 
-更新媒体目录的 `subtitles.srt`。审片预览仍是 `YYYY-MM-DD-review-preview.mp4` 时，脚本另拷同名 `.srt`，IINA 会自动挂；最终导出并移进 `upload/` 后，外挂仍是 `subtitles.srt`。
+更新媒体目录的 `subtitles.srt`。审片预览仍是 `YYYY-MM-DD-review-preview.mp4` 时，脚本另拷同名 `.srt`，IINA 会自动挂。不要在烧字成片旁边留 `YYYY-MM-DD-run-final.srt`。最终导出并移进 `upload/` 后，外挂仍是 `subtitles.srt`。
 
 然后才写简介：读校准后的 `subtitles.txt`，短句总结本期实际说了什么，写入该期 `plan.md` 的简介栏。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。大多数期没有「参考」，只写摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI。视频优先用当前平台的地址：B 站简介用 B 站链接，YouTube 简介用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没念到的不列。摘要两个平台相同，有参考时参考按平台分开。
 
@@ -201,7 +201,7 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
 对口型、质检；用户确认后 `txt_to_subs.py --media-dir auto` 更新媒体 SRT。简介 / 抖音文案 / 标签写入 `plan.md`。IINA 审片（不要推荐 ffplay）。**不要自己执行这条命令**：发给用户，用户同意或自己开：
 
 ```bash
-iina --mpv-geometry=320x180-8+8 \
+iina --no-stdin --mpv-geometry=320x180-8+8 \
   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4
 ```
 

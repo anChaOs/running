@@ -49,6 +49,33 @@ def test_cli_writes_beside_txt_and_media_copy():
 
 
 
+def test_media_sidecar_does_not_sit_beside_the_burned_final():
+    import txt_to_subs
+
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        ep = root / "2026-01-02-demo"
+        media = root / "media"
+        ep.mkdir()
+        media.mkdir()
+        (media / "2026-01-02-review-preview.mp4").write_bytes(b"preview")
+        (media / "2026-01-02-run-final.mp4").write_bytes(b"final")
+        (media / "2026-01-02-run-final.srt").write_text("old\n", encoding="utf-8")
+        names = [path.name for path in txt_to_subs.media_sidecar_targets(media, ep.name)]
+        assert names == ["subtitles.srt", "2026-01-02-review-preview.srt"]
+        txt = ep / "subtitles.txt"
+        txt.write_text("0:00:00.10–0:00:01.20  只留这一句\n", encoding="utf-8")
+        old = sys.argv
+        try:
+            sys.argv = ["txt_to_subs.py", "--txt", str(txt), "--media-dir", str(media)]
+            assert txt_to_subs.main() == 0
+        finally:
+            sys.argv = old
+        assert (media / "subtitles.srt").is_file()
+        assert (media / "2026-01-02-review-preview.srt").is_file()
+        assert not (media / "2026-01-02-run-final.srt").exists()
+
+
 def test_header_starts_with_script_info():
     text = ta.render_ass([("0:00:00.00", "0:00:01.00", "hi")])
     assert text.startswith("[Script Info]\n"), text[:40]

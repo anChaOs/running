@@ -499,7 +499,9 @@ def export_alphas(media_dir: Path, table: dict, durations: dict[str, float], *, 
             argv.extend(["--weather-city", str(hud["weather_city"])])
         else:
             argv.append("--no-weather")
-        rc = main(argv)
+        argv.extend(["--video-end-time-mode", str(hud.get("video_end_time_mode") or "file-modified")])
+        # 不走 main()：那会再记一条 hud-render。这段渲染的墙钟算在 final-export 里。
+        rc = _render_main(_parse_args(argv))
         if rc:
             raise SystemExit(f"HUD render failed for {clip_name}")
         if not dest.is_file():

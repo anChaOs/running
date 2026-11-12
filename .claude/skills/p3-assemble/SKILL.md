@@ -33,6 +33,8 @@ description: 按 logs/program.json 立刻拼一条低成本审片预览（能拷
 
 冷开场进跑步、跑步进 close 的 0.2 秒 xfade，预览只把同样的时长从非跑步那一侧剪掉，不做叠化。成片时长和导出一致。预览比各段相加短一点是正常的。`subtitles.txt` 还没写就不要传 `--subtitles`；传了也只在旁边写同时间轴的外挂，不烧进画面。
 
+和 HEVC 原片 stream copy 混接时，切开的段用 `hevc_videotoolbox` 8M。参数对不齐时 concat copy 会失败并停。不要改回按源片大约 49Mbps 重压，也不要改走 `assemble_episode.py`。
+
 ## 核对
 
 至少抽帧检查：open 开头、open→run、跑中、run→close、close 结尾。缺的段跳过。这条预览默认没有最终质量数据条；接缝是硬切，叠化不算过。确认音画没有明显缺段之后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表预览画面人工核对，不代表字幕已确认。脚本成功时会把 `logs/todo.md` 的 `preview` 标成 done；没标上就不算这步完成。下一步是 `/p3-subs`。

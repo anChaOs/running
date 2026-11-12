@@ -508,6 +508,18 @@ def duration_slack(segments: int) -> float:
     return min(DURATION_SLACK_S, 0.06 + 0.01 * segments)
 
 
+def assert_program_preview_duration(output: Path, expected_duration: float, segments: int) -> None:
+    """成片时长要和时间表的落帧时长接近。差出一段，说明 concat 把片段弄丢了。"""
+    actual = probe_duration(output)
+    slack = max(duration_slack(segments), 0.03 * segments)
+    if abs(actual - expected_duration) > slack:
+        raise SystemExit(
+            f"Review preview duration {actual:.3f}s != program timeline {expected_duration:.3f}s "
+            f"(drift {actual - expected_duration:+.3f}s, slack {slack:.3f}s). "
+            "Refusing a drifted preview. Do not recompress the rough cut at source bitrate."
+        )
+
+
 def assert_preview_ready(output: Path, expected_duration: float, segments: int) -> None:
     actual = probe_duration(output)
     slack = duration_slack(segments)
@@ -830,6 +842,8 @@ def _preview_from_program(args, media_dir: Path) -> int:
         if subtitles is not None:
             print(f"sidecar={output.with_suffix('.srt')}")
         return 0
+    if todo_list.load(media_dir).get("layout") != "done":
+        raise SystemExit("todo layout is not done; refusing to write the preview")
     if work_dir.exists():
         shutil.rmtree(work_dir)
     work_dir.mkdir(parents=True)
@@ -841,6 +855,7 @@ def _preview_from_program(args, media_dir: Path) -> int:
         try:
             for cmd in commands:
                 subprocess.run(cmd, check=True)
+            assert_program_preview_duration(output, edl.frame_program_duration(table), len(actions))
         except BaseException:
             output.unlink(missing_ok=True)
             raise

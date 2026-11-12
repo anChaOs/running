@@ -639,18 +639,20 @@ def build_program_filter(
     measured: dict[str, str] | None = None,
     apply_loudness: bool = True,
 ) -> str:
-    """按时间表裁切、叠 HUD、转场、贴图、烧字幕、响度。预览用的是同一组原片区间。"""
-    slices = edl.export_slices(table)
+    """按时间表裁切、叠 HUD、转场、贴图、烧字幕、响度。预览用的是同一组落帧区间。"""
     fps = spec.timeline.fps
+    timeline = edl.frame_timeline(table, fps)
+    if not timeline:
+        raise ValueError("program timeline has no segments")
     width, height = spec.timeline.width, spec.timeline.height
     parts: list[str] = []
     video_labels: list[str] = []
     audio_labels: list[str] = []
     durations: list[float] = []
-    for index, sl in enumerate(slices):
+    for index, sl in enumerate(timeline):
         start = float(sl["src_start_s"])
         end = float(sl["src_end_s"])
-        dur = end - start
+        dur = sl["frames"] / fps
         durations.append(dur)
         parts.append(
             f"[{index}:v]trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS,"
@@ -665,12 +667,12 @@ def build_program_filter(
         video_labels.append(f"v{index}")
         audio_labels.append(f"a{index}")
 
-    hud_slices = [sl for sl in slices if sl["hud"]]
+    hud_slices = [sl for sl in timeline if sl["hud"]]
     if len(alpha_modes) != len(hud_slices):
         raise ValueError("HUD alpha count does not match hud slices")
-    alpha_base = len(slices)
+    alpha_base = len(timeline)
     hud_at = 0
-    for index, sl in enumerate(slices):
+    for index, sl in enumerate(timeline):
         if not sl["hud"]:
             continue
         mode = alpha_modes[hud_at]
@@ -684,22 +686,22 @@ def build_program_filter(
         parts.append(f"[{video_labels[index]}][ha{index}]overlay=eof_action=pass:shortest=0:format=auto[vh{index}]")
         video_labels[index] = f"vh{index}"
 
-    fades = {item["before_id"]: float(item["duration_s"]) for item in table.get("transitions", [])}
     vcur, acur = video_labels[0], audio_labels[0]
-    acc = durations[0]
-    for index in range(1, len(slices)):
-        fade = fades.get(slices[index]["id"], 0.0)
-        if fade:
-            offset = max(0.0, acc - fade)
+    for index in range(1, len(timeline)):
+        fade_n = int(timeline[index]["fade_frames"])
+        if fade_n:
+            # offset 用落帧后的起点。浮点累计会比 fps 滤镜的真实长度长出几帧，close 就会被 xfade 丢掉。
+            offset = timeline[index]["program_start_frame"] / fps
+            fade_t = fade_n / fps
             parts.append(
-                f"[{vcur}][{video_labels[index]}]xfade=transition=fade:duration={fade:.6f}:offset={offset:.6f}[vx{index}]"
+                f"[{vcur}][{video_labels[index]}]xfade=transition=fade:duration={fade_t:.6f}:offset={offset:.6f},settb=1/{fps}[vx{index}]"
             )
-            parts.append(f"[{acur}][{audio_labels[index]}]acrossfade=d={fade:.6f}[ax{index}]")
-            acc = acc + durations[index] - fade
+            parts.append(f"[{acur}][{audio_labels[index]}]acrossfade=d={fade_t:.6f}[ax{index}]")
         else:
-            parts.append(f"[{vcur}][{video_labels[index]}]concat=n=2:v=1:a=0[vx{index}]")
+            parts.append(
+                f"[{vcur}][{video_labels[index]}]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[vx{index}]"
+            )
             parts.append(f"[{acur}][{audio_labels[index]}]concat=n=2:v=0:a=1[ax{index}]")
-            acc += durations[index]
         vcur, acur = f"vx{index}", f"ax{index}"
 
     overlay_base = alpha_base + len(hud_slices)
@@ -753,7 +755,7 @@ def program_input_args(
     spec: ExportSpec = FINAL_SPEC,
 ) -> list[str]:
     args: list[str] = []
-    for sl in edl.export_slices(table):
+    for sl in edl.export_slices(table, spec.timeline.fps):
         args.extend(["-i", str(media_dir / sl["clip"])])
     for path in alpha_paths:
         args.extend(["-i", str(path)])
@@ -779,6 +781,8 @@ def _export_from_program(args, media_dir: Path) -> int:
     table = edl.load_media(media_dir)
     if not args.confirmed:
         raise SystemExit("Final export requires --confirmed after manual subtitle review")
+    if args.no_subtitles:
+        raise SystemExit("program export burns subtitles in the one confirmed encode; --no-subtitles is not available")
     if not subtitles.is_file():
         raise SystemExit(f"subtitles.txt not found: {subtitles}")
     parse_txt(subtitles)
@@ -813,7 +817,7 @@ def _export_from_program(args, media_dir: Path) -> int:
     alpha_paths = hud.export_alphas(media_dir, table, durations, dry_run=args.dry_run)
     if len(alpha_paths) != len(jobs):
         raise SystemExit("HUD alpha plan does not match kept run slices")
-    ass = None if args.no_subtitles else make_ass(subtitles)
+    ass = make_ass(subtitles)
     try:
         plan_args = program_input_args(media_dir, table, alpha_paths)
         plan = InputPlan(tuple(plan_args), len(edl.export_slices(table)), (), (), 0.0)
@@ -834,15 +838,16 @@ def _export_from_program(args, media_dir: Path) -> int:
         tag = None if args.test_codec else FINAL_SPEC.tag
         qc_problems = final_qc.check_final(
             info,
-            expected_duration=edl.program_duration(table),
+            expected_duration=edl.frame_program_duration(table, FINAL_SPEC.timeline.fps),
             loudness_i=loudness,
             video_codec="h264" if codec == "libx264" else "hevc",
             video_tag=tag,
         )
         if qc_problems:
+            output.unlink(missing_ok=True)
             raise SystemExit("final QC failed: " + "; ".join(qc_problems))
+        # final-qc 要等抽帧看过字幕、HUD、贴图。结构检查通过只代表这一次编码可以留下。
         todo_list.mark(media_dir, "final-export", "done")
-        todo_list.mark(media_dir, "final-qc", "done")
     finally:
         if ass is not None:
             ass.unlink(missing_ok=True)

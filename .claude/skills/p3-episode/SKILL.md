@@ -49,6 +49,15 @@ subs: done，且时间表已冻结、logs/todo.md 允许导出
 
 时间表在媒体目录 `logs/program.json`。两套时钟：`source_sync` 是原片对 FIT 的偏移，HUD 永远按原片时间取样；`program` 是成片时间，句间刀、冷开场、插入、xfade 只改这张。预览和 `final_export.py` 读同一份。schema 见 `tools/program_edl.py` 模块说明。
 
+手写贴图的秒数如果是从某一条成片上量的，必须带上当时的成片时长。差过 0.15 秒就拒绝写入。之后刀点、冷开场或插入改了表，导出也会拒绝，直到按新表重放这张图。数据图用 `close-stats`，按 close 段均分，不手写秒数。
+
+```bash
+.venv/bin/python tools/program_edl.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  overlay --asset <图> --start <秒> --end <秒> \
+  --expect-duration <当时的成片秒数> --role graphic
+```
+
 **唯一最终导出入口：** `tools/assemble/final_export.py`。它不读取 HUD preview、review preview 或 close-stats 视频。有 `logs/program.json` 时按那张表裁切并只给留下的区间渲 HUD；没有这张表时仍走旧的整段原片路径。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 不属于新流程。
 
 **人工字幕门闩不能跳过：** `subtitles.txt` 是唯一源稿。用户确认前保持 `subs: waiting-review`，不能最终导出；用户确认后才写 `subs: done`，再执行 `final_export.py --confirmed`。对口型前时间表必须 `frozen`。改了刀点、冷开场或插入段之后，旧字幕作废，必须按新表重对齐，不能假定还对准。
