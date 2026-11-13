@@ -7,7 +7,7 @@
 | `p3-library` / `p3-topic` | 备选主题、选题与可念口播 | `topics/`、`talk.md` |
 | `p3-scaffold` / `p3-ingest` / `p3-shoes` | 建期、收素材、鞋账本 | episode 目录、素材、鞋里程 |
 | `p3-hud` | 只把鞋、天气、透明层规格记进时间表 | `logs/program.json` 的 `hud` |
-| `p3-assemble` | 按时间表写审片播放清单并核对 | `*-review-preview.edl`、`qc/` |
+| `p3-assemble` | 按时间表写审片播放清单并核对 | `*-review-preview.edl` |
 | `p3-subs` | 转写、人工改字、force_align、质检门；对口型前冻结时间表 | `subtitles.txt`、外挂 SRT |
 | `final_export.py` | 确认后按同一张表裁切、渲留下片段的 HUD、xfade、跑步段风刮和 whoosh、叠贴图、烧字幕、响度，一次编码 | `*-run-final.mp4` |
 | `p3-publish` | 双链、发布状态、复盘日志、清临时 | `published`、box 复盘 |

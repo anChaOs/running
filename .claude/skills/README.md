@@ -33,7 +33,7 @@
   p3-ingest       VID_ / FIT → open/run-*/close
   p3-shoes        training/logs/shoes.md，算出 -sk
   p3-hud          只记录 HUD 数据（鞋 / 天气 / qtrle），不渲未剪预览
-  p3-assemble     按 program.json 拼低成本审片预览 + 抽帧核对（不出最终片）
+  p3-assemble     按 program.json 写审片播放清单（不拼预览成片，不出最终片）
   p3-subs         字幕（转写→人改→对齐→人工确认）
   final_export.py  从原片一次叠 HUD/stats、拼接、烧字幕、响度并导出
   p3-loudness     已废弃（响度随 final_export 一次编码）

@@ -82,7 +82,7 @@ Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上�
 | 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
 | 成片 | **仅一份**：`upload/<标题>.mp4`；根目录不要再留同名成片；勿留 `*-no-burn` / 额外 `run-final` |
 | 封面 / 外挂 | `upload/` 内三封面（4:3→3:4→16:9）+ `subtitles.srt`；根目录若仍有同名，须为硬链（同 inode），勿再 copy 一份 |
-| 媒体字幕产物 | 上传用 `subtitles.srt`。审片预览旁可以有同名 `.srt`。不要在烧字成片旁边留 `*-run-final.srt` |
+| 媒体字幕产物 | 上传用 `subtitles.srt`。审片清单旁可以有同名 `.srt`。不要在烧字成片旁边留 `*-run-final.srt` |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
 | 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
 | `logs/` | 制作日志。复盘已拷到 box；本地留到满 7 天归档，清临时不删 |

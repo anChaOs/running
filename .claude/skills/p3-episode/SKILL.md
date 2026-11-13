@@ -89,12 +89,12 @@ subs: done，且时间表已冻结、logs/todo.md 允许导出
 | 只记鞋 | 鞋名 + 里程口径 | `p3-shoes` |
 | 只做 HUD | 已命名 `run-*` + FIT + `-sk`，时间表已有原片对齐 | `p3-shoes` → `p3-hud`（只记录，不渲） |
 | 只做预览 | `logs/program.json` 已排好成片时间 | `p3-assemble` |
-| 只做字幕 | 低成本 review preview，且刀点不再改 | `p3-subs` |
+| 只做字幕 | 审片播放清单已写出，且刀点不再改 | `p3-subs` |
 | 最终导出 | `subs: done` + `qc: done` + 用户确认 + 时间表已冻结 + `logs/todo.md` 允许导出 | `final_export.py` |
 | 发布 / 清临时 | 双链或用户说发完了 | `p3-publish` |
 | 发布报告 | 已 published，复盘已拷 | `p3-publish-report` |
 | 只换封面 | 自拍 + 封面句 | `p3-cover` |
-| 再核对 | review preview 或最终成片 | `p3-qc` |
+| 再核对 | 审片清单或最终成片 | `p3-qc` |
 | 剪映短片 | HUD alpha | `p3-jianying` |
 | 归档 / 腾空间 | 满 7 天的本地媒体目录 | `p3-archive` |
 

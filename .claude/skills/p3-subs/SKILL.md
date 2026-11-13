@@ -1,6 +1,6 @@
 ---
 name: p3-subs
-description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句；人改字后 force_align → check_subs，确认后 subs: done；再写简介、抖音文案与 B 站/YouTube 标签进 plan.md。用户说字幕、转写、whisper、对口型、改字幕时用。没有审片预览先走 p3-assemble。
+description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句；人改字后 force_align → check_subs，确认后 subs: done；再写简介、抖音文案与 B 站/YouTube 标签进 plan.md。用户说字幕、转写、whisper、对口型、改字幕时用。没有审片清单先走 p3-assemble。
 ---
 
 # 字幕（忠于原句）
@@ -45,13 +45,13 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 
 ## 前置
 
-需要按 `logs/program.json` 拼出来的 `YYYY-MM-DD-review-preview.mp4`。没有则先 `/p3-assemble`。预览和最终导出共用这张表。只改字不重转写。对口型之前先冻结时间表（`program_edl.py freeze`）；`force_align.py` 在表还没冻时会自己冻。冻上之后若改了刀点、冷开场或插入段，表会变成 `subs_stale`，必须按新表重跑对齐，不能把旧字幕套到新成片上。
+需要 `logs/program.json`，以及按它写出的 `YYYY-MM-DD-review-preview.edl`。没有清单则先 `/p3-assemble`。不要找、也不要生成 `YYYY-MM-DD-review-preview.mp4`。预览和最终导出共用这张表。只改字不重转写。对口型之前先冻结时间表（`program_edl.py freeze`）；`force_align.py` 在表还没冻时会自己冻。冻上之后若改了刀点、冷开场或插入段，表会变成 `subs_stale`，必须按新表重跑对齐，不能把旧字幕套到新成片上。
 
 依赖（一次）：`.venv/bin/pip install -r tools/subs/requirements.txt`。Apple Silicon 上 pip 直接装，CPU 跑。模型首次运行自动从 ModelScope 拉到 `~/Movies/running-content/.models/faster-whisper-large-v3-turbo/`（约 1.6 GB），不连 Hugging Face。
 
 专名表：`episode.md` 里写一行 `专名：Personal Agent、HUD、……`。只当识别提示纠拼写，不能拿来改用词。`p3-topic` 建期时就该写好；转写时脚本自动读。
 
-制作期预览为 `YYYY-MM-DD-review-preview.mp4`。仓库只留 `subtitles.txt`；外挂 SRT 写到媒体目录，不提交。ASS 由 `final_export.py` 临时生成，不作为最终导出前的独立媒体产物。
+制作期审片是 `YYYY-MM-DD-review-preview.edl`，旁边可以有同名 `.srt`。仓库只留 `subtitles.txt`；外挂 SRT 写到媒体目录，不提交。ASS 由 `final_export.py` 临时生成，不作为最终导出前的独立媒体产物。
 
 ## 不要做的事
 
@@ -64,11 +64,13 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 
 ## 转写 + 初稿
 
-`--audio` 直接给成片 mp4 即可。不传 `--prompt` 时自动读 `--txt` 同目录 `episode.md` 的「专名：」一行。**先把专名表写进 `episode.md` 再转写**；临时不要提示用 `--prompt ""`。
+`--audio` 给已经在成片时间轴上的 16k 单声道 wav。脚本帮助里的例子是 `asr/YYYY-MM-DD-run-final.wav`。旧流程抽过、且仍对得上这张表的 `asr/YYYY-MM-DD-review-preview.wav` 可以继续用。不传 `--prompt` 时自动读 `--txt` 同目录 `episode.md` 的「专名：」一行。**先把专名表写进 `episode.md` 再转写**；临时不要提示用 `--prompt ""`。
+
+播放清单 `.edl` 不能当 `--audio`。`draft_subs.py` 收到一条本来就有的成片 mp4 时会抽 wav；不要为了这一步去拼 `YYYY-MM-DD-review-preview.mp4`，也不要按清单把原片解码、接成一条新音频。没有对得上当前时间表的 wav 就停。
 
 ```bash
 .venv/bin/python tools/subs/draft_subs.py \
-  --audio ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4 \
+  --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav \
   --txt episodes/YYYY-MM-DD-slug/subtitles.txt
 ```
 
@@ -91,7 +93,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 2. **优先短语边界。** 「太能冲了刷新了自己的PB」→ 两条：「太能冲了」/「刷新了自己的PB」。一句里两个完整谓语，宁可拆开。
 3. **代词贴下一句主语。** 「之后的表现吧我 / 昨天…」错；对的是「看一下之后的表现吧」/「我昨天在看直播的时候」。
 4. **语义单元别拆开。** 「精神 / 图腾吧」应并成「精神图腾吧」；双音节词组、专名、固定搭配同一条。
-5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → `txt_to_subs.py --media-dir auto`。预览仍叫 review-preview 时，脚本另拷同名 `.srt` 供 IINA。
+5. **用户点名重切后：** 改 txt 切分 → `force_align.py` → `check_subs.py` → `txt_to_subs.py --media-dir auto`。有 `YYYY-MM-DD-review-preview.edl` 时，脚本另拷同名 `.srt`。IINA 不会自动挂上，打开时要加 `-- --sub-files=`。
 6. **改刀点：** 改的是 `logs/program.json`，然后按新表重出预览、重对齐。不要只改预览文件制造隐藏 offset。冷开场和插入段只推成片时间，不改后面跑步段的原片对齐。
 
 txt 一行一条，时间是成片轴：
@@ -123,7 +125,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
    ```bash
    .venv/bin/python tools/subs/force_align.py \
      --txt episodes/YYYY-MM-DD-slug/subtitles.txt \
-     --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-review-preview.wav
+     --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav
    ```
 
    - 对齐前若发现切条问题，先按「切条易错」改切分，再对齐。
@@ -133,12 +135,12 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
      ```bash
      .venv/bin/python tools/subs/check_subs.py \
        --subs episodes/YYYY-MM-DD-slug/subtitles.txt \
-       --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-review-preview.wav
+       --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav
      ```
 
      **机器过门 ≠ 可以写 `subs: done`**：硬失败行必须给人听。漏盖若是路人说话或删掉的磕巴，人听过确认后在回复里说明。用户写的括号注释保留。
    - 对完扫一遍：单行；用词跟口播；没有被改写成另一种说法。
-   - preview 时长变了（重渲 HUD），对着新成片重抽 wav、重跑这一步。
+   - 时间表变了（`subs_stale`）就用对得上新表的同一条 wav 重跑这一步。不要重渲预览片，也不要为了对齐再抽一条 wav。
 
 `check_subs.py` 机器过门之后，把硬失败行列给人；**用户确认「改好了 / 可以了」之后**，`assets.md` 才改成 `subs: done`，`episode.md` 的 `status` 改为 `edited`。同时：
 
@@ -157,7 +159,7 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
   --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto
 ```
 
-更新媒体目录的 `subtitles.srt`。审片预览仍是 `YYYY-MM-DD-review-preview.mp4` 时，脚本另拷同名 `.srt`，IINA 会自动挂。不要在烧字成片旁边留 `YYYY-MM-DD-run-final.srt`。最终导出并移进 `upload/` 后，外挂仍是 `subtitles.srt`。
+更新媒体目录的 `subtitles.srt`。有 `YYYY-MM-DD-review-preview.edl`（或旧的预览 mp4）时，脚本另拷同名 `.srt`。IINA 不会自动挂，要用 `-- --sub-files=`。不要在烧字成片旁边留 `YYYY-MM-DD-run-final.srt`。最终导出并移进 `upload/` 后，外挂仍是 `subtitles.srt`。
 
 然后才写简介：读校准后的 `subtitles.txt`，短句总结本期实际说了什么，写入该期 `plan.md` 的简介栏。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。大多数期没有「参考」，只写摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI。视频优先用当前平台的地址：B 站简介用 B 站链接，YouTube 简介用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没念到的不列。摘要两个平台相同，有参考时参考按平台分开。
 
@@ -202,7 +204,10 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
 
 ```bash
 iina --no-stdin --mpv-geometry=320x180-8+8 \
-  ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.mp4
+  ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl \
+  -- --sub-files=~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.srt
 ```
+
+没有 sidecar 就不要加 `-- --sub-files=`。不要用 `--mpv-sub-file`，IINA 会静默丢掉。
 
 > 下一步：用户确认字幕后走 `final_export.py --confirmed`。还要 60–90 秒短视频才提 `/p3-jianying`。

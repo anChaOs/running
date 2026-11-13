@@ -28,9 +28,18 @@ description: 按 logs/program.json 写一份 mpv 播放清单来审片（不拼�
 mpv ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl
 ```
 
-mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 命令会一并打印，只是尝试：`.edl` 能否被 IINA 直接打开没有核实，打不开不算这步失败。需要当场播再加 `--play`；本机没有 mpv 时清单仍然写好，并说明启动失败。
+mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 1.5.1 能直接打开这份 `.edl`。需要当场播再加 `--play`；本机没有 mpv 时清单仍然写好，并说明启动失败。打不开播放器不算这步失败。
 
-`subtitles.txt` 还没写就不要传 `--subtitles`。传了只在清单旁边写一份外挂 `.srt`，时间用虚拟时间线（和 txt 里的成片时间同一套），用 `mpv --sub-file=` 挂上，不烧进画面。没有字幕文件就不要造。不要在成片旁边留同名 `.srt`。
+`subtitles.txt` 还没写就不要传 `--subtitles`。传了只在清单旁边写一份外挂 `.srt`，时间用虚拟时间线（和 txt 里的成片时间同一套），不烧进画面。没有字幕文件就不要造。不要在成片旁边留同名 `.srt`。
+
+mpv 挂字幕用 `--sub-file=`。这是命令行别名，等于 `--sub-files-append`，mpv 自己认。IINA 走 libmpv，不认这个别名，`--mpv-sub-file` 会被静默丢掉。IINA 要把文件放在前面，选项放在 `--` 后面：
+
+```bash
+iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl \
+  -- --sub-files=~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.srt
+```
+
+没有 sidecar 就不要加 `-- --sub-files=`。
 
 ## 前置
 
