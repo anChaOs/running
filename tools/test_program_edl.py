@@ -831,6 +831,103 @@ class SameTableTest(unittest.TestCase):
         self.assertAlmostEqual(edl.frame_program_duration(table), 2.0)
         self.assertLess(abs(actual - 2.0), 0.05)
 
+    def test_ffmpeg_shared_input_keeps_two_slices_of_one_clip(self) -> None:
+        if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+            self.skipTest("ffmpeg not installed")
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        def yuv(path: Path, at: float) -> tuple[float, float, float]:
+            # -ss 放在 -i 后面才会落到这一帧。signalstats 会把 seek 丢掉的前面几帧也打出来，取最后一组。
+            info = subprocess.check_output(
+                [
+                    "ffmpeg", "-hide_banner", "-loglevel", "error",
+                    "-i", str(path), "-ss", f"{at:.3f}", "-frames:v", "1",
+                    "-vf", "signalstats,metadata=print:file=-", "-f", "null", "-",
+                ],
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            y = u = v = None
+            for line in info.splitlines():
+                if "YAVG=" in line:
+                    y = float(line.rsplit("=", 1)[-1])
+                elif "UAVG=" in line:
+                    u = float(line.rsplit("=", 1)[-1])
+                elif "VAVG=" in line:
+                    v = float(line.rsplit("=", 1)[-1])
+            if y is None or u is None or v is None:
+                raise AssertionError(f"no color for {path} at {at}: {info[-400:]}")
+            return y, u, v
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            colors = ("red", "green", "blue", "yellow")
+            cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"]
+            for color in colors:
+                cmd.extend(["-f", "lavfi", "-i", f"color=c={color}:s=160x90:r=30:d=1"])
+            cmd.extend(["-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=4"])
+            cmd.extend(
+                [
+                    "-filter_complex", "[0:v][1:v][2:v][3:v]concat=n=4:v=1:a=0[v]",
+                    "-map", "[v]", "-map", "4:a",
+                    "-c:v", "libx264", "-g", "30", "-keyint_min", "30",
+                    "-force_key_frames", "expr:gte(t,n_forced*1)",
+                    "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                    str(root / "2026-01-02-run-a.mp4"),
+                ]
+            )
+            subprocess.run(cmd, check=True)
+            for name, color in (("2026-01-02-open.mp4", "white"), ("2026-01-02-close.mp4", "black")):
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                        "-f", "lavfi", "-i", f"color=c={color}:s=160x90:r=30:d=1",
+                        "-f", "lavfi", "-i", "sine=frequency=880:sample_rate=48000:duration=1",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                        str(root / name),
+                    ],
+                    check=True,
+                )
+            table = edl.empty_program("2026-01-02-demo")
+            edl.set_source_sync(table, [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}])
+            edl.upsert_keeps(
+                table,
+                [
+                    {"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 1.0},
+                    {"clip": "2026-01-02-run-a.mp4", "src_start_s": 1.0, "src_end_s": 2.0},
+                    {"clip": "2026-01-02-run-a.mp4", "src_start_s": 3.0, "src_end_s": 4.0},
+                    {"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 1.0},
+                ],
+            )
+            for seg in table["program"]:
+                seg["hud"] = False
+            args = final_export.program_input_args(root, table, [])
+            run_inputs = [args[i + 1] for i, flag in enumerate(args) if flag == "-i" and args[i + 1].endswith("run-a.mp4")]
+            self.assertEqual(len(run_inputs), 1)
+            self.assertEqual(args[args.index("-ss") + 1], "1.000000")
+            graph = final_export.build_program_filter(table, [], 0, None, apply_loudness=False)
+            self.assertIn("[1:v]split=2", graph)
+            self.assertIn("trim=start=2.000000:end=3.000000", graph)
+            out = root / "out.mp4"
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-filter_complex_threads", "1",
+                    *args, "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac",
+                    str(out),
+                ],
+                check=True,
+            )
+            expected = edl.frame_program_duration(table)
+            actual = final_export.probe_duration(out)
+            self.assertLess(abs(actual - expected), 0.05)
+            green = yuv(root / "2026-01-02-run-a.mp4", 1.5)
+            yellow = yuv(root / "2026-01-02-run-a.mp4", 3.5)
+            for got, want in ((yuv(out, 1.2), green), (yuv(out, 2.2), yellow)):
+                self.assertTrue(all(abs(a - b) < 12 for a, b in zip(got, want, strict=True)), (got, want))
+            self.assertGreater(abs(green[2] - yellow[2]), 40)
+
 
 class TodoTest(unittest.TestCase):
     def test_later_steps_cannot_skip_ahead(self) -> None:

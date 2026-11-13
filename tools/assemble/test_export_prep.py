@@ -555,6 +555,163 @@ def test_existing_alpha_is_reused_inside_the_shared_wrap() -> None:
         assert not (media / "hud-renders" / "keeps").exists()
 
 
+def _input_paths(args: list[str]) -> list[str]:
+    return [args[index + 1] for index, flag in enumerate(args) if flag == "-i"]
+
+
+def _many_slice_program() -> tuple[dict, list[str]]:
+    """130 段、7 条原片、118 个跑步 HUD 窗。和撑爆 16GB 的那次导出同一形状。"""
+    table = edl.empty_program("2026-01-02-demo")
+    runs = [f"2026-01-02-run-{index}.mp4" for index in range(5)]
+    edl.set_source_sync(
+        table,
+        [{"clip": name, "fit": "run.fit", "offset_s": float(index)} for index, name in enumerate(runs)],
+    )
+    rows: list[dict] = []
+    cursor = 0.0
+    for _ in range(6):
+        rows.append({"clip": "2026-01-02-open.mp4", "src_start_s": cursor, "src_end_s": cursor + 1.0})
+        cursor += 1.5
+    counts = (24, 24, 24, 23, 23)
+    for name, count in zip(runs, counts, strict=True):
+        cursor = 8.0
+        for _ in range(count):
+            rows.append({"clip": name, "src_start_s": cursor, "src_end_s": cursor + 1.0})
+            cursor += 1.5
+    cursor = 0.0
+    for _ in range(6):
+        rows.append({"clip": "2026-01-02-close.mp4", "src_start_s": cursor, "src_end_s": cursor + 1.0})
+        cursor += 1.5
+    edl.upsert_keeps(table, rows)
+    return table, runs
+
+
+def test_confirmed_input_plan_opens_shared_clip_once() -> None:
+    table, runs = _many_slice_program()
+    timeline = edl.export_slices(table)
+    assert len(timeline) == 130
+    assert len({row["clip"] for row in timeline}) == 7
+    assert sum(1 for row in timeline if row["hud"]) == 118
+    alphas = [Path(f"/media/hud-renders/qtrle/{index}.mov") for index in range(118)]
+    args = final_export.program_input_args(Path("/media"), table, alphas)
+    paths = _input_paths(args)
+    clip_paths = paths[:7]
+    assert len(paths) == 7 + 118 + 1
+    assert len(set(clip_paths)) == 7
+    assert all(path.endswith(".mp4") for path in clip_paths)
+    assert paths[0].endswith("2026-01-02-open.mp4")
+    assert paths[6].endswith("2026-01-02-close.mp4")
+    for name in runs:
+        assert clip_paths.count(str(Path("/media") / name)) == 1
+    seeks = [args[index + 1] for index, flag in enumerate(args) if flag == "-ss"]
+    assert seeks == ["8.000000"] * 5
+    assert "9.500000" not in seeks
+    assert "hud-renders/keeps" not in " ".join(args)
+    assert len(clip_paths) < len(timeline)
+
+    graph = final_export.build_program_filter(table, ["kept"] * 118, 0, None, apply_loudness=False)
+    assert "[0:v]split=6" in graph
+    assert "[1:v]split=24" in graph
+    assert "trim=start=1.500000:end=2.500000" in graph
+    assert "atrim=start=1.500000:end=2.500000" in graph
+    assert "[7:v]trim=duration=" in graph
+    assert "[124:v]" in graph
+    assert "[125:a]" in graph
+    assert "[130:v]" not in graph
+    assert "[248:a]" not in graph
+    audio_args = final_export.program_audio_input_args(Path("/media"), table)
+    assert len(_input_paths(audio_args)) == 8
+    audio = final_export.build_program_audio_filter(table, apply_loudness=False)
+    assert "]split=" not in audio
+    assert "asplit=24" in audio
+    assert "[7:a]" in audio
+    assert "[8:a]" not in audio
+    assert "subtitles=" not in audio
+
+
+def test_rewound_source_opens_a_second_decoder() -> None:
+    table = edl.empty_program("2026-01-02-demo")
+    edl.set_source_sync(
+        table,
+        [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}],
+    )
+    edl.upsert_keeps(
+        table,
+        [
+            {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 2.0},
+            {"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 2.0},
+        ],
+    )
+    edl.set_lead(
+        table,
+        {"clip": "2026-01-02-run-a.mp4", "src_start_s": 8.0, "src_end_s": 10.0, "hud": False},
+    )
+    for seg in table["program"]:
+        if seg["type"] != "run":
+            seg["hud"] = False
+    args = final_export.program_input_args(Path("/media"), table, [Path("/media/hud-renders/qtrle/a.mov")])
+    paths = _input_paths(args)
+    run = str(Path("/media/2026-01-02-run-a.mp4"))
+    assert paths.count(run) == 2
+    assert [args[index + 1] for index, flag in enumerate(args) if flag == "-ss"] == ["8.000000"]
+    graph = final_export.build_program_filter(table, ["kept"], 0, None, apply_loudness=False)
+    assert "split=" not in graph
+    assert "[0:v]trim=start=0.000000:end=2.000000" in graph
+    assert "[1:v]trim=start=0.000000:end=2.000000" in graph
+
+
+def test_confirmed_command_opens_shared_run_once() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        table = edl.empty_program("2026-01-02-demo")
+        edl.set_source_sync(
+            table,
+            [{"clip": "2026-01-02-run-a.mp4", "fit": "2026-01-02-run-data.fit", "offset_s": 0.0}],
+        )
+        edl.upsert_keeps(
+            table,
+            [
+                {"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 4.0},
+                {"clip": "2026-01-02-run-a.mp4", "src_start_s": 12.0, "src_end_s": 14.0},
+                {"clip": "2026-01-02-run-a.mp4", "src_start_s": 16.0, "src_end_s": 18.0},
+                {"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 4.0},
+            ],
+        )
+        edl.record_hud(table, shoe_name="Fly", shoe_km_after=100.0, weather_city="shanghai")
+        edl.freeze(table)
+        media, episode = _stage(root, table, subs="done")
+        plans = hud.plan_alpha_jobs(media, table, {"2026-01-02-run-a.mp4": 100.0})
+        assert len(plans) == 2
+        for plan in plans:
+            plan["dest"].parent.mkdir(parents=True, exist_ok=True)
+            plan["dest"].write_bytes(b"alpha")
+        hud.write_alpha_manifest(media, table, plans)
+        final_export.write_loudness(media, table, dict(MEASURED))
+        out = media / "2026-01-02-run-final.mp4"
+        with _patches() as (encode, render, measure, _full):
+            assert final_export.main(
+                [
+                    "--media-dir", str(media),
+                    "--episode-dir", str(episode),
+                    "--out", str(out),
+                    "--confirmed",
+                ]
+            ) == 0
+        render.assert_not_called()
+        measure.assert_not_called()
+        assert encode.call_count == 1
+        cmd = encode.call_args.args[0]
+        run = str((media / "2026-01-02-run-a.mp4").resolve())
+        assert _input_paths(cmd).count(run) == 1
+        assert cmd[cmd.index("-ss") + 1] == "12.000000"
+        assert cmd[cmd.index("-filter_complex_threads") + 1] == "1"
+        graph = cmd[cmd.index("-filter_complex") + 1]
+        assert "[1:v]split=2" in graph
+        assert "trim=start=4.000000:end=6.000000" in graph
+        assert "hud-renders/keeps" not in " ".join(cmd)
+        assert "hevc_videotoolbox" in cmd
+
+
 def test_confirmed_export_backfill_respects_jobs() -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -599,5 +756,8 @@ if __name__ == "__main__":
     test_batch_plan_splits_only_the_dominant_source()
     test_batch_command_is_one_wrap_and_keeps_full_clip_unbounded()
     test_existing_alpha_is_reused_inside_the_shared_wrap()
+    test_confirmed_input_plan_opens_shared_clip_once()
+    test_rewound_source_opens_a_second_decoder()
+    test_confirmed_command_opens_shared_run_once()
     test_confirmed_export_backfill_respects_jobs()
     print("ok")

@@ -3,6 +3,8 @@
 
 预览只用于人工检查；本入口直接读取原片和 HUD 透明层，在一次最终编码中完成
 转场拼接、数据图叠加、中段 overlays.json、字幕和响度处理。
+
+同一条原片只打开一次解码器：`-ss` 到这组切片最早的入点，句间刀在滤镜里 trim / split。
 """
 
 from __future__ import annotations
@@ -657,8 +659,94 @@ _SEEK_EPSILON_S = 1e-4
 
 
 def source_is_seeked(start_s: float) -> bool:
-    """切开的原片在 -i 前 seek。从片头开始的段不 seek，避免改掉已对齐的帧边界。"""
+    """这组切片的第一段不在片头时，在 -i 前 seek。从片头开始不 seek，避免改掉已对齐的帧边界。"""
     return float(start_s) > _SEEK_EPSILON_S
+
+
+@dataclass(frozen=True)
+class ClipOpening:
+    """一次打开的原片。slices 是时间表下标，按成片顺序，原片时间不回头。"""
+
+    clip: str
+    seek_s: float | None
+    slices: tuple[int, ...]
+
+
+def clip_openings(slices: list[dict]) -> list[ClipOpening]:
+    """同一条原片的顺向句间刀共用一次 -i。
+
+    原片时间往回走（冷开场取了后面的一段）时另开一路。一个解码器只能往前读，
+    倒 seek 会把已经错过的帧丢掉。
+    """
+    openings: list[ClipOpening] = []
+    active: dict[str, int] = {}
+    for index, sl in enumerate(slices):
+        start = float(sl["src_start_s"])
+        clip = str(sl["clip"])
+        slot = active.get(clip)
+        if slot is not None:
+            previous = openings[slot]
+            last = slices[previous.slices[-1]]
+            if start >= float(last["src_end_s"]) - 1e-6:
+                openings[slot] = ClipOpening(previous.clip, previous.seek_s, previous.slices + (index,))
+                continue
+        seek = start if source_is_seeked(start) else None
+        active[clip] = len(openings)
+        openings.append(ClipOpening(clip, seek, (index,)))
+    return openings
+
+
+def slice_trim_window(sl: dict, seek_s: float | None) -> tuple[float, float]:
+    """seek 把时间戳拨回 0，trim 从 0 量。没 seek 的仍用原片绝对时间。"""
+    start = float(sl["src_start_s"])
+    end = float(sl["src_end_s"])
+    if seek_s is not None:
+        return start - seek_s, end - seek_s
+    return start, end
+
+
+def _source_pads(
+    parts: list[str],
+    slices: list[dict],
+    *,
+    video: bool,
+) -> tuple[list[ClipOpening], list[str], list[str], list[tuple[float, float]]]:
+    """把共用的原片拆成每段一个滤镜入口。只有一段时不插 split。"""
+    openings = clip_openings(slices)
+    video_pads = [""] * len(slices)
+    audio_pads = [""] * len(slices)
+    windows: list[tuple[float, float]] = [(0.0, 0.0)] * len(slices)
+    for input_index, opening in enumerate(openings):
+        for index in opening.slices:
+            windows[index] = slice_trim_window(slices[index], opening.seek_s)
+        if len(opening.slices) == 1:
+            index = opening.slices[0]
+            video_pads[index] = f"{input_index}:v"
+            audio_pads[index] = f"{input_index}:a"
+            continue
+        n = len(opening.slices)
+        if video:
+            labels = "".join(f"[c{input_index}v{k}]" for k in range(n))
+            parts.append(f"[{input_index}:v]split={n}{labels}")
+        labels = "".join(f"[c{input_index}a{k}]" for k in range(n))
+        parts.append(f"[{input_index}:a]asplit={n}{labels}")
+        for k, index in enumerate(opening.slices):
+            video_pads[index] = f"c{input_index}v{k}"
+            audio_pads[index] = f"c{input_index}a{k}"
+    if any(pad == "" for pad in audio_pads):
+        raise ValueError("program input plan left a slice without a source")
+    return openings, video_pads, audio_pads, windows
+
+
+def _clip_input_args(media_dir: Path, slices: list[dict]) -> list[str]:
+    args: list[str] = []
+    for opening in clip_openings(slices):
+        if opening.seek_s is not None:
+            # 只跳过这段最早入点之前的画面。刀和刀之间的空隙仍会解码再丢掉。
+            # 和滤镜里「seek 之后从 0 量」是一对，不能只改一边。
+            args.extend(["-ss", f"{opening.seek_s:.6f}"])
+        args.extend(["-i", str(media_dir / opening.clip)])
+    return args
 
 
 def _program_alpha_mode(job: dict, durations: dict[str, float]) -> str:
@@ -733,23 +821,18 @@ def build_program_filter(
     video_labels: list[str] = []
     audio_labels: list[str] = []
     durations: list[float] = []
+    openings, video_pads, audio_pads, windows = _source_pads(parts, timeline, video=True)
     for index, sl in enumerate(timeline):
-        start = float(sl["src_start_s"])
-        end = float(sl["src_end_s"])
         dur = sl["frames"] / fps
         durations.append(dur)
-        # 输入 -ss 把时间戳拨回 0，滤镜改从 0 量到本段时长。从片头开始的段仍用原片绝对时间。
-        if source_is_seeked(start):
-            trim_start, trim_end = 0.0, dur
-        else:
-            trim_start, trim_end = start, end
+        trim_start, trim_end = windows[index]
         parts.append(
-            f"[{index}:v]trim=start={trim_start:.6f}:end={trim_end:.6f},setpts=PTS-STARTPTS,"
+            f"[{video_pads[index]}]trim=start={trim_start:.6f}:end={trim_end:.6f},setpts=PTS-STARTPTS,"
             f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
             f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,fps={fps},settb=1/{fps},format=yuv420p,setsar=1[v{index}]"
         )
         parts.append(
-            f"[{index}:a]atrim=start={trim_start:.6f}:end={trim_end:.6f},asetpts=PTS-STARTPTS,"
+            f"[{audio_pads[index]}]atrim=start={trim_start:.6f}:end={trim_end:.6f},asetpts=PTS-STARTPTS,"
             f"aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo,"
             f"aresample=async=1:first_pts=0,apad=whole_dur={dur:.6f},atrim=0:{dur:.6f}[a{index}]"
         )
@@ -759,7 +842,7 @@ def build_program_filter(
     hud_slices = [sl for sl in timeline if sl["hud"]]
     if len(alpha_modes) != len(hud_slices):
         raise ValueError("HUD alpha count does not match hud slices")
-    alpha_base = len(timeline)
+    alpha_base = len(openings)
     hud_at = 0
     for index, sl in enumerate(timeline):
         if not sl["hud"]:
@@ -944,13 +1027,8 @@ def loudness_reusable(saved: dict | None, table: dict) -> bool:
 
 
 def program_audio_input_args(media_dir: Path, table: dict, spec: ExportSpec = FINAL_SPEC) -> list[str]:
-    """测响度只解码成片用到的音频。不读透明层、贴图或字幕。"""
-    args: list[str] = []
-    for sl in edl.export_slices(table, spec.timeline.fps):
-        start = float(sl["src_start_s"])
-        if source_is_seeked(start):
-            args.extend(["-ss", f"{start:.6f}"])
-        args.extend(["-i", str(media_dir / sl["clip"])])
+    """测响度只解码成片用到的音频。不读透明层、贴图或字幕。同一条原片只打开一次。"""
+    args = _clip_input_args(media_dir, edl.export_slices(table, spec.timeline.fps))
     if edl.wind_transitions(table):
         if not WHOOSH_PATH.is_file():
             raise SystemExit(f"wind transitions need whoosh audio: {WHOOSH_PATH}")
@@ -971,16 +1049,12 @@ def build_program_audio_filter(
         raise ValueError("program timeline has no segments")
     parts: list[str] = []
     audio_labels: list[str] = []
+    openings, _video_pads, audio_pads, windows = _source_pads(parts, timeline, video=False)
     for index, sl in enumerate(timeline):
-        start = float(sl["src_start_s"])
-        end = float(sl["src_end_s"])
         dur = sl["frames"] / fps
-        if source_is_seeked(start):
-            trim_start, trim_end = 0.0, dur
-        else:
-            trim_start, trim_end = start, end
+        trim_start, trim_end = windows[index]
         parts.append(
-            f"[{index}:a]atrim=start={trim_start:.6f}:end={trim_end:.6f},asetpts=PTS-STARTPTS,"
+            f"[{audio_pads[index]}]atrim=start={trim_start:.6f}:end={trim_end:.6f},asetpts=PTS-STARTPTS,"
             f"aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo,"
             f"aresample=async=1:first_pts=0,apad=whole_dur={dur:.6f},atrim=0:{dur:.6f}[a{index}]"
         )
@@ -1002,7 +1076,7 @@ def build_program_audio_filter(
             parts.append(f"[{acur}][{audio_labels[index]}]concat=n=2:v=0:a=1[ax{index}]")
         acur = f"ax{index}"
     if winds and whoosh_delays:
-        parts.append(mix_whoosh(acur, len(timeline), whoosh_delays))
+        parts.append(mix_whoosh(acur, len(openings), whoosh_delays))
         acur = "amixed"
     if apply_loudness:
         parts.append(f"[{acur}]{loudness_filter(spec, measured)}[a]")
@@ -1016,7 +1090,8 @@ def build_program_audio_filter(
 
 def measure_program_loudness(media_dir: Path, table: dict) -> dict[str, str] | None:
     graph = build_program_audio_filter(table, measured=None)
-    plan = InputPlan(tuple(program_audio_input_args(media_dir, table)), len(edl.export_slices(table)), (), (), 0.0)
+    openings = clip_openings(edl.export_slices(table))
+    plan = InputPlan(tuple(program_audio_input_args(media_dir, table)), len(openings), (), (), 0.0)
     return measure_loudness(plan, graph)
 
 
@@ -1081,13 +1156,8 @@ def program_input_args(
     alpha_paths: list[Path],
     spec: ExportSpec = FINAL_SPEC,
 ) -> list[str]:
-    args: list[str] = []
-    for sl in edl.export_slices(table, spec.timeline.fps):
-        start = float(sl["src_start_s"])
-        if source_is_seeked(start):
-            # 只解码切点附近。和滤镜里「seek 之后从 0 量」是一对，不能只改一边。
-            args.extend(["-ss", f"{start:.6f}"])
-        args.extend(["-i", str(media_dir / sl["clip"])])
+    """确认导出的输入。原片按条打开，透明层、whoosh 和贴图仍是各自的文件。"""
+    args = _clip_input_args(media_dir, edl.export_slices(table, spec.timeline.fps))
     for path in alpha_paths:
         args.extend(["-i", str(path)])
     if edl.wind_transitions(table):
@@ -1175,7 +1245,8 @@ def _export_from_program(args, media_dir: Path) -> int:
         elif not args.dry_run:
             print("Loudnorm pass 1 skipped; encode will use single-pass loudnorm", flush=True)
         plan_args = program_input_args(media_dir, table, alpha_paths)
-        plan = InputPlan(tuple(plan_args), len(edl.export_slices(table, fps)), (), (), 0.0)
+        openings = clip_openings(edl.export_slices(table, fps))
+        plan = InputPlan(tuple(plan_args), len(openings), (), (), 0.0)
         final_graph = build_program_filter(
             table, modes, len(table.get("overlays") or []), ass, measured=measured,
         )
