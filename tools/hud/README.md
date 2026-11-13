@@ -141,7 +141,7 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-variant.xm
   -sk 642
 ```
 
-这条只把鞋、天气和透明层规格写进 `logs/program.json`。不要加 `--preview`：那会在渲透明层的同时把未剪原片再压一遍。最终导出才给留下的区间渲透明层。
+这条只把鞋、天气和透明层规格写进 `logs/program.json`。不要加 `--preview`：那会在渲透明层的同时把未剪原片再压一遍。时间表冻结后用 `--prep-alpha`，按留下的入出点直接画透明层，不先切 `hud-renders/keeps/`。确认导出若发现清单对不上，会自己补画。
 
 默认透明层编码是 **qtrle**（QuickTime Animation。比 ProRes 4444 小；alpha 是无损压缩。开发机没有媒体盘，没有做实机画质对比）。导出画面不能接受，或剪映要 ProRes 时：
 

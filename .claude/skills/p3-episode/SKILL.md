@@ -35,11 +35,18 @@ p3-cover             → cover-*.jpg（与记录 HUD 并行）
 
 review-preview
   p3-subs     → 转写。对口型前冻结时间表。之后改刀点必须按新表重对齐
+              → 冻结后，用户只改错字和换行；同时可以画 HUD、测响度
+
+frozen，字幕还在校对
+  render_running_hud.py --prep-alpha
+              → 按留下的入出点直接画透明层，不写 hud-renders/keeps/
+  final_export.py --measure-only
+              → 只测切点 + 风刮/whoosh 的成片混音，不读字幕
 
 subs: done，且时间表已冻结、logs/todo.md 允许导出
   final_export.py --confirmed
-              → 只给留下的片段渲最终 HUD（默认 qtrle）
-              → 同一张表：裁切、xfade、跑步段风刮和 whoosh、贴图、烧字幕、响度，一次编码
+              → 缺的透明层或响度自己补上
+              → 同一张表：裁原片、叠 HUD、xfade、风刮和 whoosh、贴图、烧字幕、套用已测响度，一次编码
               → YYYY-MM-DD-run-final.mp4
 
 双链齐
@@ -65,7 +72,7 @@ subs: done，且时间表已冻结、logs/todo.md 允许导出
   --expect-duration <当时的成片秒数> --role graphic
 ```
 
-**唯一最终导出入口：** `tools/assemble/final_export.py`。它不读取 HUD preview、review preview 或 close-stats 视频。有 `logs/program.json` 时按那张表裁切并只给留下的区间渲 HUD；没有这张表时仍走旧的整段原片路径。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 不属于新流程。
+**唯一最终导出入口：** `tools/assemble/final_export.py --confirmed`。它不读取 HUD preview、review preview、close-stats 或 `hud-renders/keeps/`。有 `logs/program.json` 时按那张表裁原片，并叠已经画好的透明层；透明层或响度测量对不上当前表时，这条命令先补再编码。没有这张表时仍走旧的整段原片路径。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 不属于新流程。不要先导出无字幕成片，再烧字，再改响度。
 
 **人工字幕门闩不能跳过：** `subtitles.txt` 是唯一源稿。用户确认前保持 `subs: waiting-review`，不能最终导出；用户确认后才写 `subs: done`，再执行 `final_export.py --confirmed`。对口型前时间表必须 `frozen`。改了刀点、冷开场或插入段之后，旧字幕作废，必须按新表重对齐，不能假定还对准。
 
@@ -75,7 +82,7 @@ subs: done，且时间表已冻结、logs/todo.md 允许导出
 
 步名：`scaffold` `ingest` `shoes` `cover` `hud-render` `review-preview` `draft-subs` `force-align` `final-export` `pack-upload` `drive-stage` `youtube-upload` `bilibili-upload` `published`。重试是新行。`p3-scaffold` 建期时就建 `logs/`，不要拖到最终导出。`p3-qc` 抽帧不单记一步。
 
-**进度清单（硬规则）：** 同一目录 `logs/todo.md`，和 `timeline.txt` 一起维护，一直到 `published`。这是门闩，不是备忘。状态以这份文件为准，不能只看文件名或 `assets.md` 里写了 done。未写入 todo 不算这一步完成。后面的阶段不能在前面没完成时打勾。官方脚本会写；手补用：
+**进度清单（硬规则）：** 同一目录 `logs/todo.md`，和 `timeline.txt` 一起维护，一直到 `published`。这是门闩，不是备忘。状态以这份文件为准，不能只看文件名或 `assets.md` 里写了 done。未写入 todo 不算这一步完成。有前置的步骤，前置没完成不能打勾。`hud-render` 和 `loudness-measure` 只要求预览已完成，字幕校对时可以先打勾；`final-export` 仍要字幕 `confirmed` 再加 `--confirmed`。改刀点、冷开场、插入，或重记鞋和规格时，脚本会把已经打勾的准备步骤改回 pending。官方脚本会写；手补用：
 
 `.venv/bin/python tools/todo_list.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug mark <step> done`
 
@@ -90,7 +97,8 @@ subs: done，且时间表已冻结、logs/todo.md 允许导出
 | 只做 HUD | 已命名 `run-*` + FIT + `-sk`，时间表已有原片对齐 | `p3-shoes` → `p3-hud`（只记录，不渲） |
 | 只做预览 | `logs/program.json` 已排好成片时间 | `p3-assemble` |
 | 只做字幕 | 审片播放清单已写出，且刀点不再改 | `p3-subs` |
-| 最终导出 | `subs: done` + `qc: done` + 用户确认 + 时间表已冻结 + `logs/todo.md` 允许导出 | `final_export.py` |
+| 冻结后的准备 | 时间表已冻结、预览已完成；字幕可以还在校对 | `render_running_hud.py --prep-alpha`，可选 `final_export.py --measure-only` |
+| 最终导出 | `subs: done` + `qc: done` + 用户确认 + 时间表已冻结 + `logs/todo.md` 允许导出 | `final_export.py --confirmed` |
 | 发布 / 清临时 | 双链或用户说发完了 | `p3-publish` |
 | 发布报告 | 已 published，复盘已拷 | `p3-publish-report` |
 | 只换封面 | 自拍 + 封面句 | `p3-cover` |

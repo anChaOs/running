@@ -60,7 +60,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 - 不要自造第二套切条/对齐规则；也不要为跑流程去 Read `tools/subs/` 源码（改算法 / 排错 / 解释切法除外）
 - 不要把一段识别的起止按字数均分给几条字幕，也不要手填等步长的时间。对不上的条留给 `force_align.py` 报出来，人听了再定
 - 不要用 tiny / small；只用 large-v3-turbo
-- 不要在这里烧字；用户确认后走 `final_export.py --confirmed`。
+- 不要在这里烧字，也不要在这里修响度。用户确认后只走一次 `final_export.py --confirmed`。
 
 ## 转写 + 初稿
 
@@ -192,7 +192,19 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
 
 **刚写完稿（`waiting-review`）**
 
-立刻停。不要对口型、不要烧字幕、不要写简介。说明切条已自检。
+立刻停。不要对口型、不要烧字幕、不要写简介。说明切条已自检。时间表若已经冻结，这一轮可以同时画 HUD 和测响度，不必等用户确认字幕。校对只改错字和换行，刀点不动。
+
+```bash
+.venv/bin/python tools/hud/render_running_hud.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  --prep-alpha
+
+.venv/bin/python tools/assemble/final_export.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  --measure-only
+```
+
+`--prep-alpha` 按留下的入出点直接画透明层，不写 `hud-renders/keeps/`。`--measure-only` 只测切点和风刮之后的成片混音，不读字幕。两条都会改 `logs/todo.md`，而且不要求 `subs confirmed`。之后若改了刀点，准备步骤会回到 pending。只挪了大约 1 秒以内、片段顺序没变，响度可以不重测；改动更大必须重测。
 
 > 切条已按易错规则扫过。这一轮抽听核对、改错字即可。优先动 `episodes/YYYY-MM-DD-slug/subtitles.txt`。时间先别动。改好了直接发：
 >
@@ -210,4 +222,4 @@ iina --no-stdin --mpv-geometry=320x180-8+8 \
 
 没有 sidecar 就不要加 `-- --sub-files=`。不要用 `--mpv-sub-file`，IINA 会静默丢掉。
 
-> 下一步：用户确认字幕后走 `final_export.py --confirmed`。还要 60–90 秒短视频才提 `/p3-jianying`。
+> 下一步：用户确认字幕后走一次 `final_export.py --confirmed`。透明层或响度还没测，这条命令会自己补上再编码，不会先出一条无字幕成片。还要 60–90 秒短视频才提 `/p3-jianying`。

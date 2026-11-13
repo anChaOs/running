@@ -6,12 +6,12 @@
 
 - `p3-hud --preview` 生成单段 `*-hud-preview.mp4`。没有时间表时，`preview_episode.py` 把这些已渲片段，加上 open，以及已叠数据图的 `*-close-stats.mp4`（没有数据图时用原 close）接成整条审片预览。目标跟 HUD preview 走：`yuvj420p` 和 `30000/1001` 直接 stream copy，不把长预览收成 `yuv420p` 或整数 30。只有对不上的段（常见是 HEVC open/close、60fps 数据图段）才按 preview profile 轻转到这个目标，然后再 `-c copy`。不从原片和 HUD alpha 重压。缺 HUD preview，或有 stats 图片却没有 close-stats 时，直接失败。
 - 预览保持 30fps（`30/1` 或 `30000/1001`），不为求快降分辨率，不做叠化。open 尾和 close 头按最终成片的 0.2s xfade 剪掉同样的时长，中间段不剪。外挂字幕时间不平移。和最终成片比，剩下的差是 HUD preview 比原始 run 多出来的帧。不烧字幕、不修响度。
-- 最终导出唯一入口是 `tools/assemble/final_export.py`。它直接读取 `open`、原始 `run-*`、`close`、HUD alpha、stats 图片和 `subtitles.txt`，在同一张 FFmpeg filter graph 内完成叠加、转场、拼接、字幕和响度，最后只编码一次 HEVC 成片。
-- `loudnorm` 第一遍只输出到 `null` 做测量，不写媒体；第二遍才写最终文件。`assemble_episode.py`、`burn_ass.py`、`loudness_only.py` 不是新期正式成片路径。`close-stats.mp4` 只作为审片预览的数据图段；最终导出仍读取原 close 和 stats 图片，不读这条视频。
+- 最终导出唯一入口是 `tools/assemble/final_export.py --confirmed`。它直接读取 `open`、原始 `run-*`、`close`、HUD alpha、stats 图片和 `subtitles.txt`，在同一张 FFmpeg filter graph 内完成裁切、叠加、转场、拼接、字幕和响度，最后只编码一次 HEVC 成片。画面来源是原片，不是 `hud-renders/keeps/`。
+- 时间表冻结后，字幕校对可以和准备并行。`render_running_hud.py --prep-alpha` 按留下的入出点直接画透明层。`final_export.py --measure-only` 把 loudnorm 第一遍测在成片混音上，只输出到 `null`，不写媒体，也不读字幕。确认导出套用这次测量；对不上当前表就先补测再编码。刀点只挪了大约 1 秒、片段顺序没变时，可以不重测。`assemble_episode.py`、`burn_ass.py`、`loudness_only.py` 不是新期正式成片路径。`close-stats.mp4` 只作为审片预览的数据图段；最终导出仍读取原 close 和 stats 图片，不读这条视频。
 
 ## 字幕门闩
 
-预览用于人工看画面、转场、stats 和校对字幕。`subtitles.txt` 是唯一字幕源稿；用户确认后由 `p3-subs` 写 `subs: done`。最终导出还要求 `preview: done`、`qc: done` 和命令行 `--confirmed`，缺任一门闩都不生成成片。改字后重新执行最终导出，不先生成无字幕成片再烧第二遍。
+预览用于人工看画面、转场、stats 和校对字幕。`subtitles.txt` 是唯一字幕源稿；用户确认后由 `p3-subs` 写 `subs: done`。最终导出还要求 `preview: done`、`qc: done` 和命令行 `--confirmed`，缺任一门闩都不生成成片。改字后重新执行最终导出，不先生成无字幕成片再烧第二遍。HUD 和响度可以在确认前准备好，但确认导出仍然是烧进字幕的那一次编码。
 
 ## 规格配置
 
