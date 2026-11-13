@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -579,8 +580,17 @@ class SameTableTest(unittest.TestCase):
         self.assertEqual(mpv[0], "mpv")
         self.assertNotIn("--no-stdin", mpv)
         self.assertIn("--sub-file=/tmp/review.srt", mpv)
-        self.assertEqual(iina[:2], ["iina", "--no-stdin"])
-        self.assertIn("--mpv-sub-file=/tmp/review.srt", iina)
+        self.assertNotIn("--sub-files=/tmp/review.srt", mpv)
+        self.assertEqual(preview_episode.mpv_play_command(Path("/tmp/review.edl"), None), ["mpv", "/tmp/review.edl"])
+        self.assertEqual(
+            iina,
+            ["iina", "--no-stdin", "/tmp/review.edl", "--", "--sub-files=/tmp/review.srt"],
+        )
+        self.assertNotIn("--mpv-sub-file=/tmp/review.srt", iina)
+        self.assertEqual(
+            preview_episode.iina_play_command(Path("/tmp/review.edl"), None),
+            ["iina", "--no-stdin", "/tmp/review.edl"],
+        )
 
     def test_program_preview_writes_edl_not_mp4(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))

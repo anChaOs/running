@@ -837,11 +837,15 @@ def mpv_play_command(edl_path: Path, subtitles: Path | None) -> list[str]:
 
 
 def iina_play_command(edl_path: Path, subtitles: Path | None) -> list[str]:
-    """IINA 命令只是尝试。.edl 能否直接打开没有核实，失败不算预览失败。"""
-    cmd = ["iina", "--no-stdin"]
+    """IINA 1.5.1 能打开 .edl。字幕用 libmpv 认识的 --sub-files。
+
+    mpv 手册写明 --sub-file 只是命令行别名，等于 --sub-files-append。
+    IINA 把选项交给 libmpv，不认这个别名，--mpv-sub-file 会被静默丢掉。
+    文件在前，选项放在 -- 后面。--no-stdin 只加给 IINA。
+    """
+    cmd = ["iina", "--no-stdin", str(edl_path)]
     if subtitles is not None:
-        cmd.append(f"--mpv-sub-file={subtitles}")
-    cmd.append(str(edl_path))
+        cmd.extend(["--", f"--sub-files={subtitles}"])
     return cmd
 
 
@@ -895,7 +899,7 @@ def _preview_from_program(args, media_dir: Path) -> int:
     mpv_cmd = mpv_play_command(output, sidecar)
     iina_cmd = iina_play_command(output, sidecar)
     print("mpv:", " ".join(shlex.quote(part) for part in mpv_cmd))
-    print("iina (unverified for .edl):", " ".join(shlex.quote(part) for part in iina_cmd))
+    print("iina:", " ".join(shlex.quote(part) for part in iina_cmd))
     if args.dry_run:
         print(document, end="")
         if sidecar is not None:
