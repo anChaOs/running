@@ -1,11 +1,11 @@
 ---
 name: p3-hud
-description: 先把跑鞋、天气和透明层规格记进 logs/program.json，不渲未剪原片。时间表冻结后可以用 --prep-alpha 按留下的入出点直接画透明层，和字幕校对并行。需要已命名 mp4、FIT、跑鞋 -sn/-sk。用户说 HUD、叠加数据、overlay 时用。封面走 p3-cover，可并行。不要给 open/close 加 HUD，不要剪原片 run-*。天气用上海城市场点，不要发 FIT GPS。确认导出若缺透明层会自己补，仍然只编码一次。
+description: 先把跑鞋、天气和透明层规格记进 logs/program.json，不渲未剪原片。时间表冻结后可以用 --prep-alpha 按留下的入出点直接画透明层，和字幕校对并行。需要已命名 mp4、FIT、跑鞋 -sn/-sk。用户说 HUD、叠加数据、overlay 时用。封面走 p3-cover，可并行。不要给 open/close 加 HUD，不要剪原片 run-*。天气用上海城市场点，不要发 FIT GPS。确认导出若缺透明层会自己补。确认导出按大约 120 秒分段编码，再流拷贝成一个文件。
 ---
 
 # HUD
 
-记录这一步只写 HUD 要什么：鞋名、跑完后的累计公里、天气城市、透明层规格。写进 `logs/program.json` 的 `hud`，并把 `logs/todo.md` 的 `hud-record` 标成 done。**不要在这里对未剪原片渲 ProRes，也不要在同一次任务里压审片预览。** 透明层等时间表冻结后再画：输入仍是原片，用 `--hud-start` / `--hud-end` 只画留下的区间，直接写成 `hud-renders/<profile>/` 里的 alpha。不要先把画面切到 `hud-renders/keeps/`。默认 `qtrle`。确认导出每条原片只打开一次：`-ss` 落在这组切片最早的入点，句间刀从同一次输入里裁出来再接成这一段。这条原片上的窗口 alpha 收成一条再叠一次；另一条原片分开。不要按窗口各开一个透明层输入。
+记录这一步只写 HUD 要什么：鞋名、跑完后的累计公里、天气城市、透明层规格。写进 `logs/program.json` 的 `hud`，并把 `logs/todo.md` 的 `hud-record` 标成 done。**不要在这里对未剪原片渲 ProRes，也不要在同一次任务里压审片预览。** 透明层等时间表冻结后再画：输入仍是原片，用 `--hud-start` / `--hud-end` 只画留下的区间，直接写成 `hud-renders/<profile>/` 里的 alpha。不要先把画面切到 `hud-renders/keeps/`。默认 `qtrle`。确认导出按大约 120 秒分段。每一段里，一条原片只打开一次：`-ss` 落在这段最早的入点，句间刀用 `select` 丢掉空隙。这段用到的窗口 alpha 收成一条再叠一次；另一条原片分开。不要按窗口各开一个透明层输入。
 
 封面走 `p3-cover`，和这一步互不依赖，可并行。细节见 `tools/hud/README.md`。不要为换封面句重渲 HUD。
 
@@ -70,9 +70,9 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json，�
 
 同一条原片起一个 wrap：FIT 和模板加载一次，再按留下的窗口逐段写成 `hud-renders/<profile>/` 里各自的 alpha mov。一条原片占了大部分窗口时，最多拆成 `-j` 个进程，每个进程仍然一次加载、连续画多段。短窗补起点，透明层时间从 0 起。已经对得上的文件直接复用。不写 `hud-renders/keeps/`，也不解码重编原片画面。
 
-确认导出仍是这一次编码。同一条原片只打开一次，`-ss` 放在这一次 `-i` 前面，句间刀在滤镜里裁完再接成这一段。这条原片上的窗口 alpha 收成一条再叠一次，时长等于留下的窗口之和；另一条原片的 alpha 分开。风刮和 xfade 在 open、各段跑、close 之间。`-filter_complex_threads` 仍是 1。不要按窗口各开一个透明层输入，也不要把 `hud-renders/keeps/` 当画面。
+确认导出仍是 `final_export.py --confirmed` 这一条命令、一个成片文件。它按大约 120 秒分段。每一段里，同一条原片只打开一次，`-ss` 放在这一次 `-i` 前面，句间刀用 `select` 丢掉空隙，不再 `split`。这一段用到的窗口 alpha 收成一条再叠一次；另一条原片的 alpha 分开。风刮和 xfade 整段落在某一段里，不从中间切开。`-filter_complex_threads` 是 3。不要按窗口各开一个透明层输入，也不要把 `hud-renders/keeps/` 当画面。段文件最后流拷贝接起来。
 
-脚本把 `hud-render` 标成 done，墙钟记在 `hud-render`。切开的区间由这一次加载后的窗口步进器来画，输入仍是原片。整段留下的原片不限窗口。清单写在 `logs/hud-alpha.json`。对不上当前表时，`final_export.py --confirmed -j 6` 会自己重画，工人数同样认 `--jobs`。确认导出仍然只编码一次。
+脚本把 `hud-render` 标成 done，墙钟记在 `hud-render`。切开的区间由这一次加载后的窗口步进器来画，输入仍是原片。整段留下的原片不限窗口。清单写在 `logs/hud-alpha.json`。对不上当前表时，`final_export.py --confirmed -j 6` 会自己重画，工人数同样认 `--jobs`。确认导出仍然是这一条命令；编码按段进行，最后接成一个文件。
 
 响度测量不是这一步。要提前测用 `final_export.py --measure-only`。
 

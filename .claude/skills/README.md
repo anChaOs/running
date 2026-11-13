@@ -60,7 +60,7 @@ p3-library / p3-topic / p3-scaffold
   → 冻结时间表
   → 用户校对字幕（只改错字和换行）∥ 一次解码画 HUD ∥ 可选测响度
   → 确认字幕
-  → final_export --confirmed（一张滤镜图，一次编码）
+  → final_export --confirmed（约 120 秒一段编码，流拷贝接成一个文件）
   → （可选）p3-bilibili / p3-youtube 自动上传；均不挡、不嵌入 publish
   → publish（published 门闩 / 复盘日志上 box / 清临时真源）
   → p3-publish-report（复盘拷完后的单屏 HTML）

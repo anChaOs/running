@@ -238,17 +238,21 @@ def test_confirmed_export_reuses_prep_and_encodes_once() -> None:
         render.assert_not_called()
         measure.assert_not_called()
         full_measure.assert_not_called()
-        assert encode.call_count == 1
-        cmd = encode.call_args.args[0]
+        filters, joins = _encode_calls(encode)
+        assert len(filters) == 1
+        assert len(joins) == 1
+        cmd = filters[0]
         graph = cmd[cmd.index("-filter_complex") + 1]
         assert "subtitles=" in graph
         assert "measured_I=-23.4" in graph
-        assert cmd[cmd.index("-filter_complex_threads") + 1] == "1"
+        assert cmd[cmd.index("-filter_complex_threads") + 1] == "3"
         assert cmd.index("-filter_complex_threads") < cmd.index("-i")
         assert "-threads" not in cmd
-        assert cmd[-1] == str(out)
         assert "no-subs" not in " ".join(cmd)
         assert "hud-renders/keeps" not in " ".join(cmd)
+        assert joins[0][joins[0].index("-c") + 1] == "copy"
+        assert "hevc_videotoolbox" not in joins[0]
+        assert joins[0][-1] == str(out)
         assert todo.load(media)["final-export"] == "done"
 
 
@@ -279,16 +283,19 @@ def test_confirmed_export_backfills_missing_prep_then_encodes_once() -> None:
         assert render.call_args.kwargs["jobs"] == hud.HUD_EXPORT_JOBS
         measure.assert_called_once()
         full_measure.assert_not_called()
-        assert encode.call_count == 1
-        cmd = encode.call_args.args[0]
+        filters, joins = _encode_calls(encode)
+        assert len(filters) == 1
+        assert len(joins) == 1
+        cmd = filters[0]
         graph = cmd[cmd.index("-filter_complex") + 1]
         assert "subtitles=" in graph
         assert "loudnorm=" in graph
         assert "measured_I=-23.4" in graph
-        assert cmd[cmd.index("-filter_complex_threads") + 1] == "1"
+        assert cmd[cmd.index("-filter_complex_threads") + 1] == "3"
         assert cmd.index("-filter_complex_threads") < cmd.index("-i")
         assert "-threads" not in cmd
-        assert cmd[-1] == str(out)
+        assert joins[0][-1] == str(out)
+        assert joins[0][joins[0].index("-c") + 1] == "copy"
         assert todo.load(media)["hud-render"] == "done"
         assert todo.load(media)["loudness-measure"] == "done"
 
@@ -559,6 +566,14 @@ def _input_paths(args: list[str]) -> list[str]:
     return [args[index + 1] for index, flag in enumerate(args) if flag == "-i"]
 
 
+def _encode_calls(encode) -> tuple[list[list[str]], list[list[str]]]:
+    """分段编码，再加最后那条流拷贝。不要把 concat 当成滤镜图。"""
+    cmds = [call.args[0] for call in encode.call_args_list]
+    filters = [cmd for cmd in cmds if "-filter_complex" in cmd]
+    joins = [cmd for cmd in cmds if "-filter_complex" not in cmd]
+    return filters, joins
+
+
 def _many_slice_program() -> tuple[dict, list[str]]:
     """130 段、7 条原片、118 个跑步 HUD 窗。和撑爆 16GB 的那次导出同一形状。"""
     table = edl.empty_program("2026-01-02-demo")
@@ -629,11 +644,14 @@ def test_confirmed_input_plan_opens_shared_clip_once() -> None:
     assert len(clip_paths) < len(timeline)
 
     graph = final_export.build_program_filter(table, ["kept"] * 118, 0, None, apply_loudness=False)
-    assert "[0:v]split=6" in graph
-    assert "[1:v]split=24" in graph
-    assert "concat=n=24:v=1:a=0" in graph
-    assert "trim=start=1.500000:end=2.500000" in graph
+    # 同一条原片的句间刀用 select，不再 split。split 会把解码帧留到这段结束。
+    assert "[0:v]select=" in graph
+    assert "[1:v]select=" in graph
+    assert "]split=24" not in graph
+    assert "]split=6" not in graph
+    assert "gte(t\\,1.500000)*lt(t\\,2.500000)" in graph
     assert "atrim=start=1.500000:end=2.500000" in graph
+    assert "concat=n=24:v=0:a=1" in graph
     assert "[7:v]trim=duration=24.000000" in graph
     assert "[10:v]trim=duration=23.000000" in graph
     assert "[11:v]trim=duration=23.000000" in graph
@@ -732,16 +750,20 @@ def test_confirmed_command_opens_shared_run_once() -> None:
             ) == 0
         render.assert_not_called()
         measure.assert_not_called()
-        assert encode.call_count == 1
-        cmd = encode.call_args.args[0]
+        filters, joins = _encode_calls(encode)
+        assert len(filters) == 1
+        assert len(joins) == 1
+        cmd = filters[0]
         run = str((media / "2026-01-02-run-a.mp4").resolve())
         assert _input_paths(cmd).count(run) == 1
         assert cmd[cmd.index("-ss") + 1] == "12.000000"
-        assert cmd[cmd.index("-filter_complex_threads") + 1] == "1"
+        assert cmd[cmd.index("-filter_complex_threads") + 1] == "3"
         graph = cmd[cmd.index("-filter_complex") + 1]
-        assert "[1:v]split=2" in graph
-        assert "trim=start=4.000000:end=6.000000" in graph
-        assert "concat=n=2:v=1:a=0" in graph
+        assert "[1:v]select=" in graph
+        assert "]split=2" not in graph
+        assert "gte(t\\,4.000000)*lt(t\\,6.000000)" in graph
+        assert "atrim=start=4.000000:end=6.000000" in graph
+        assert "concat=n=2:v=0:a=1" in graph
         assert graph.count("overlay=eof_action=pass:shortest=0:format=auto") == 1
         inputs = _input_paths(cmd)
         assert inputs.count(run) == 1
@@ -780,8 +802,250 @@ def test_confirmed_export_backfill_respects_jobs() -> None:
                 ]
             ) == 0
         assert seen["jobs"] == 6
-        assert encode.call_count == 1
+        filters, joins = _encode_calls(encode)
+        assert len(filters) == 1
+        assert len(joins) == 1
         full_measure.assert_not_called()
+
+
+def _episode_shape():
+    """130 段、7 条原片、118 个 HUD 窗，成片大约 1152.6 秒。时长按已发布那期的各条原片分。"""
+    durations = [
+        ("2026-11-12-open.mp4", 86.4, 6),
+        ("2026-11-12-run-a.mp4", 201.866667, 24),
+        ("2026-11-12-run-b.mp4", 111.8, 24),
+        ("2026-11-12-run-c.mp4", 113.4, 24),
+        ("2026-11-12-run-d.mp4", 116.333333, 23),
+        ("2026-11-12-run-e.mp4", 263.933333, 23),
+        ("2026-11-12-close.mp4", 259.266667, 6),
+    ]
+    rows = []
+    for name, dur, count in durations:
+        for index in range(count):
+            rows.append(
+                {
+                    "clip": name,
+                    "src_start_s": dur * index / count,
+                    "src_end_s": dur * (index + 1) / count,
+                }
+            )
+    table = edl.empty_program("2026-11-12-8020")
+    edl.set_source_sync(
+        table,
+        [{"clip": name, "fit": "fit.fit", "offset_s": 0.0} for name, _dur, count in durations if count > 6],
+    )
+    edl.upsert_keeps(table, rows)
+    edl.add_close_stats(table, ["2026-11-12-stats-01.jpg", "2026-11-12-stats-02.jpg"])
+    edl.add_overlay(
+        table,
+        {
+            "asset": "2026-11-12-16week-zones.jpg",
+            "program_start_s": 784.13,
+            "program_end_s": 864.90,
+            "role": "graphic",
+            "x": "W-w-48",
+            "y": "(H-h)/2",
+            "width": 450,
+            "opacity": 0.95,
+        },
+        expect_duration_s=edl.program_duration(table),
+    )
+    return table
+
+
+def test_segments_do_not_cut_wind_or_xfade_and_keep_inputs_small() -> None:
+    table = _episode_shape()
+    timeline = edl.export_slices(table)
+    assert len(timeline) == 130
+    assert sum(1 for row in timeline if row["hud"]) == 118
+    assert abs(edl.frame_program_duration(table) - 1152.6) < 0.05
+    blocked = final_export.segment_blocked_starts(table)
+    segments = final_export.plan_confirmed_segments(table)
+    assert len(segments) > 1
+    assert segments[0].start_frame == 0
+    assert segments[-1].end_frame == edl.frame_timeline(table)[-1]["program_start_frame"] + edl.frame_timeline(table)[-1]["frames"]
+    assert sum(seg.frames for seg in segments) == segments[-1].end_frame
+    for seg in segments[1:]:
+        assert seg.start_frame not in blocked
+    # 每段不超过大约两分钟，尾巴可以短一点。风刮区间并进来时也不会把整片合成一段。
+    assert max(seg.frames for seg in segments) <= 120 * 30 + 60
+    alphas = [Path(f"/media/hud-renders/qtrle/{index}.mov") for index in range(118)]
+    modes = ["kept"] * 118
+    cues = [("0:01:59.00", "0:02:05.00", "跨过两分钟")]
+    counts = []
+    with tempfile.TemporaryDirectory() as td:
+        work = Path(td)
+        for index, seg in enumerate(segments):
+            cmd = final_export.confirmed_segment_cmd(
+                Path("/media"), table, seg, alphas, modes, cues, dict(MEASURED),
+                work, index, work / f"seg-{index}.mp4",
+            )
+            inputs = _input_paths(cmd)
+            counts.append(len(inputs))
+            assert len(inputs) <= 8
+            assert len(inputs) < 118
+            assert not any(path.endswith(".mov") for path in inputs)
+            assert "hud-renders/keeps" not in " ".join(cmd)
+            assert cmd.count("hevc_videotoolbox") == 1
+            assert "libx265" not in cmd
+            assert cmd[cmd.index("-filter_complex_threads") + 1] == "3"
+            assert cmd.index("-filter_complex_threads") < cmd.index("-i")
+            assert "-threads" not in cmd
+            graph = cmd[cmd.index("-filter_complex") + 1]
+            assert "]split=24" not in graph
+            assert "]split=23" not in graph
+            assert "measured_I=-23.4" in graph
+            assert "measured_TP=-3.1" in graph
+            assert "offset=1.2" in graph
+            assert "subtitles=" in graph
+            ass = (work / f"seg-{index:03d}.ass").read_text(encoding="utf-8")
+            # 119s–125s 的一句跨过 120s 的段界。前一段只留到段尾，后一段从 0 起算。
+            if seg.start_frame == 0:
+                assert "0:01:59.00" in ass
+                assert "0:02:00.00" in ass
+                assert "跨过两分钟" in ass
+            if seg.start_frame == 120 * 30:
+                assert "Dialogue: 0,0:00:00.00,0:00:05.00,Default" in ass
+                assert "0:01:59.00" not in ass
+        join = final_export.concat_copy_cmd(work / "segments.ffconcat", Path("/tmp/final.mp4"))
+        assert join[join.index("-c") + 1] == "copy"
+        assert "hevc_videotoolbox" not in join
+        assert "-filter_complex" not in join
+    # 这一期的切法：一段最多两条原片加透明层、whoosh 和贴图。
+    assert counts == [3, 2, 5, 5, 5, 5, 3, 5, 3, 2]
+    assert max(counts) == 5
+
+
+def test_segment_boundary_keeps_wind_and_xfade_intact() -> None:
+    table = edl.empty_program("2026-01-02-demo")
+    edl.set_source_sync(
+        table,
+        [
+            {"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0},
+            {"clip": "2026-01-02-run-b.mp4", "fit": "run.fit", "offset_s": 1.0},
+        ],
+    )
+    edl.upsert_keeps(
+        table,
+        [
+            {"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 4.0},
+            {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 10.0},
+            {"clip": "2026-01-02-run-b.mp4", "src_start_s": 0.0, "src_end_s": 10.0},
+            {"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 4.0},
+        ],
+    )
+    for seg in table["program"]:
+        if seg["type"] != "run":
+            seg["hud"] = False
+    blocked = final_export.segment_blocked_starts(table, 30)
+    # 目标段长 4 秒，短于每一条。接缝仍必须整段留在同一边。
+    segments = final_export.plan_confirmed_segments(table, max_s=4)
+    assert len(segments) > 2
+    for seg in segments[1:]:
+        assert seg.start_frame not in blocked
+    timeline = edl.frame_timeline(table)
+    wind = next(sl for sl in timeline if sl["id"] in {item["before_id"] for item in edl.wind_transitions(table)})
+    seam = int(wind["program_start_frame"])
+    owner = next(seg for seg in segments if seg.start_frame <= seam < seg.end_frame)
+    assert owner.start_frame < seam < owner.end_frame
+    xfade = next(sl for sl in timeline if sl["fade_frames"])
+    fade_at = int(xfade["program_start_frame"])
+    fade_owner = next(seg for seg in segments if seg.start_frame <= fade_at < seg.end_frame)
+    assert fade_owner.start_frame <= fade_at
+    assert fade_owner.end_frame >= fade_at + int(xfade["fade_frames"])
+    # 段与段的帧数加起来等于成片，没有把叠化算两遍。
+    total = timeline[-1]["program_start_frame"] + timeline[-1]["frames"]
+    assert sum(seg.frames for seg in segments) == total
+
+
+def test_subtitle_times_are_local_on_each_side_of_a_cut() -> None:
+    cues = [("0:00:08.00", "0:00:12.50", "跨段")]
+    first = final_export.cues_for_segment(cues, 0.0, 10.0)
+    second = final_export.cues_for_segment(cues, 10.0, 20.0)
+    assert first == [("0:00:08.00", "0:00:10.00", "跨段")]
+    assert second == [("0:00:00.00", "0:00:02.50", "跨段")]
+    assert final_export.cues_for_segment(cues, 20.0, 30.0) == []
+
+
+def test_fast_init_failure_retries_once_with_one_filter_thread() -> None:
+    calls: list[str] = []
+
+    def _run(cmd, check=False):
+        del check
+        calls.append(cmd[cmd.index("-filter_complex_threads") + 1])
+        code = 1 if len(calls) == 1 else 0
+        return subprocess.CompletedProcess(cmd, code)
+
+    with patch.object(final_export.subprocess, "run", side_effect=_run):
+        final_export._run_segment_encode(["ffmpeg", "-filter_complex_threads", "3", "-i", "clip.mp4"])
+    assert calls == ["3", "1"]
+
+    killed: list[int] = []
+
+    def _kill(cmd, check=False):
+        del check
+        killed.append(cmd[cmd.index("-filter_complex_threads") + 1] == "3")
+        return subprocess.CompletedProcess(cmd, -9)
+
+    with patch.object(final_export.subprocess, "run", side_effect=_kill):
+        try:
+            final_export._run_segment_encode(["ffmpeg", "-filter_complex_threads", "3", "-i", "clip.mp4"])
+        except subprocess.CalledProcessError as exc:
+            assert exc.returncode == -9
+        else:
+            raise AssertionError("SIGKILL should not be retried")
+    assert killed == [True]
+
+
+def test_failed_segment_cleans_temp_files_and_partial_output() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        media, episode = _stage(root, _table(partial=True), subs="done")
+        plans = hud.plan_alpha_jobs(media, _table(partial=True), {"2026-01-02-run-a.mp4": 100.0})
+        for plan in plans:
+            plan["dest"].parent.mkdir(parents=True, exist_ok=True)
+            plan["dest"].write_bytes(b"alpha")
+        hud.write_alpha_manifest(media, edl.load_media(media), plans)
+        final_export.write_loudness(media, edl.load_media(media), dict(MEASURED))
+        out = media / "2026-01-02-run-final.mp4"
+        dirs: list[Path] = []
+        real = tempfile.TemporaryDirectory
+
+        class _Dir(real):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                dirs.append(Path(self.name))
+
+        def _boom(cmd, check=False):
+            del cmd, check
+            out.write_bytes(b"partial")
+            raise subprocess.CalledProcessError(1, ["ffmpeg"])
+
+        from contextlib import ExitStack
+
+        contexts = (
+            patch.object(tempfile, "TemporaryDirectory", _Dir),
+            patch.object(final_export.subprocess, "run", side_effect=_boom),
+            *_qc_ok(),
+        )
+        with ExitStack() as stack:
+            for item in contexts:
+                stack.enter_context(item)
+            try:
+                final_export.main(
+                    [
+                        "--media-dir", str(media),
+                        "--episode-dir", str(episode),
+                        "--out", str(out),
+                        "--confirmed",
+                    ]
+                )
+            except subprocess.CalledProcessError:
+                pass
+            else:
+                raise AssertionError("encode failure should surface")
+        assert dirs and all(not path.exists() for path in dirs)
+        assert not out.exists()
 
 
 if __name__ == "__main__":
@@ -801,4 +1065,9 @@ if __name__ == "__main__":
     test_rewound_source_opens_a_second_decoder()
     test_confirmed_command_opens_shared_run_once()
     test_confirmed_export_backfill_respects_jobs()
+    test_segments_do_not_cut_wind_or_xfade_and_keep_inputs_small()
+    test_segment_boundary_keeps_wind_and_xfade_intact()
+    test_subtitle_times_are_local_on_each_side_of_a_cut()
+    test_fast_init_failure_retries_once_with_one_filter_thread()
+    test_failed_segment_cleans_temp_files_and_partial_output()
     print("ok")

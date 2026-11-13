@@ -152,7 +152,7 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-variant.xm
   -j 6
 ```
 
-`-j` / `--jobs` 的默认仍是 2。6 路是把 8 核里的 1–2 核留给系统和写 mov 的 ffmpeg。同一条原片只起一个 wrap，FIT 和模板加载一次，再按窗口写成 `hud-renders/<profile>/` 里各自的 alpha mov。一条原片占了大部分窗口时，最多拆成 `-j` 个进程，每个进程仍然一次加载、连续画多段。已经对得上的文件直接复用。确认导出仍然只跑 `final_export.py --confirmed` 这一次编码：同一条原片的窗口 alpha 收成一条再叠一次，不按窗口各开一个输入。
+`-j` / `--jobs` 的默认仍是 2。6 路是把 8 核里的 1–2 核留给系统和写 mov 的 ffmpeg。同一条原片只起一个 wrap，FIT 和模板加载一次，再按窗口写成 `hud-renders/<profile>/` 里各自的 alpha mov。一条原片占了大部分窗口时，最多拆成 `-j` 个进程，每个进程仍然一次加载、连续画多段。已经对得上的文件直接复用。确认导出仍然只跑 `final_export.py --confirmed`，写出一个文件。它按大约 120 秒分段：每一段里，同一条原片的窗口 alpha 收成一条再叠一次，不按窗口各开一个输入。段与段流拷贝接起来。
 
 默认透明层编码是 **qtrle**（QuickTime Animation。比 ProRes 4444 小；alpha 是无损压缩。开发机没有媒体盘，没有做实机画质对比）。导出画面不能接受，或剪映要 ProRes 时：
 

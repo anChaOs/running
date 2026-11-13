@@ -10,7 +10,7 @@ description: 核对审片预览或最终成片。默认预览画面核对在 p3-
 ## 两个阶段
 
 - **预览核对**：看播放清单 `YYYY-MM-DD-review-preview.edl`，听旁白、看有没有明显缺段。清单不带渲好的 HUD，也不烧字幕。通过后 `assets.md` 写 `preview: done`、`qc: done`。接缝、HUD、贴图和烧进去的字幕在最终片上抽帧。
-- **最终核对**：`final_export.py --confirmed` 是唯一确认导出。它在一张滤镜图里裁原片、把每条原片的窗口 alpha 收成一条再叠一次、做转场、烧字幕、套上已经测好的响度，只编码一次 HEVC。缺透明层或响度测量时会先补上再编码，不会先出无字幕成片再烧字、再改响度。写出成片后做一道结构检查：能解码、一路视频一路音频、1920×1080、30fps、HEVC、`hvc1`、AAC、时长接近时间表、综合响度在 -16 LUFS 附近。结构不过就停，脚本只把 `final-export` 标成 done，**不会**标 `final-qc`。另外抽帧看字幕、HUD、贴图。失败应改 `subtitles.txt` 或时间表，再重新导出，不能对最终片单独 burn/loudness。抽帧通过之后才 `todo_list.py mark final-qc done`。这一步没打勾，`pack_upload.py` 会停。
+- **最终核对**：`final_export.py --confirmed` 是唯一确认导出，仍然只写出一个文件。它按大约 120 秒分段：每一段裁自己用到的原片、把这段的窗口 alpha 收成一条再叠一次、做落在这段里的转场、烧字幕、套上已经测好的响度，用 HEVC 编码，再流拷贝接起来。缺透明层或响度测量时会先补上再编码，不会先出无字幕成片再烧字、再改响度。写出成片后做一道结构检查：能解码、一路视频一路音频、1920×1080、30fps、HEVC、`hvc1`、AAC、时长接近时间表、综合响度在 -16 LUFS 附近。结构不过就停，脚本只把 `final-export` 标成 done，**不会**标 `final-qc`。另外抽帧看字幕、HUD、贴图。失败应改 `subtitles.txt` 或时间表，再重新导出，不能对最终片单独 burn/loudness。抽帧通过之后才 `todo_list.py mark final-qc done`。这一步没打勾，`pack_upload.py` 会停。
 
 ## 看预览
 

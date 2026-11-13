@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """字幕确认后的唯一最终导出入口。
 
-预览只用于人工检查；本入口直接读取原片和 HUD 透明层，在一次最终编码中完成
-转场拼接、数据图叠加、中段 overlays.json、字幕和响度处理。
+预览只用于人工检查。有时间表时，确认导出仍是一条命令、一个成片文件，但不再把
+大约 19 分钟塞进一张滤镜图。按大约两分钟切段，段界不切断风刮或 xfade。每一段
+只打开自己用到的原片和窗口透明层，`hevc_videotoolbox` 编码，再用 concat 解复用
+流拷贝接成最终 mp4。已测的 loudnorm 参数原样套到每一段。
 
-同一条原片只打开一次解码器：`-ss` 到这组切片最早的入点，句间刀在滤镜里 trim / split，
-再接成这一段。这条原片上已经画好的窗口透明层收成一条 alpha，只叠一次。
-风刮和 xfade 在 open、各段跑、close 之间。不要按窗口各留一个 ARGB 解码器。
+同一段里，一条原片只打开一次：`-ss` 到这段最早的入点，多段句间刀用 select 丢掉
+空隙，不再 split。split 会把还没读到的输出垫住，解码帧一直留到这段结束，16GB
+机器上足迹会随时间涨到几十 GB。窗口透明层仍按原片收成一条再叠一次，不按窗口
+各留一个输入，也不读 `hud-renders/keeps/`。
 """
 
 from __future__ import annotations
@@ -14,10 +17,10 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -566,14 +569,16 @@ def build_encode_cmd(
     output: Path,
     test_codec: str | None = None,
     spec: ExportSpec = FINAL_SPEC,
+    filter_threads: int = 1,
 ) -> list[str]:
-    # 大时间表上 ffmpeg 会插入上百个 auto_scale。默认滤镜图多线程在重配时
-    # 返回 EAGAIN（-35），一帧都写不出来。这是全局参数，必须放在第一个输入之前。
-    # 不要加 -threads 1，那会限制 VideoToolbox；-filter_threads 1 也解决不了。
+    # 滤镜线程必须写在第一个 -i 前面。不要加 -threads 1，那会限制 VideoToolbox。
+    # 没有时间表的整段原片路径保持 1。确认导出的分段图用 CONFIRMED_FILTER_THREADS。
+    if filter_threads < 1:
+        raise ValueError("filter_threads must be >= 1")
     codec_args = video_codec_args(spec, test_codec=test_codec)
     return [
         "ffmpeg", "-y", "-hide_banner",
-        "-filter_complex_threads", "1",
+        "-filter_complex_threads", str(filter_threads),
         *plan.args,
         "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
         *codec_args,
@@ -626,7 +631,7 @@ def main(argv: list[str] | None = None) -> int:
         "--jobs",
         type=int,
         default=None,
-        help="补画 HUD 透明层的并行路数，默认 2。不改变确认导出这一次编码。"
+        help="补画 HUD 透明层的并行路数，默认 2。不改变确认导出的分段编码。"
         "8 核机器建议 6，留 1 到 2 核给系统和写 mov 的 ffmpeg",
     )
     args = parser.parse_args(argv)
@@ -675,19 +680,21 @@ class ClipOpening:
     slices: tuple[int, ...]
 
 
-def clip_openings(slices: list[dict]) -> list[ClipOpening]:
+def clip_openings(slices: list[dict], break_before: set[int] | None = None) -> list[ClipOpening]:
     """同一条原片的顺向句间刀共用一次 -i。
 
     原片时间往回走（冷开场取了后面的一段）时另开一路。一个解码器只能往前读，
-    倒 seek 会把已经错过的帧丢掉。
+    倒 seek 会把已经错过的帧丢掉。`break_before` 里的下标强制另开一路，用来
+    把风刮、xfade 或 HUD 开关两边拆开。
     """
+    breaks = break_before or set()
     openings: list[ClipOpening] = []
     active: dict[str, int] = {}
     for index, sl in enumerate(slices):
         start = float(sl["src_start_s"])
         clip = str(sl["clip"])
         slot = active.get(clip)
-        if slot is not None:
+        if slot is not None and index not in breaks:
             previous = openings[slot]
             last = slices[previous.slices[-1]]
             if start >= float(last["src_end_s"]) - 1e-6:
@@ -697,6 +704,13 @@ def clip_openings(slices: list[dict]) -> list[ClipOpening]:
         active[clip] = len(openings)
         openings.append(ClipOpening(clip, seek, (index,)))
     return openings
+
+
+def program_openings(timeline: list[dict], wind_ids: set[str]) -> list[ClipOpening]:
+    """画面输入按 act 打开。一个 act 里的句间刀仍共用一次 -i。"""
+    breaks = {act[0] for act in _program_acts(timeline, wind_ids)}
+    breaks.discard(0)
+    return clip_openings(timeline, break_before=breaks)
 
 
 def slice_trim_window(sl: dict, seek_s: float | None) -> tuple[float, float]:
@@ -713,9 +727,18 @@ def _source_pads(
     slices: list[dict],
     *,
     video: bool,
+    wind_ids: set[str] | None = None,
 ) -> tuple[list[ClipOpening], list[str], list[str], list[tuple[float, float]]]:
-    """把共用的原片拆成每段一个滤镜入口。只有一段时不插 split。"""
-    openings = clip_openings(slices)
+    """把共用的原片拆成每段一个音频入口。只有一段时不插 asplit。
+
+    画面不再走 split。split 的输出要等 concat 逐个来读，没读到的那几路会把
+    已经解码的帧留到这段结束，足迹随时间涨。`wind_ids` 给定时按 act 断开输入，
+    和 `program_input_args` 使用同一组开口。测响度不传，避免改掉已测的音频图。
+    """
+    if wind_ids is None:
+        openings = clip_openings(slices)
+    else:
+        openings = program_openings(slices, wind_ids)
     video_pads = [""] * len(slices)
     audio_pads = [""] * len(slices)
     windows: list[tuple[float, float]] = [(0.0, 0.0)] * len(slices)
@@ -875,6 +898,40 @@ def confirmed_alpha_groups(table: dict, alpha_paths: list[Path], fps: int = 30) 
     return groups
 
 
+def _picture_chain(width: int, height: int, fps: int) -> str:
+    return (
+        f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+        f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,fps={fps},settb=1/{fps},format=yuv420p,setsar=1"
+    )
+
+
+def _opening_video(
+    parts: list[str],
+    input_index: int,
+    ranges: list[tuple[float, float]],
+    width: int,
+    height: int,
+    fps: int,
+) -> str:
+    """一次打开的画面只留一个消费者。多段句间刀用 select，不 split。"""
+    if len(ranges) == 1:
+        start, end = ranges[0]
+        head = f"trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS"
+    else:
+        expr = "+".join(f"gte(t\\,{start:.6f})*lt(t\\,{end:.6f})" for start, end in ranges)
+        head = f"select='{expr}',setpts=N/FRAME_RATE/TB"
+    label = f"ov{input_index}"
+    parts.append(f"[{input_index}:v]{head},{_picture_chain(width, height, fps)}[{label}]")
+    return label
+
+
+def _kept_alpha_trim(skip: float, dur: float) -> str:
+    """窗口 mov 从 0 起。段从窗口中间开始时，要跳过前面已经画过的透明层。"""
+    if skip > 1e-6:
+        return f"trim=start={skip:.6f}:end={skip + dur:.6f},setpts=PTS-STARTPTS"
+    return f"trim=duration={dur:.6f},setpts=PTS-STARTPTS"
+
+
 def build_program_filter(
     table: dict,
     alpha_modes: list[str],
@@ -883,11 +940,14 @@ def build_program_filter(
     spec: ExportSpec = FINAL_SPEC,
     measured: dict[str, str] | None = None,
     apply_loudness: bool = True,
+    alpha_skip: dict[str, float] | None = None,
 ) -> str:
     """按时间表裁切、叠 HUD、转场、贴图、烧字幕、响度。预览用的是同一组落帧区间。
 
     句间刀先收成 open / 每一段跑 / close。一段跑上的窗口透明层已经在输入侧收成一条，
-    这里只叠一次。测响度的音频图不走这条，仍按切片拼接，好让已测的 loudness.json 继续对得上。
+    这里只叠一次。画面用 select 或单段 trim，不用 split。测响度的音频图不走这条，
+    仍按切片拼接，好让已测的 loudness.json 继续对得上。
+    `alpha_skip` 是切片 id → 透明层要从窗口开头跳过的秒数，分段导出切在窗口中间时用。
     """
     fps = spec.timeline.fps
     timeline = edl.frame_timeline(table, fps)
@@ -895,26 +955,29 @@ def build_program_filter(
         raise ValueError("program timeline has no segments")
     width, height = spec.timeline.width, spec.timeline.height
     parts: list[str] = []
-    video_labels: list[str] = []
     audio_labels: list[str] = []
     durations: list[float] = []
-    openings, video_pads, audio_pads, windows = _source_pads(parts, timeline, video=True)
+    winds = {item["before_id"]: item for item in edl.wind_transitions(table)}
+    wind_ids = set(winds)
+    openings, _video_pads, audio_pads, windows = _source_pads(parts, timeline, video=False, wind_ids=wind_ids)
+    video_of: dict[int, str] = {}
+    for input_index, opening in enumerate(openings):
+        label = _opening_video(
+            parts, input_index, [windows[index] for index in opening.slices], width, height, fps,
+        )
+        for index in opening.slices:
+            video_of[index] = label
     for index, sl in enumerate(timeline):
         dur = sl["frames"] / fps
         durations.append(dur)
         trim_start, trim_end = windows[index]
         parts.append(
-            f"[{video_pads[index]}]trim=start={trim_start:.6f}:end={trim_end:.6f},setpts=PTS-STARTPTS,"
-            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
-            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,fps={fps},settb=1/{fps},format=yuv420p,setsar=1[v{index}]"
-        )
-        parts.append(
             f"[{audio_pads[index]}]atrim=start={trim_start:.6f}:end={trim_end:.6f},asetpts=PTS-STARTPTS,"
             f"aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo,"
             f"aresample=async=1:first_pts=0,apad=whole_dur={dur:.6f},atrim=0:{dur:.6f}[a{index}]"
         )
-        video_labels.append(f"v{index}")
         audio_labels.append(f"a{index}")
+    skips = alpha_skip or {}
 
     hud_count = sum(1 for sl in timeline if sl["hud"])
     if len(alpha_modes) != hud_count:
@@ -926,8 +989,6 @@ def build_program_filter(
             continue
         modes_at[index] = alpha_modes[hud_at]
         hud_at += 1
-    winds = {item["before_id"]: item for item in edl.wind_transitions(table)}
-    wind_ids = set(winds)
     acts = _program_acts(timeline, wind_ids)
     alpha_at: dict[int, int] = {}
     next_input = len(openings)
@@ -944,8 +1005,12 @@ def build_program_filter(
     act_video: list[str] = []
     act_audio: list[str] = []
     for act_i, act in enumerate(acts):
-        # 一段里的切片先接成一条。只有一个切片时标签不变，单窗图和以前一致。
-        vlabel = _concat_ready(parts, [video_labels[index] for index in act], video=True, tag=f"gv{act_i}", fps=fps)
+        # 一个 act 的画面已经是一条 select/trim。这里只接音频。标签相同就不要再 concat。
+        picture = []
+        for index in act:
+            if not picture or picture[-1] != video_of[index]:
+                picture.append(video_of[index])
+        vlabel = _concat_ready(parts, picture, video=True, tag=f"gv{act_i}", fps=fps)
         alabel = _concat_ready(parts, [audio_labels[index] for index in act], video=False, tag=f"ga{act_i}", fps=fps)
         if act_i in alpha_at:
             anchor = act[0]
@@ -955,12 +1020,12 @@ def build_program_filter(
                 if mode == "full":
                     trim = f"trim=start={sl['src_start_s']:.6f}:end={sl['src_end_s']:.6f},setpts=PTS-STARTPTS"
                 else:
-                    trim = f"trim=duration={durations[anchor]:.6f},setpts=PTS-STARTPTS"
+                    trim = _kept_alpha_trim(float(skips.get(sl["id"], 0.0)), durations[anchor])
             else:
                 if any(modes_at[index] == "full" for index in act):
                     raise ValueError("a run with several windows cannot use a full-length HUD alpha")
                 frames = sum(int(timeline[index]["frames"]) for index in act)
-                trim = f"trim=duration={frames / fps:.6f},setpts=PTS-STARTPTS"
+                trim = _kept_alpha_trim(float(skips.get(timeline[anchor]["id"], 0.0)), frames / fps)
             parts.append(f"[{alpha_at[act_i]}:v]{trim},fps={fps},format=rgba[ha{anchor}]")
             parts.append(f"[{vlabel}][ha{anchor}]overlay=eof_action=pass:shortest=0:format=auto[vh{anchor}]")
             vlabel = f"vh{anchor}"
@@ -1270,8 +1335,15 @@ def program_input_args(
     不在滤镜图里为每个窗口留一个输入：那些 ARGB 解码器会一起常驻，16GB 机器会被杀掉。
     清单只是这几条短文件的路径，不是整段未压缩透明底，用完要删。
     """
-    args = _clip_input_args(media_dir, edl.export_slices(table, spec.timeline.fps))
-    for index, group in enumerate(confirmed_alpha_groups(table, alpha_paths, spec.timeline.fps)):
+    fps = spec.timeline.fps
+    timeline = edl.frame_timeline(table, fps)
+    wind_ids = {str(item["before_id"]) for item in edl.wind_transitions(table)}
+    args: list[str] = []
+    for opening in program_openings(timeline, wind_ids):
+        if opening.seek_s is not None:
+            args.extend(["-ss", f"{opening.seek_s:.6f}"])
+        args.extend(["-i", str(media_dir / opening.clip)])
+    for index, group in enumerate(confirmed_alpha_groups(table, alpha_paths, fps)):
         if len(group) == 1:
             args.extend(["-i", str(group[0])])
             continue
@@ -1285,12 +1357,292 @@ def program_input_args(
         if not WHOOSH_PATH.is_file():
             raise SystemExit(f"wind transitions need whoosh audio: {WHOOSH_PATH}")
         args.extend(["-i", str(WHOOSH_PATH)])
-    fps = spec.timeline.fps
     for ov in table.get("overlays") or []:
         span = float(ov["program_end_s"]) - float(ov["program_start_s"])
         asset = media_dir / ov["asset"]
         args.extend(["-loop", "1", "-framerate", str(fps), "-t", f"{span:.6f}", "-i", str(asset)])
     return args
+
+
+# 大约两分钟。整片那张图在 16GB 上足迹随成片时间涨，两分钟是留给桌面程序的上限。
+# select 之后预期足迹是平的；就算还在涨，一段也不该摸到 8–10GB。再短只是多几次 AAC 接缝。
+SEGMENT_MAX_S = 120.0
+# 小分段图用 3。整片上百个 auto_scale 才会在默认多线程下 EAGAIN，那种图不再建。
+# 这一段若十几秒内起不来，退回 1。不要加 -threads 1。
+CONFIRMED_FILTER_THREADS = 3
+FILTER_THREAD_RETRY_S = 15.0
+_WHOOSH_SECONDS: float | None = None
+
+
+@dataclass(frozen=True)
+class ExportSegment:
+    """成片帧区间 [start_frame, end_frame)。下一段从 end_frame 接着编码。"""
+
+    start_frame: int
+    end_frame: int
+
+    @property
+    def frames(self) -> int:
+        return self.end_frame - self.start_frame
+
+
+def whoosh_duration_s() -> float:
+    global _WHOOSH_SECONDS
+    if _WHOOSH_SECONDS is None:
+        import wave
+
+        with wave.open(str(WHOOSH_PATH)) as handle:
+            rate = handle.getframerate() or 1
+            _WHOOSH_SECONDS = handle.getnframes() / float(rate)
+    return _WHOOSH_SECONDS
+
+
+def segment_blocked_starts(table: dict, fps: int = 30) -> set[int]:
+    """这些成片帧不能当一段的第一帧，否则会从风刮或 xfade 中间切开。"""
+    timeline = edl.frame_timeline(table, fps)
+    blocked: set[int] = set()
+    whoosh_n = max(1, snap_frames(whoosh_duration_s(), fps))
+    for sl in timeline:
+        fade_n = int(sl["fade_frames"])
+        if fade_n:
+            start = int(sl["program_start_frame"])
+            # 含叠化第一帧。从那里起段，上一段在新图里只剩叠化那么长，时间表会拒绝。
+            blocked.update(range(max(start, 1), start + fade_n))
+    by_id = {sl["id"]: sl for sl in timeline}
+    for item in edl.wind_transitions(table):
+        host = by_id.get(str(item.get("before_id")))
+        if host is None:
+            continue
+        wind_n = max(1, snap_frames(float(item["duration_s"]), fps))
+        seam = int(host["program_start_frame"])
+        # 风刮要留下 wind_n*2+2 帧才画。whoosh 从接缝前 wind_n 帧开始，跨到下一段。
+        guard = max(wind_n * 2 + 2, whoosh_n)
+        blocked.update(frame for frame in range(seam - guard + 1, seam + guard) if frame > 0)
+    return blocked
+
+
+def _choose_segment_end(start: int, total: int, blocked: set[int], max_frames: int, fps: int) -> int:
+    if start >= total:
+        return total
+    target = min(total, start + max_frames)
+    if target >= total:
+        return total
+    cut: int | None = None
+    for frame in range(target, start, -1):
+        if frame not in blocked:
+            cut = frame
+            break
+    if cut is None:
+        for frame in range(target + 1, total + 1):
+            if frame == total or frame not in blocked:
+                cut = frame
+                break
+    if cut is None or cut <= start:
+        cut = total
+    # 尾巴不到一秒就并进这一段，避免为几帧再起一个编码器。并到片尾不会切断转场。
+    if 0 < total - cut < fps:
+        cut = total
+    return cut
+
+
+def plan_confirmed_segments(
+    table: dict,
+    fps: int = 30,
+    max_s: float = SEGMENT_MAX_S,
+) -> list[ExportSegment]:
+    """把成片切成大约 max_s 秒的段。段界只落在硬切上，不落在风刮或 xfade 里面。"""
+    timeline = edl.frame_timeline(table, fps)
+    if not timeline:
+        raise ValueError("program timeline has no segments")
+    if max_s <= 0:
+        raise ValueError("segment length must be positive")
+    total = int(timeline[-1]["program_start_frame"] + timeline[-1]["frames"])
+    max_frames = max(1, int(round(float(max_s) * fps)))
+    blocked = segment_blocked_starts(table, fps)
+    segments: list[ExportSegment] = []
+    start = 0
+    while start < total:
+        end = _choose_segment_end(start, total, blocked, max_frames, fps)
+        if end <= start:
+            raise RuntimeError("confirmed segment did not advance")
+        if start != 0 and start in blocked:
+            raise RuntimeError(f"confirmed segment starts inside a transition at frame {start}")
+        segments.append(ExportSegment(start, end))
+        start = end
+    if not segments or segments[-1].end_frame != total:
+        raise RuntimeError("confirmed segments do not cover the program")
+    return segments
+
+
+def segment_program(table: dict, seg: ExportSegment, fps: int = 30) -> tuple[dict, dict[str, float]]:
+    """切出这一段自己的时间表。成片时间从 0 起，转场只保留整段落在这段里的。"""
+    timeline = edl.frame_timeline(table, fps)
+    program: list[dict] = []
+    skips: dict[str, float] = {}
+    included: list[str] = []
+    for sl in timeline:
+        origin = int(sl["program_start_frame"])
+        count = int(sl["frames"])
+        lo = max(origin, seg.start_frame)
+        hi = min(origin + count, seg.end_frame)
+        if lo >= hi:
+            continue
+        src0 = int(sl["src_start_frame"])
+        src_lo = src0 + (lo - origin)
+        src_hi = src0 + (hi - origin)
+        program.append(
+            {
+                "id": sl["id"],
+                "type": sl["type"],
+                "clip": sl["clip"],
+                "src_start_s": src_lo / fps,
+                "src_end_s": src_hi / fps,
+                "program_start_s": 0.0,
+                "hud": bool(sl["hud"]),
+            }
+        )
+        included.append(str(sl["id"]))
+        skips[str(sl["id"])] = (src_lo - src0) / fps
+    present = set(included)
+    by_id = {str(sl["id"]): sl for sl in timeline}
+    transitions = []
+    for item in table.get("transitions") or []:
+        before = str(item.get("before_id"))
+        if before not in present:
+            continue
+        seam = int(by_id[before]["program_start_frame"])
+        if not (seg.start_frame <= seam < seg.end_frame):
+            continue
+        index = next(i for i, sl in enumerate(timeline) if str(sl["id"]) == before)
+        if index == 0 or str(timeline[index - 1]["id"]) not in present:
+            continue
+        transitions.append(dict(item))
+    seg_s = seg.start_frame / fps
+    seg_e = seg.end_frame / fps
+    overlays = []
+    for ov in table.get("overlays") or []:
+        lo = max(float(ov["program_start_s"]), seg_s)
+        hi = min(float(ov["program_end_s"]), seg_e)
+        if hi - lo <= 1e-4:
+            continue
+        shifted = dict(ov)
+        shifted["program_start_s"] = lo - seg_s
+        shifted["program_end_s"] = hi - seg_s
+        overlays.append(shifted)
+    sub = {"program": program, "transitions": transitions, "overlays": overlays}
+    got = edl.frame_program_duration(sub, fps)
+    want = (seg.end_frame - seg.start_frame) / fps
+    if abs(got - want) > 1e-3:
+        raise ValueError(
+            f"segment {seg.start_frame}:{seg.end_frame} reflowed to {got:.6f}s, want {want:.6f}s"
+        )
+    return sub, skips
+
+
+def cues_for_segment(
+    cues: list[tuple[str, str, str]],
+    start_s: float,
+    end_s: float,
+) -> list[tuple[str, str, str]]:
+    """字幕按成片时间写。这一段的画面从 0 起，所以每条字幕减去段首，跨段的裁开。"""
+    from subs_core import fmt_txt_time, parse_txt_time
+
+    span = end_s - start_s
+    shifted: list[tuple[str, str, str]] = []
+    for start, end, text in cues:
+        left = max(0.0, parse_txt_time(start) - start_s)
+        right = min(span, parse_txt_time(end) - start_s)
+        if right - left < 0.01:
+            continue
+        shifted.append((fmt_txt_time(left), fmt_txt_time(right), text))
+    return shifted
+
+
+def concat_copy_cmd(listing: Path, output: Path) -> list[str]:
+    """段已经是同一套 videotoolbox / AAC 参数。接成片只做流拷贝，不再滤镜。"""
+    return [
+        "ffmpeg", "-y", "-hide_banner",
+        "-f", "concat", "-safe", "0", "-i", str(listing),
+        "-c", "copy", "-movflags", "+faststart", str(output),
+    ]
+
+
+def _run_segment_encode(cmd: list[str]) -> None:
+    started = time.monotonic()
+    proc = subprocess.run(cmd)
+    if proc.returncode == 0:
+        return
+    threads = cmd[cmd.index("-filter_complex_threads") + 1]
+    # 负的返回码是信号（上一回是 SIGKILL）。再跑一遍只会再被杀掉。
+    if proc.returncode > 0 and threads != "1" and time.monotonic() - started < FILTER_THREAD_RETRY_S:
+        print(
+            "segment filter graph did not stay up; retrying with -filter_complex_threads 1",
+            flush=True,
+        )
+        retry = list(cmd)
+        retry[retry.index("-filter_complex_threads") + 1] = "1"
+        subprocess.run(retry, check=True)
+        return
+    raise subprocess.CalledProcessError(proc.returncode, cmd)
+
+
+def confirmed_segment_cmd(
+    media_dir: Path,
+    table: dict,
+    seg: ExportSegment,
+    alpha_paths: list[Path],
+    modes: list[str],
+    cues: list[tuple[str, str, str]],
+    measured: dict[str, str] | None,
+    work: Path,
+    index: int,
+    output: Path,
+    test_codec: str | None = None,
+    spec: ExportSpec = FINAL_SPEC,
+) -> list[str]:
+    """这一段的 ffmpeg 命令。只打开这段用到的原片和透明层。"""
+    fps = spec.timeline.fps
+    sub, skips = segment_program(table, seg, fps)
+    full = edl.frame_timeline(table, fps)
+    hud_ids = [str(sl["id"]) for sl in full if sl["hud"]]
+    if len(hud_ids) != len(alpha_paths) or len(hud_ids) != len(modes):
+        raise ValueError("HUD alpha count does not match hud slices")
+    path_of = dict(zip(hud_ids, alpha_paths, strict=True))
+    mode_of = dict(zip(hud_ids, modes, strict=True))
+    sub_timeline = edl.frame_timeline(sub, fps)
+    sub_paths = [path_of[str(sl["id"])] for sl in sub_timeline if sl["hud"]]
+    sub_modes = [mode_of[str(sl["id"])] for sl in sub_timeline if sl["hud"]]
+    list_dir = work / f"lists-{index:03d}"
+    plan_args = program_input_args(media_dir, sub, sub_paths, spec, list_dir=list_dir)
+    if any("hud-renders/keeps" in item.replace("\\", "/") for item in plan_args):
+        raise SystemExit("final export cannot use keep intermediates as picture or HUD")
+    ass_path = work / f"seg-{index:03d}.ass"
+    ass_path.write_text(
+        render_ass(cues_for_segment(cues, seg.start_frame / fps, seg.end_frame / fps)),
+        encoding="utf-8",
+    )
+    wind_ids = {str(item["before_id"]) for item in edl.wind_transitions(sub)}
+    openings = program_openings(sub_timeline, wind_ids)
+    graph = build_program_filter(
+        sub,
+        sub_modes,
+        len(sub.get("overlays") or []),
+        ass_path,
+        spec,
+        measured=measured,
+        alpha_skip=skips,
+    )
+    if "subtitles=" not in graph or "loudnorm=" not in graph:
+        raise SystemExit("confirmed export must burn subtitles and apply loudness in one encode")
+    plan = InputPlan(tuple(plan_args), len(openings), (), (), 0.0)
+    return build_encode_cmd(
+        plan,
+        graph,
+        output,
+        test_codec=test_codec,
+        spec=spec,
+        filter_threads=CONFIRMED_FILTER_THREADS,
+    )
 
 
 def _reject_program_source(name: str) -> None:
@@ -1311,7 +1663,7 @@ def _export_from_program(args, media_dir: Path) -> int:
         raise SystemExit("program export burns subtitles in the one confirmed encode; --no-subtitles is not available")
     if not subtitles.is_file():
         raise SystemExit(f"subtitles.txt not found: {subtitles}")
-    parse_txt(subtitles)
+    cues = parse_txt(subtitles)
     status = read_status(episode_dir)
     if not status.get("preview", "").startswith("done"):
         raise SystemExit("Final export requires assets.md preview: done")
@@ -1358,54 +1710,69 @@ def _export_from_program(args, media_dir: Path) -> int:
             raise SystemExit(f"final export cannot use keep intermediates as HUD: {path}")
     if not args.dry_run:
         todo_list.mark(media_dir, "hud-render", "done")
-    ass = make_ass(subtitles)
-    list_dir: Path | None = None
+    # 段文件、透明层清单和按段平移过的 ASS 都在这一个临时目录里。成功和失败都删。
+    work = tempfile.TemporaryDirectory(prefix="running-confirmed-")
     try:
-        measured = _loudness_for_export(media_dir, table, dry_run=args.dry_run)
-        if measured is not None and not args.dry_run:
-            todo_list.mark(media_dir, "loudness-measure", "done")
-        elif not args.dry_run:
-            print("Loudnorm pass 1 skipped; encode will use single-pass loudnorm", flush=True)
-        # 清单放临时目录，不写进媒体目录。编码结束就删，不管成功失败。
-        list_dir = Path(tempfile.mkdtemp(prefix="running-alpha-concat-"))
-        groups = confirmed_alpha_groups(table, alpha_paths, fps)
-        windows = sum(len(group) for group in groups)
-        print(f"HUD alpha: {windows} windows → {len(groups)} tracks", flush=True)
-        plan_args = program_input_args(media_dir, table, alpha_paths, list_dir=list_dir)
-        openings = clip_openings(edl.export_slices(table, fps))
-        plan = InputPlan(tuple(plan_args), len(openings), (), (), 0.0)
-        final_graph = build_program_filter(
-            table, modes, len(table.get("overlays") or []), ass, measured=measured,
-        )
-        if "subtitles=" not in final_graph or "loudnorm=" not in final_graph:
-            raise SystemExit("confirmed export must burn subtitles and apply loudness in one encode")
-        cmd = build_encode_cmd(plan, final_graph, output, test_codec=args.test_codec)
-        print("$", " ".join(cmd), flush=True)
-        if args.dry_run:
-            return 0
-        subprocess.run(cmd, check=True)
-        print(f"Wrote {output}", flush=True)
-        info = final_qc.probe_final(output)
-        loudness = final_qc.measure_integrated_lufs(output)
-        codec = args.test_codec or FINAL_SPEC.vcodec
-        tag = None if args.test_codec else FINAL_SPEC.tag
-        qc_problems = final_qc.check_final(
-            info,
-            expected_duration=edl.frame_program_duration(table, FINAL_SPEC.timeline.fps),
-            loudness_i=loudness,
-            video_codec="h264" if codec == "libx264" else "hevc",
-            video_tag=tag,
-        )
-        if qc_problems:
-            output.unlink(missing_ok=True)
-            raise SystemExit("final QC failed: " + "; ".join(qc_problems))
-        # final-qc 要等抽帧看过字幕、HUD、贴图。结构检查通过只代表这一次编码可以留下。
-        todo_list.mark(media_dir, "final-export", "done")
+        try:
+            measured = _loudness_for_export(media_dir, table, dry_run=args.dry_run)
+            if measured is not None and not args.dry_run:
+                todo_list.mark(media_dir, "loudness-measure", "done")
+            elif not args.dry_run:
+                print("Loudnorm pass 1 skipped; encode will use single-pass loudnorm", flush=True)
+            segments = plan_confirmed_segments(table, fps)
+            work_dir = Path(work.name)
+            print(
+                f"confirmed segments={len(segments)} max={SEGMENT_MAX_S:.0f}s "
+                f"filter_threads={CONFIRMED_FILTER_THREADS}",
+                flush=True,
+            )
+            segment_paths: list[Path] = []
+            for index, seg in enumerate(segments):
+                seg_path = work_dir / f"seg-{index:03d}.mp4"
+                cmd = confirmed_segment_cmd(
+                    media_dir, table, seg, alpha_paths, modes, cues, measured,
+                    work_dir, index, seg_path, test_codec=args.test_codec,
+                )
+                inputs = [cmd[pos + 1] for pos, flag in enumerate(cmd) if flag == "-i"]
+                print(
+                    f"segment {index + 1}/{len(segments)} "
+                    f"{seg.start_frame / fps:.3f}-{seg.end_frame / fps:.3f}s "
+                    f"inputs={len(inputs)}",
+                    flush=True,
+                )
+                print("$", " ".join(cmd), flush=True)
+                if not args.dry_run:
+                    _run_segment_encode(cmd)
+                segment_paths.append(seg_path)
+            listing = work_dir / "segments.ffconcat"
+            _write_alpha_concat(tuple(segment_paths), listing)
+            join = concat_copy_cmd(listing, output)
+            print("$", " ".join(join), flush=True)
+            if args.dry_run:
+                return 0
+            subprocess.run(join, check=True)
+            print(f"Wrote {output}", flush=True)
+            info = final_qc.probe_final(output)
+            loudness = final_qc.measure_integrated_lufs(output)
+            codec = args.test_codec or FINAL_SPEC.vcodec
+            tag = None if args.test_codec else FINAL_SPEC.tag
+            qc_problems = final_qc.check_final(
+                info,
+                expected_duration=edl.frame_program_duration(table, FINAL_SPEC.timeline.fps),
+                loudness_i=loudness,
+                video_codec="h264" if codec == "libx264" else "hevc",
+                video_tag=tag,
+            )
+            if qc_problems:
+                raise SystemExit("final QC failed: " + "; ".join(qc_problems))
+            # final-qc 要等抽帧看过字幕、HUD、贴图。结构检查通过只代表这一次编码可以留下。
+            todo_list.mark(media_dir, "final-export", "done")
+        except BaseException:
+            if not args.dry_run:
+                output.unlink(missing_ok=True)
+            raise
     finally:
-        if list_dir is not None:
-            shutil.rmtree(list_dir, ignore_errors=True)
-        if ass is not None:
-            ass.unlink(missing_ok=True)
+        work.cleanup()
     return 0
 
 

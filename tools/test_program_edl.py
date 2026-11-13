@@ -719,8 +719,9 @@ class SameTableTest(unittest.TestCase):
         self.assertIn("[4:v]trim=duration=3.000000", graph)
         self.assertIn("[5:v]trim=duration=3.000000", graph)
         self.assertNotIn("[6:v]trim=duration=", graph)
-        self.assertIn("[1:v]split=3", graph)
-        self.assertIn("concat=n=3:v=1:a=0", graph)
+        self.assertIn("[1:v]select=", graph)
+        self.assertNotIn("]split=3", graph)
+        self.assertIn("concat=n=3:v=0:a=1", graph)
         cmd = final_export.build_encode_cmd(
             final_export.InputPlan(tuple(args), 4, (), (), 0.0),
             graph,
@@ -956,8 +957,10 @@ class SameTableTest(unittest.TestCase):
             self.assertEqual(len(run_inputs), 1)
             self.assertEqual(args[args.index("-ss") + 1], "1.000000")
             graph = final_export.build_program_filter(table, [], 0, None, apply_loudness=False)
-            self.assertIn("[1:v]split=2", graph)
-            self.assertIn("trim=start=2.000000:end=3.000000", graph)
+            self.assertIn("[1:v]select=", graph)
+            self.assertNotIn("]split=2", graph)
+            self.assertIn("gte(t\\,2.000000)*lt(t\\,3.000000)", graph)
+            self.assertIn("atrim=start=2.000000:end=3.000000", graph)
             out = root / "out.mp4"
             subprocess.run(
                 [
@@ -976,6 +979,102 @@ class SameTableTest(unittest.TestCase):
             for got, want in ((yuv(out, 1.2), green), (yuv(out, 2.2), yellow)):
                 self.assertTrue(all(abs(a - b) < 12 for a, b in zip(got, want, strict=True)), (got, want))
             self.assertGreater(abs(green[2] - yellow[2]), 40)
+
+    def test_ffmpeg_segment_concat_keeps_frame_alignment(self) -> None:
+        """短分段编码再流拷贝。段界在一条连续画面中间，帧还是对齐的。"""
+        if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+            self.skipTest("ffmpeg not installed")
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        def yuv(path: Path, at: float) -> tuple[float, float, float]:
+            info = subprocess.check_output(
+                [
+                    "ffmpeg", "-hide_banner", "-loglevel", "error",
+                    "-i", str(path), "-ss", f"{at:.3f}", "-frames:v", "1",
+                    "-vf", "signalstats,metadata=print:file=-", "-f", "null", "-",
+                ],
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            y = u = v = None
+            for line in info.splitlines():
+                if "YAVG=" in line:
+                    y = float(line.rsplit("=", 1)[-1])
+                elif "UAVG=" in line:
+                    u = float(line.rsplit("=", 1)[-1])
+                elif "VAVG=" in line:
+                    v = float(line.rsplit("=", 1)[-1])
+            if y is None or u is None or v is None:
+                raise AssertionError(f"no color for {path} at {at}: {info[-400:]}")
+            return y, u, v
+
+        measured = {
+            "input_i": "-23.4",
+            "input_tp": "-3.1",
+            "input_lra": "8.0",
+            "input_thresh": "-33.0",
+            "target_offset": "1.2",
+        }
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "color=c=red:s=160x90:r=30:d=1",
+                    "-f", "lavfi", "-i", "color=c=blue:s=160x90:r=30:d=1",
+                    "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=2",
+                    "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0[v]",
+                    "-map", "[v]", "-map", "2:a",
+                    "-c:v", "libx264", "-g", "30", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                    str(root / "2026-01-02-run-a.mp4"),
+                ],
+                check=True,
+            )
+            table = edl.empty_program("2026-01-02-demo")
+            edl.set_source_sync(table, [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}])
+            edl.upsert_keeps(table, [{"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 2.0}])
+            for seg in table["program"]:
+                seg["hud"] = False
+            segments = final_export.plan_confirmed_segments(table, max_s=1.0)
+            self.assertEqual([(seg.start_frame, seg.end_frame) for seg in segments], [(0, 30), (30, 60)])
+            paths = []
+            for index, seg in enumerate(segments):
+                dest = root / f"seg-{index}.mp4"
+                cmd = final_export.confirmed_segment_cmd(
+                    root, table, seg, [], [],
+                    [("0:00:01.80", "0:00:02.00", "尾")],
+                    measured, root, index, dest, test_codec="libx264",
+                )
+                self.assertEqual(cmd[cmd.index("-c:v") + 1], "libx264")
+                self.assertEqual(cmd[cmd.index("-filter_complex_threads") + 1], "3")
+                self.assertNotIn("hevc_videotoolbox", cmd)
+                self.assertNotIn("-threads", cmd)
+                subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                paths.append(dest)
+            listing = root / "segments.ffconcat"
+            final_export._write_alpha_concat(tuple(paths), listing)
+            out = root / "out.mp4"
+            join = final_export.concat_copy_cmd(listing, out)
+            self.assertEqual(join[join.index("-c") + 1], "copy")
+            self.assertNotIn("-filter_complex", join)
+            subprocess.run(join, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            frames = subprocess.check_output(
+                [
+                    "ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+                    "-show_entries", "stream=nb_read_frames", "-of", "default=nw=1:nk=1",
+                    str(out),
+                ],
+                text=True,
+            ).strip()
+            self.assertEqual(frames, "60")
+            red = yuv(root / "2026-01-02-run-a.mp4", 0.4)
+            blue = yuv(root / "2026-01-02-run-a.mp4", 1.4)
+            got_red = yuv(out, 0.4)
+            got_blue = yuv(out, 1.4)
+            self.assertTrue(all(abs(a - b) < 12 for a, b in zip(got_red, red, strict=True)), (got_red, red))
+            self.assertTrue(all(abs(a - b) < 12 for a, b in zip(got_blue, blue, strict=True)), (got_blue, blue))
+            self.assertGreater(max(abs(a - b) for a, b in zip(red, blue, strict=True)), 30)
 
 
 class TodoTest(unittest.TestCase):
