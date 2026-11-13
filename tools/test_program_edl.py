@@ -1055,7 +1055,7 @@ class SameTableTest(unittest.TestCase):
                 self.assertNotIn("-threads", cmd)
                 self.assertNotIn("loudnorm=", cmd[cmd.index("-filter_complex") + 1])
                 subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                final_export._require_segment_frames(dest, seg.frames)
+                final_export._require_segment_frames(dest, seg.frames, first=(index == 0))
                 paths.append(dest)
             audio = root / "program-audio.m4a"
             audio_cmd = final_export.program_audio_cmd(root, table, measured, audio)
@@ -1077,6 +1077,155 @@ class SameTableTest(unittest.TestCase):
             self.assertTrue(all(abs(a - b) < 12 for a, b in zip(got_red, red, strict=True)), (got_red, red))
             self.assertTrue(all(abs(a - b) < 12 for a, b in zip(got_blue, blue, strict=True)), (got_blue, blue))
             self.assertGreater(max(abs(a - b) for a, b in zip(red, blue, strict=True)), 30)
+
+    def test_ffmpeg_wind_keeps_planned_frames_and_wipe(self) -> None:
+        """两段 180 帧的跑，中间一次风刮。擦帧要留在成片里，总帧数不能少。"""
+        if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+            self.skipTest("ffmpeg not installed")
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        def y_of(path: Path, frame: int, crop: str) -> float:
+            info = subprocess.check_output(
+                [
+                    "ffmpeg", "-hide_banner", "-loglevel", "error",
+                    "-i", str(path),
+                    "-vf", f"select=eq(n\\,{frame}),{crop},signalstats,metadata=print:file=-",
+                    "-frames:v", "1", "-f", "null", "-",
+                ],
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            y = None
+            for line in info.splitlines():
+                if "YAVG=" in line:
+                    y = float(line.rsplit("=", 1)[-1])
+            if y is None:
+                raise AssertionError(f"no YAVG for {path} frame {frame}: {info[-400:]}")
+            return y
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            for name, color in (("2026-01-02-run-a.mp4", "red"), ("2026-01-02-run-b.mp4", "blue")):
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                        "-f", "lavfi", "-i", f"color=c={color}:s=160x90:r=30:d=6",
+                        "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=6",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                        str(root / name),
+                    ],
+                    check=True,
+                )
+            table = edl.empty_program("2026-01-02-demo")
+            edl.set_source_sync(
+                table,
+                [
+                    {"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0},
+                    {"clip": "2026-01-02-run-b.mp4", "fit": "run.fit", "offset_s": 6.0},
+                ],
+            )
+            edl.upsert_keeps(
+                table,
+                [
+                    {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 6.0},
+                    {"clip": "2026-01-02-run-b.mp4", "src_start_s": 0.0, "src_end_s": 6.0},
+                ],
+            )
+            for seg in table["program"]:
+                seg["hud"] = False
+            self.assertEqual(len(edl.wind_transitions(table)), 1)
+            segments = final_export.plan_confirmed_segments(table)
+            self.assertEqual(len(segments), 1)
+            self.assertEqual(segments[0].frames, 360)
+            dest = root / "seg-000.mp4"
+            cmd = final_export.confirmed_segment_cmd(
+                root, table, segments[0], [], [],
+                [("0:00:01.00", "0:00:02.00", "风")],
+                None, root, 0, dest, test_codec="libx264",
+            )
+            graph = cmd[cmd.index("-filter_complex") + 1]
+            self.assertIn("trim=end_frame=2,format=yuv420p[rw0to]", graph)
+            self.assertIn("trim=end_frame=2,format=yuv420p[rw1hi]", graph)
+            self.assertNotIn("overlay=x='W*0.62*pow(min(t/0.066667,1),1.65)':y=0:shortest=1,fade=t=out:st=0.046667:d=0.020000,fps=30", graph)
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            final_export._require_segment_frames(dest, 360, first=True)
+            self.assertEqual(final_export._count_frames(dest), 360)
+            body = y_of(dest, 90, "crop=16:90:0:0")
+            wipe_out = y_of(dest, 179, "crop=16:90:0:0")
+            blue_edge = y_of(dest, 270, "crop=16:90:1904:0")
+            wipe_in = y_of(dest, 180, "crop=16:90:1904:0")
+            self.assertGreater(body, 60)
+            self.assertLess(wipe_out, body - 15, (body, wipe_out, wipe_in, blue_edge))
+            self.assertLess(wipe_in, blue_edge - 10, (body, wipe_out, wipe_in, blue_edge))
+
+    def test_ffmpeg_still_insert_writes_its_frames_and_silence(self) -> None:
+        if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+            self.skipTest("ffmpeg not installed")
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            subprocess.run(
+                [
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    "-f", "lavfi", "-i", "color=c=green:s=160x90",
+                    "-frames:v", "1", str(root / "card.jpg"),
+                ],
+                check=True,
+            )
+            for name, color in (("2026-01-02-run-a.mp4", "red"), ("2026-01-02-run-b.mp4", "blue")):
+                subprocess.run(
+                    [
+                        "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                        "-f", "lavfi", "-i", f"color=c={color}:s=160x90:r=30:d=1",
+                        "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=1",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+                        str(root / name),
+                    ],
+                    check=True,
+                )
+            table = edl.empty_program("2026-01-02-demo")
+            edl.set_source_sync(table, [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}])
+            edl.upsert_keeps(
+                table,
+                [
+                    {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 1.0},
+                    {"clip": "2026-01-02-run-b.mp4", "src_start_s": 0.0, "src_end_s": 1.0},
+                ],
+            )
+            edl.add_insert(
+                table,
+                {
+                    "id": "card",
+                    "clip": "card.jpg",
+                    "src_start_s": 0.0,
+                    "src_end_s": 1.0,
+                    "after_id": table["program"][0]["id"],
+                    "transition": "cut",
+                },
+            )
+            for seg in table["program"]:
+                seg["hud"] = False
+            segments = final_export.plan_confirmed_segments(table)
+            self.assertEqual(sum(seg.frames for seg in segments), 90)
+            dest = root / "seg-000.mp4"
+            cmd = final_export.confirmed_segment_cmd(
+                root, table, segments[0], [], [], [], None, root, 0, dest, test_codec="libx264",
+            )
+            card = str(root / "card.jpg")
+            at = cmd.index(card)
+            self.assertEqual(cmd[at - 7:at], ["-loop", "1", "-framerate", "30", "-t", "1.000000", "-i"])
+            self.assertNotIn("-ss", cmd[at - 7:at])
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            final_export._require_segment_frames(dest, 90, first=True)
+            audio = root / "program-audio.m4a"
+            audio_cmd = final_export.program_audio_cmd(root, table, None, audio)
+            self.assertTrue(any(item.startswith("anullsrc=") for item in audio_cmd))
+            self.assertNotIn(card, audio_cmd)
+            subprocess.run(audio_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.assertGreater(final_export.probe_duration(audio), 2.5)
 
 
 class TodoTest(unittest.TestCase):

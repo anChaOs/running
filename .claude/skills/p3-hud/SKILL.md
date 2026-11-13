@@ -70,7 +70,7 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json，�
 
 同一条原片起一个 wrap：FIT 和模板加载一次，再按留下的窗口逐段写成 `hud-renders/<profile>/` 里各自的 alpha mov。一条原片占了大部分窗口时，最多拆成 `-j` 个进程，每个进程仍然一次加载、连续画多段。短窗补起点，透明层时间从 0 起。已经对得上的文件直接复用。不写 `hud-renders/keeps/`，也不解码重编原片画面。
 
-确认导出仍是 `final_export.py --confirmed` 这一条命令、一个成片文件。画面按大约 120 秒分段，只出画面。每一段里，同一条原片只打开一次，`-ss` 和 `-t` 放在这一次 `-i` 前面，句间刀先落到 30fps 再用 `select`，不再 `split`。这一段用到的窗口 alpha 收成一条再叠一次；另一条原片的 alpha 分开。风刮和 xfade 整段落在某一段里，不从中间切开。`-filter_complex_threads` 是 3。整片音频只混一次，和第一段画面并行。不要按窗口各开一个透明层输入，也不要把 `hud-renders/keeps/` 当画面。
+确认导出仍是 `final_export.py --confirmed` 这一条命令、一个成片文件。画面按大约 120 秒分段，只出画面。每一段里，同一条原片只打开一次，`-ss` 和 `-t` 放在这一次 `-i` 前面，句间刀先落到 30fps 再用 `select`，不再 `split`。这一段用到的窗口 alpha 收成一条再叠一次；另一条原片的 alpha 分开。风刮和 xfade 整段落在某一段里，不从中间切开。`-filter_complex_threads` 是 3。整片音频只混一次。响度没测好就和第一段画面一起测，测完再开音频编码，不挡画面；音频一直留在内存监控里直到结束。不要按窗口各开一个透明层输入，也不要把 `hud-renders/keeps/` 当画面。
 
 脚本把 `hud-render` 标成 done，墙钟记在 `hud-render`。切开的区间由这一次加载后的窗口步进器来画，输入仍是原片。整段留下的原片不限窗口。清单写在 `logs/hud-alpha.json`。对不上当前表时，`final_export.py --confirmed -j 6` 会自己重画，工人数同样认 `--jobs`。确认导出仍然是这一条命令；编码按段进行，最后接成一个文件。
 

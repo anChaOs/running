@@ -260,6 +260,7 @@ def test_confirmed_export_reuses_prep_and_encodes_once() -> None:
         assert "loudnorm=" in audio_graph
         assert "subtitles=" not in audio_graph
         assert "-vn" in audio
+        assert audio[audio.index("-filter_complex_threads") + 1] == "2"
         assert "hevc_videotoolbox" not in audio
         assert joins[0][joins[0].index("-c") + 1] == "copy"
         assert "hevc_videotoolbox" not in joins[0]
@@ -292,9 +293,21 @@ def test_confirmed_export_backfills_missing_prep_then_encodes_once() -> None:
             ) == 0
         render.assert_called_once()
         assert render.call_args.kwargs["jobs"] == hud.HUD_EXPORT_JOBS
-        measure.assert_called_once()
+        measure.assert_not_called()
         full_measure.assert_not_called()
         videos, audios, joins = _encode_calls(encode)
+        kinds = []
+        for cmd in _patches.launched:
+            if "-an" in cmd:
+                kinds.append("video")
+            elif "-vn" in cmd:
+                kinds.append("audio")
+            elif "-f" in cmd and cmd[cmd.index("-f") + 1] == "null":
+                kinds.append("measure")
+            else:
+                kinds.append("other")
+        assert kinds == ["measure", "video", "audio", "other"]
+        assert _patches.launched[0][_patches.launched[0].index("-filter_complex_threads") + 1] == "2"
         assert len(videos) == 1
         assert len(audios) == 1
         assert len(joins) == 1
@@ -367,11 +380,18 @@ class _patches:
             argv = list(cmd)
             type(self).launched.append(argv)
 
+            class _Err:
+                def read(self) -> str:
+                    return json.dumps(MEASURED)
+
             class _Proc:
                 def __init__(self) -> None:
                     self.args = argv
                     self.pid = 4242
                     self.returncode = None
+                    self.stderr = None
+                    if "-f" in argv and argv[argv.index("-f") + 1] == "null":
+                        self.stderr = _Err()
 
                 def wait(self, timeout=None):
                     del timeout
@@ -386,7 +406,7 @@ class _patches:
 
             return _Proc()
 
-        def _frames(path):
+        def _frames(path, **_kwargs):
             for cmd in reversed(type(self).launched):
                 if cmd and str(cmd[-1]) == str(path) and "-frames:v" in cmd:
                     return int(cmd[cmd.index("-frames:v") + 1])
@@ -1138,6 +1158,144 @@ def test_footprint_text_is_phys_footprint_in_gb() -> None:
     text = "phys_footprint_peak: 9 GB\nphys_footprint: 2147483648\n"
     assert abs(final_export.parse_footprint_gb(text) - 2) < 0.01
     assert final_export.parse_footprint_gb("nothing here") is None
+    assert abs(final_export.parse_footprint_gb("phys_footprint: 1,024 MiB\n") - 1.0) < 1e-9
+    assert abs(final_export.parse_footprint_gb("phys_footprint: 2 GiB\n") - 2.0) < 1e-9
+    assert abs(final_export.parse_footprint_gb("phys_footprint: 512 KB\n") - 512 / 1024 / 1024) < 1e-9
+    assert final_export.parse_footprint_gb("phys_footprint: 0 B\n") == 0.0
+    with (
+        patch.object(final_export, "_footprint_gb", return_value=0.0),
+        patch.object(final_export, "_rss_gb", return_value=1.25),
+    ):
+        assert final_export._process_memory_gb(1) == (1.25, "rss")
+    with (
+        patch.object(final_export, "_footprint_gb", return_value=None),
+        patch.object(final_export, "_rss_gb", return_value=0.5),
+    ):
+        assert final_export._process_memory_gb(1) == (0.5, "rss")
+    with (
+        patch.object(final_export, "_footprint_gb", return_value=1.5),
+        patch.object(final_export, "_rss_gb", side_effect=AssertionError("rss fallback")),
+    ):
+        assert final_export._process_memory_gb(1) == (1.5, "footprint")
+
+
+def test_thread_retry_times_the_segment_not_its_audio_companion() -> None:
+    popen = _fake_proc(1)
+
+    def _popen(cmd, **kwargs):
+        proc = popen(cmd, **kwargs)
+        proc._code = 1 if len(popen.cmds) == 1 else 0
+        return proc
+
+    companion = type("Companion", (), {})()
+    companion.pid = 99
+    companion.returncode = None
+    companion.wait_calls = 0
+
+    def wait(timeout=None):
+        del timeout
+        companion.wait_calls += 1
+        raise AssertionError("audio companion should not be waited on")
+
+    def poll():
+        return None
+
+    def kill():
+        companion.returncode = -9
+
+    companion.wait = wait
+    companion.poll = poll
+    companion.kill = kill
+    with (
+        patch.object(final_export.subprocess, "Popen", side_effect=_popen),
+        patch.object(final_export, "_process_memory_gb", return_value=(0.1, "rss")),
+    ):
+        final_export._run_segment_encode(
+            ["ffmpeg", "-filter_complex_threads", "3", "-i", "clip.mp4"],
+            companions=[(companion, "program audio")],
+        )
+    assert companion.wait_calls == 0
+    assert [cmd[cmd.index("-filter_complex_threads") + 1] for cmd in popen.cmds] == ["3", "1"]
+
+
+def test_frame_count_uses_header_only_after_segment_one_agrees() -> None:
+    final_export._FRAME_COUNT_MODE = None
+    assert final_export.decide_frame_probe(360, 360, None) == (360, "header")
+    assert final_export.decide_frame_probe(359, 360, None) == (360, "count")
+    assert final_export.decide_frame_probe(None, 360, None) == (360, "count")
+    assert final_export.decide_frame_probe(360, None, "header") == (360, "header")
+    assert final_export.decide_frame_probe(None, 12, "header") == (12, "count")
+    path = Path("/tmp/seg.mp4")
+    with (
+        patch.object(final_export, "_header_nb_frames", return_value=360),
+        patch.object(final_export, "_count_frames", return_value=360) as counted,
+    ):
+        assert final_export.probe_video_frames(path, first=True) == 360
+        counted.assert_called_once()
+    with (
+        patch.object(final_export, "_header_nb_frames", return_value=360),
+        patch.object(final_export, "_count_frames", side_effect=AssertionError("later segment should not decode")),
+    ):
+        assert final_export.probe_video_frames(path) == 360
+    final_export._FRAME_COUNT_MODE = None
+    with (
+        patch.object(final_export, "_header_nb_frames", return_value=359),
+        patch.object(final_export, "_count_frames", return_value=360) as counted,
+    ):
+        assert final_export.probe_video_frames(path, first=True) == 360
+        assert final_export._FRAME_COUNT_MODE == "count"
+    with (
+        patch.object(final_export, "_header_nb_frames", return_value=359),
+        patch.object(final_export, "_count_frames", return_value=360) as counted,
+    ):
+        assert final_export.probe_video_frames(path) == 360
+        counted.assert_called_once()
+    final_export._FRAME_COUNT_MODE = None
+
+
+def test_wind_chain_keeps_every_wipe_frame() -> None:
+    chain = final_export.wind_chain("src", "dst", 2 / 30, 1920, 1080, 30, "out")
+    assert "trim=end_frame=2" in chain
+    assert "fps=30,settb" not in chain
+    assert chain.endswith("format=yuv420p[dst]")
+
+
+def test_still_insert_loops_picture_and_feeds_silence() -> None:
+    table = edl.empty_program("2026-01-02-demo")
+    edl.set_source_sync(
+        table,
+        [{"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0}],
+    )
+    edl.upsert_keeps(
+        table,
+        [
+            {"clip": "2026-01-02-run-a.mp4", "src_start_s": 0.0, "src_end_s": 2.0},
+            {"clip": "2026-01-02-run-b.mp4", "src_start_s": 0.0, "src_end_s": 2.0},
+        ],
+    )
+    edl.add_insert(
+        table,
+        {
+            "id": "card",
+            "clip": "card.jpg",
+            "src_start_s": 0.0,
+            "src_end_s": 1.0,
+            "after_id": table["program"][0]["id"],
+            "transition": "cut",
+        },
+    )
+    for seg in table["program"]:
+        seg["hud"] = False
+    video = final_export.program_input_args(Path("/media"), table, [])
+    card = str(Path("/media") / "card.jpg")
+    at = video.index(card)
+    assert video[at - 7:at] == ["-loop", "1", "-framerate", "30", "-t", "1.000000", "-i"]
+    assert "-ss" not in video[at - 7:at]
+    audio = final_export.program_audio_input_args(Path("/media"), table)
+    assert any(item.startswith("anullsrc=") for item in audio)
+    assert card not in audio
+    graph = final_export.build_program_audio_filter(table, apply_loudness=False)
+    assert "[1:a]" in graph
 
 
 def test_failed_segment_cleans_temp_files_and_partial_output() -> None:
@@ -1233,5 +1391,9 @@ if __name__ == "__main__":
     test_fast_init_failure_retries_once_with_one_filter_thread()
     test_memory_cap_kills_the_segment_without_retry()
     test_footprint_text_is_phys_footprint_in_gb()
+    test_thread_retry_times_the_segment_not_its_audio_companion()
+    test_frame_count_uses_header_only_after_segment_one_agrees()
+    test_wind_chain_keeps_every_wipe_frame()
+    test_still_insert_loops_picture_and_feeds_silence()
     test_failed_segment_cleans_temp_files_and_partial_output()
     print("ok")

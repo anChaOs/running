@@ -49,7 +49,7 @@ subs: done，且时间表已冻结、logs/todo.md 允许导出
               → 缺的透明层或响度自己补上
               → 大约 120 秒一段。段界不切断风刮或 xfade
               → 每一段只打开自己用到的原片；窗口 alpha 在这一段里收成一条再叠一次
-              → 每段只出画面：烧字幕，hevc_videotoolbox。第一段和整片音频并行
+              → 每段只出画面：烧字幕，hevc_videotoolbox。音频一直留到它自己编完
               → 画面流拷贝接起来，配上这一条 AAC。不把 hud-renders/keeps/ 当画面
               → YYYY-MM-DD-run-final.mp4
 
@@ -76,7 +76,7 @@ subs: done，且时间表已冻结、logs/todo.md 允许导出
   --expect-duration <当时的成片秒数> --role graphic
 ```
 
-**唯一最终导出入口：** `tools/assemble/final_export.py --confirmed`。它不读取 HUD preview、review preview、close-stats 或 `hud-renders/keeps/`。有 `logs/program.json` 时按那张表分段编码：大约 120 秒一段，段界不切断风刮或 xfade，每一段只出画面并烧字幕，`hevc_videotoolbox`。整片音频用和测响度同一张图混一次，和第一段画面并行。画面流拷贝接起来，再配上这一条音频。透明层或响度测量对不上当前表时，这条命令先补再编码。没有这张表时仍走旧的整段原片路径。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 不属于新流程。不要先导出无字幕成片，再烧字，再改响度。
+**唯一最终导出入口：** `tools/assemble/final_export.py --confirmed`。它不读取 HUD preview、review preview、close-stats 或 `hud-renders/keeps/`。有 `logs/program.json` 时按那张表分段编码：大约 120 秒一段，段界不切断风刮或 xfade，每一段只出画面并烧字幕，`hevc_videotoolbox`。整片音频用和测响度同一张图混一次。响度没测好就和第一段画面一起测，测完再开音频编码，不挡画面；音频一直留在内存监控里直到结束。画面流拷贝接起来，再配上这一条音频。透明层或响度测量对不上当前表时，这条命令先补再编码。没有这张表时仍走旧的整段原片路径。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 不属于新流程。不要先导出无字幕成片，再烧字，再改响度。
 
 **人工字幕门闩不能跳过：** `subtitles.txt` 是唯一源稿。用户确认前保持 `subs: waiting-review`，不能最终导出；用户确认后才写 `subs: done`，再执行 `final_export.py --confirmed`。对口型前时间表必须 `frozen`。改了刀点、冷开场或插入段之后，旧字幕作废，必须按新表重对齐，不能假定还对准。
 

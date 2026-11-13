@@ -3,7 +3,8 @@
 
 有时间表时，确认导出仍是一条命令、一个成片文件。画面按大约两分钟分段编码，
 段界不切断风刮或 xfade；每一段只出画面。整片音频用和测响度同一张图混一次、
-编一次 AAC，和第一段画面并行。最后把画面段流拷贝接起来，配上这一条音频。
+编一次 AAC。响度还没测好时，测量和第一段画面一起跑，测完再开音频编码，不挡画面。
+音频进程一直留在内存监控里，直到它自己结束。最后把画面段流拷贝接起来，配上这一条音频。
 
 同一段里，一条原片只打开一次：`-ss` 到这段最早的入点，多段句间刀用 select 丢掉
 空隙，不再 split。split 会把还没读到的输出垫住，解码帧一直留到这段结束，16GB
@@ -19,6 +20,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +51,10 @@ import assemble_episode as assemble  # noqa: E402
 DATE_STATS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-stats-\d+$")
 RAW_STATS_HINTS = ("screenshot", "coros", "截图")
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def _is_still_image(name: str) -> bool:
+    return Path(name).suffix.lower() in IMAGE_EXT
 RAW_CLIP_PARTS = (
     "run-final",
     "hud-preview",
@@ -335,7 +341,9 @@ def wind_chain(src: str, dst: str, duration: float, width: int, height: int, fps
     return (
         f"color=c=black:s={width}x{height}:d={t}:r={fps},setsar=1,settb=1/{fps}[{bg}];"
         f"[{src}]dblur=angle=0:radius=46,setsar=1[{blur}];"
-        f"[{bg}][{blur}]overlay=x='{x}':y=0:shortest=1,{fade},fps={fps},settb=1/{fps},format=yuv420p[{dst}]"
+        f"[{bg}][{blur}]overlay=x='{x}':y=0:shortest=1,{fade},"
+        f"setpts=N/{fps}/TB,settb=1/{fps},trim=end_frame={max(1, int(round(float(duration) * fps)))},"
+        f"format=yuv420p[{dst}]"
     )
 
 
@@ -631,7 +639,7 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=None,
         help="补画 HUD 透明层的并行路数，默认 2。不改变确认导出的分段编码。"
-        "8 核机器建议 6，留 1 到 2 核给系统和写 mov 的 ffmpeg",
+        "16GB 机器保持默认；不要把路数开到把内存占满",
     )
     args = parser.parse_args(argv)
     try:
@@ -693,7 +701,7 @@ def clip_openings(slices: list[dict], break_before: set[int] | None = None) -> l
         start = float(sl["src_start_s"])
         clip = str(sl["clip"])
         slot = active.get(clip)
-        if slot is not None and index not in breaks:
+        if slot is not None and index not in breaks and not _is_still_image(clip):
             previous = openings[slot]
             last = slices[previous.slices[-1]]
             if start >= float(last["src_end_s"]) - 1e-6:
@@ -743,7 +751,12 @@ def _source_pads(
     windows: list[tuple[float, float]] = [(0.0, 0.0)] * len(slices)
     for input_index, opening in enumerate(openings):
         for index in opening.slices:
-            windows[index] = slice_trim_window(slices[index], opening.seek_s)
+            sl = slices[index]
+            if _is_still_image(str(sl["clip"])):
+                # 静图用 -loop 从 0 生成这一段时长，不按原片时间 seek。
+                windows[index] = (0.0, float(sl["src_end_s"]) - float(sl["src_start_s"]))
+            else:
+                windows[index] = slice_trim_window(sl, opening.seek_s)
         if len(opening.slices) == 1:
             index = opening.slices[0]
             video_pads[index] = f"{input_index}:v"
@@ -775,9 +788,32 @@ def _opening_limit_args(opening: ClipOpening, slices: list[dict]) -> list[str]:
     return args + ["-t", f"{end - start + _INPUT_TAIL_S:.6f}"]
 
 
-def _clip_input_args(media_dir: Path, slices: list[dict]) -> list[str]:
+def _still_duration_s(opening: ClipOpening, slices: list[dict]) -> float:
+    return sum(float(slices[index]["src_end_s"]) - float(slices[index]["src_start_s"]) for index in opening.slices)
+
+
+def _still_video_args(media_dir: Path, opening: ClipOpening, slices: list[dict], fps: int) -> list[str]:
+    """静图没有时间轴。按这一段的时长循环一帧，不 seek。"""
+    return [
+        "-loop", "1", "-framerate", str(fps), "-t", f"{_still_duration_s(opening, slices):.6f}",
+        "-i", str(media_dir / opening.clip),
+    ]
+
+
+def _still_audio_args(opening: ClipOpening, slices: list[dict], sample_rate: int) -> list[str]:
+    """静图没有音轨。这段用同样时长的静音，避免音频图去读 [i:a]。"""
+    return [
+        "-f", "lavfi", "-t", f"{_still_duration_s(opening, slices):.6f}",
+        "-i", f"anullsrc=channel_layout=stereo:sample_rate={sample_rate}",
+    ]
+
+
+def _clip_input_args(media_dir: Path, slices: list[dict], *, sample_rate: int = 48000) -> list[str]:
     args: list[str] = []
     for opening in clip_openings(slices):
+        if _is_still_image(opening.clip):
+            args.extend(_still_audio_args(opening, slices, sample_rate))
+            continue
         # 只跳过这段最早入点之前的画面。刀和刀之间的空隙仍会解码再丢掉。
         # 和滤镜里「seek 之后从 0 量」是一对，不能只改一边。
         args.extend(_opening_limit_args(opening, slices))
@@ -1220,7 +1256,11 @@ def loudness_reusable(saved: dict | None, table: dict) -> bool:
 
 def program_audio_input_args(media_dir: Path, table: dict, spec: ExportSpec = FINAL_SPEC) -> list[str]:
     """测响度只解码成片用到的音频。不读透明层、贴图或字幕。同一条原片只打开一次。"""
-    args = _clip_input_args(media_dir, edl.export_slices(table, spec.timeline.fps))
+    args = _clip_input_args(
+        media_dir,
+        edl.export_slices(table, spec.timeline.fps),
+        sample_rate=spec.timeline.sample_rate,
+    )
     if edl.wind_transitions(table):
         if not WHOOSH_PATH.is_file():
             raise SystemExit(f"wind transitions need whoosh audio: {WHOOSH_PATH}")
@@ -1278,6 +1318,17 @@ def build_program_audio_filter(
     if "subtitles=" in graph:
         raise ValueError("loudness graph must not burn subtitles")
     return graph
+
+
+def measure_program_cmd(media_dir: Path, table: dict) -> list[str]:
+    """测响度的命令。和成片音频同一张图，只写到 null，不挡画面编码。"""
+    graph = build_program_audio_filter(table, measured=None)
+    return [
+        "ffmpeg", "-hide_banner", "-nostats", "-nostdin",
+        "-filter_complex_threads", "2",
+        *program_audio_input_args(media_dir, table),
+        "-filter_complex", graph, "-map", "[a]", "-f", "null", "-",
+    ]
 
 
 def measure_program_loudness(media_dir: Path, table: dict) -> dict[str, str] | None:
@@ -1361,6 +1412,9 @@ def program_input_args(
     wind_ids = {str(item["before_id"]) for item in edl.wind_transitions(table)}
     args: list[str] = []
     for opening in program_openings(timeline, wind_ids):
+        if _is_still_image(opening.clip):
+            args.extend(_still_video_args(media_dir, opening, timeline, fps))
+            continue
         args.extend(_opening_limit_args(opening, timeline))
         args.extend(["-i", str(media_dir / opening.clip)])
     for index, group in enumerate(confirmed_alpha_groups(table, alpha_paths, fps)):
@@ -1609,24 +1663,26 @@ def _rss_gb(pid: int) -> float:
 
 def parse_footprint_gb(text: str) -> float | None:
     """从 `footprint -p` 的输出里读 phys_footprint，单位换成 GB。读不到就返回 None。"""
+    scale = {
+        "": 1.0, "B": 1.0, "BYTES": 1.0,
+        "KB": 1024.0, "KIB": 1024.0,
+        "MB": 1024.0 ** 2, "MIB": 1024.0 ** 2,
+        "GB": 1024.0 ** 3, "GIB": 1024.0 ** 3,
+        "TB": 1024.0 ** 4, "TIB": 1024.0 ** 4,
+    }
     for line in text.splitlines():
         if not re.search(r"phys_footprint\b", line, re.I):
             continue
         if re.search(r"peak", line, re.I):
             continue
-        match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(bytes|[KMGT]B|B)?", line, re.I)
+        match = re.search(r"([0-9][0-9,]*(?:\.[0-9]+)?)\s*(bytes|[KMGT]i?B|B)?", line, re.I)
         if match is None:
             continue
-        value = float(match.group(1))
+        value = float(match.group(1).replace(",", ""))
         unit = (match.group(2) or "").upper()
-        scale = {"": 1.0, "B": 1.0, "BYTES": 1.0, "KB": 1024.0, "MB": 1024.0 ** 2, "GB": 1024.0 ** 3}
         if unit not in scale:
             continue
         # 没有单位、数字又很大时，footprint 打的是字节。
-        if unit in ("", "B", "BYTES") and value >= 1024:
-            return value / (1024.0 ** 3)
-        if unit in ("", "B", "BYTES"):
-            return value / (1024.0 ** 3)
         return value * scale[unit] / (1024.0 ** 3)
     return None
 
@@ -1645,59 +1701,66 @@ def _footprint_gb(pid: int) -> float | None:
 
 
 def _process_memory_gb(pid: int) -> tuple[float, str]:
-    """macOS 上有 footprint 就读 phys_footprint，否则用 ps RSS。返回 (GB, 名字)。"""
+    """macOS 上有 footprint 就读 phys_footprint，否则用 ps RSS。返回 (GB, 名字)。
+
+    解析结果接近 0 或读失败时退回 RSS，避免把一次失败的 footprint 当成进程没占内存。
+    """
     footprint = _footprint_gb(pid)
-    if footprint is not None:
+    if footprint is not None and footprint >= 0.001:
         return footprint, "footprint"
     return _rss_gb(pid), "rss"
 
 
-def _watch_group(items: list[tuple[subprocess.Popen, str]], cap_gb: float = SEGMENT_RSS_CAP_GB) -> None:
-    """盯着一组已经启动的 ffmpeg。每两秒加一次内存，合计超过上限就全杀掉，不重试。"""
-    peaks = {id(proc): 0.0 for proc, _label in items}
-    kinds = {id(proc): "rss" for proc, _label in items}
-    started = {id(proc): time.monotonic() for proc, _label in items}
-    finished: dict[int, float] = {}
+def _watch_primary(
+    primary: subprocess.Popen,
+    label: str,
+    companions: list[tuple[subprocess.Popen, str]] | None = None,
+    cap_gb: float = SEGMENT_RSS_CAP_GB,
+) -> float:
+    """盯着主进程直到它自己退出，返回它的墙钟秒数。
+
+    同伴（整片音频、测响度）只参加内存合计，不挡住返回。合计超过上限就全杀掉，不重试。
+    15 秒的滤镜线程退回只看主进程这段时间，不能把音频的耗时算进去。
+    """
+    items = [(primary, label), *(companions or [])]
+    peaks = {id(proc): 0.0 for proc, _name in items}
+    kinds = {id(proc): "rss" for proc, _name in items}
+    started = time.monotonic()
     killed = False
     next_sample = time.monotonic()
-    while True:
-        alive = [(proc, label) for proc, label in items if proc.poll() is None]
-        for proc, _label in items:
-            if proc.poll() is not None and id(proc) not in finished:
-                finished[id(proc)] = time.monotonic()
-        if not alive:
-            break
+    while primary.poll() is None:
+        alive = [(proc, name) for proc, name in items if proc.poll() is None]
         now = time.monotonic()
-        if now >= next_sample:
+        if now >= next_sample and alive:
             total = 0.0
-            for proc, _label in alive:
+            for proc, _name in alive:
                 gb, kind = _process_memory_gb(proc.pid)
                 peaks[id(proc)] = max(peaks[id(proc)], gb)
                 kinds[id(proc)] = kind
                 total += gb
             if total > cap_gb and not killed:
-                names = ", ".join(label for _proc, label in alive)
+                names = ", ".join(name for _proc, name in alive)
                 print(
                     f"memory {total:.1f}GB > cap {cap_gb:.1f}GB ({names}), killing; not retrying",
                     flush=True,
                 )
-                for proc, _label in alive:
+                for proc, _name in alive:
                     proc.kill()
                 killed = True
             next_sample = now + _RSS_POLL_S
         try:
-            alive[0][0].wait(timeout=max(0.05, min(_RSS_POLL_S, next_sample - time.monotonic())))
+            primary.wait(timeout=max(0.05, min(_RSS_POLL_S, next_sample - time.monotonic())))
         except subprocess.TimeoutExpired:
             pass
-    for proc, label in items:
-        wall = finished.get(id(proc), time.monotonic()) - started[id(proc)]
-        kind = kinds[id(proc)]
-        print(
-            f"{label}: rc={proc.returncode} peak_{kind}={peaks[id(proc)]:.2f}GB wall={wall:.1f}s",
-            flush=True,
-        )
+    wall = time.monotonic() - started
+    kind = kinds[id(primary)]
+    print(
+        f"{label}: rc={primary.returncode} peak_{kind}={peaks[id(primary)]:.2f}GB wall={wall:.1f}s",
+        flush=True,
+    )
     if killed:
         raise SystemExit(f"export exceeded the {cap_gb:.1f}GB memory cap; not retrying")
+    return wall
 
 
 def _run_segment_encode(
@@ -1705,17 +1768,16 @@ def _run_segment_encode(
     label: str = "segment",
     companions: list[tuple[subprocess.Popen, str]] | None = None,
 ) -> None:
-    companions = list(companions or [])
-    started = time.monotonic()
+    companions = [(peer, name) for peer, name in (companions or []) if peer.poll() is None]
     proc = subprocess.Popen(cmd)
-    _watch_group([(proc, label), *companions])
+    wall = _watch_primary(proc, label, companions)
     rc = proc.returncode
     if rc == 0:
         return
     threads = cmd[cmd.index("-filter_complex_threads") + 1]
-    # 负的返回码是信号（上一回是 SIGKILL）。内存超限已经在 _watch_group 里停掉，不会走到这里重试。
+    # 负的返回码是信号（上一回是 SIGKILL）。内存超限已经在 _watch_primary 里停掉，不会走到这里重试。
     still = [(peer, name) for peer, name in companions if peer.poll() is None]
-    if rc > 0 and threads != "1" and time.monotonic() - started < FILTER_THREAD_RETRY_S:
+    if rc > 0 and threads != "1" and wall < FILTER_THREAD_RETRY_S:
         print(
             "segment filter graph did not stay up; retrying with -filter_complex_threads 1",
             flush=True,
@@ -1723,15 +1785,49 @@ def _run_segment_encode(
         retry = list(cmd)
         retry[retry.index("-filter_complex_threads") + 1] = "1"
         proc = subprocess.Popen(retry)
-        _watch_group([(proc, label + " (threads 1)"), *still])
+        _watch_primary(proc, label + " (threads 1)", still)
         if proc.returncode != 0:
             raise subprocess.CalledProcessError(proc.returncode, retry)
         return
     raise subprocess.CalledProcessError(rc if rc is not None else 1, cmd)
 
 
-def probe_video_frames(path: Path) -> int:
-    """数这一段实际写出的视频帧。和计划差一帧就停，不要把累计漂移接到成片里。"""
+# 第一段对过帧头和逐帧数之后，后面的段沿用同一种数法。每次确认导出开始时清掉。
+_FRAME_COUNT_MODE: str | None = None
+
+
+def decide_frame_probe(header: int | None, counted: int | None, mode: str | None) -> tuple[int, str]:
+    """第一段 header 和逐帧数一致就改读帧头；不一致或帧头是 N/A 就继续逐帧数。"""
+    if mode is None:
+        if header is not None and counted is not None and header == counted:
+            return counted, "header"
+        if counted is None:
+            raise SystemExit("no video frames")
+        return counted, "count"
+    if mode == "header" and header is not None:
+        return header, "header"
+    if counted is None:
+        raise SystemExit("no video frames")
+    return counted, "count"
+
+
+def _header_nb_frames(path: Path) -> int | None:
+    raw = subprocess.check_output(
+        [
+            "ffprobe", "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=nb_frames", "-of", "default=nw=1:nk=1", str(path),
+        ],
+        text=True,
+    ).strip()
+    if not raw or raw.upper() == "N/A":
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _count_frames(path: Path) -> int:
     raw = subprocess.check_output(
         [
             "ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
@@ -1739,13 +1835,39 @@ def probe_video_frames(path: Path) -> int:
         ],
         text=True,
     ).strip()
-    if not raw:
+    if not raw or raw.upper() == "N/A":
         raise SystemExit(f"no video frames in {path}")
     return int(raw)
 
 
-def _require_segment_frames(path: Path, expected: int) -> None:
-    got = probe_video_frames(path)
+def probe_video_frames(path: Path, *, first: bool = False) -> int:
+    """数这一段实际写出的视频帧。和计划差一帧就停，不要把累计漂移接到成片里。
+
+    第一段同时读帧头 `nb_frames` 和逐帧数。两者一致时，后面的段只读帧头；
+    帧头是 N/A 再退回逐帧数。对不上就一直逐帧数。VideoToolbox 的编辑列表可能差一帧。
+    """
+    global _FRAME_COUNT_MODE
+    header = _header_nb_frames(path)
+    calibrate = first or _FRAME_COUNT_MODE is None
+    if calibrate or _FRAME_COUNT_MODE == "count" or header is None:
+        counted = _count_frames(path)
+    else:
+        counted = None
+    got, mode = decide_frame_probe(header, counted, None if calibrate else _FRAME_COUNT_MODE)
+    if calibrate:
+        why = f"header={header} count={counted}"
+        print(f"frame count: using {mode} ({why})", flush=True)
+        _FRAME_COUNT_MODE = mode
+    elif mode == "count" and _FRAME_COUNT_MODE == "header":
+        print(f"frame count: header nb_frames missing on {path.name}, using count_frames", flush=True)
+    return got
+
+
+def _require_segment_frames(path: Path, expected: int, *, first: bool = False) -> None:
+    if first:
+        global _FRAME_COUNT_MODE
+        _FRAME_COUNT_MODE = None
+    got = probe_video_frames(path, first=first)
     if got != expected:
         raise SystemExit(f"{path.name} has {got} frames, plan is {expected}")
 
@@ -1822,6 +1944,7 @@ def program_audio_cmd(media_dir: Path, table: dict, measured: dict[str, str] | N
     graph = build_program_audio_filter(table, spec, measured=measured, apply_loudness=True)
     return [
         "ffmpeg", "-y", "-hide_banner", "-nostdin",
+        "-filter_complex_threads", "2",
         *program_audio_input_args(media_dir, table, spec),
         "-filter_complex", graph, "-map", "[a]", "-vn",
         *audio_codec_args(spec), "-f", "mp4", str(output),
@@ -1908,11 +2031,10 @@ def _export_from_program(args, media_dir: Path) -> int:
     work = tempfile.TemporaryDirectory(prefix="running-confirmed-")
     try:
         try:
-            measured = _loudness_for_export(media_dir, table, dry_run=args.dry_run)
-            if measured is not None and not args.dry_run:
-                todo_list.mark(media_dir, "loudness-measure", "done")
-            elif not args.dry_run:
-                print("Loudnorm pass 1 skipped; encode will use single-pass loudnorm", flush=True)
+            global _FRAME_COUNT_MODE
+            _FRAME_COUNT_MODE = None
+            saved = read_loudness(media_dir)
+            measured: dict[str, str] | None = None
             segments = plan_confirmed_segments(table, fps)
             work_dir = Path(work.name)
             print(
@@ -1922,14 +2044,91 @@ def _export_from_program(args, media_dir: Path) -> int:
             )
             segment_paths: list[Path] = []
             audio_path = work_dir / "program-audio.m4a"
-            audio_cmd = program_audio_cmd(media_dir, table, measured, audio_path)
-            # 整片音频和第一段画面一起跑。音频大约 0.2GB，第一段画面大约 1–2GB，合计仍在 8GB 内。
-            print("$", " ".join(audio_cmd), flush=True)
+            audio_cmd: list[str] | None = None
+            measure_cmd: list[str] | None = None
             audio_proc: subprocess.Popen | None = None
-            if not args.dry_run:
-                audio_proc = subprocess.Popen(audio_cmd)
+            measure_proc: subprocess.Popen | None = None
+
+            def _companions() -> list[tuple[subprocess.Popen, str]]:
+                group: list[tuple[subprocess.Popen, str]] = []
+                if measure_proc is not None and measure_proc.poll() is None:
+                    group.append((measure_proc, "loudness-measure"))
+                if audio_proc is not None and audio_proc.poll() is None:
+                    group.append((audio_proc, "program audio"))
+                return group
+
+            def _start_audio(measured_now: dict[str, str] | None) -> None:
+                nonlocal audio_cmd, audio_proc, measured
+                if audio_cmd is not None:
+                    return
+                measured = measured_now
+                audio_cmd = program_audio_cmd(media_dir, table, measured, audio_path)
+                print("$", " ".join(audio_cmd), flush=True)
+                if not args.dry_run:
+                    audio_proc = subprocess.Popen(audio_cmd)
+
+            def _consume_measure() -> bool:
+                nonlocal measure_proc
+                if measure_proc is None or measure_proc.poll() is None:
+                    return False
+                thread = getattr(measure_proc, "_stderr_thread", None)
+                if thread is not None:
+                    thread.join()
+                buf = getattr(measure_proc, "_stderr_buf", None)
+                err = buf[0] if buf else ""
+                if not err and getattr(measure_proc, "stderr", None) is not None:
+                    err = measure_proc.stderr.read() or ""
+                rc = measure_proc.returncode
+                measure_proc = None
+                if rc != 0:
+                    raise subprocess.CalledProcessError(rc if rc is not None else 1, measure_cmd or [])
+                parsed = parse_loudnorm(err)
+                if parsed is None:
+                    raise SystemExit("Loudnorm pass 1: could not parse loudnorm JSON")
+                print(f"Loudnorm pass 1: I={parsed['input_i']} TP={parsed['input_tp']}", flush=True)
+                write_loudness(media_dir, table, parsed)
+                todo_list.mark(media_dir, "loudness-measure", "done")
+                _start_audio(parsed)
+                return True
+
+            if loudness_reusable(saved, table):
+                reused = saved["measured"] if saved is not None else None
+                print(f"Loudnorm pass 1 reused I={reused['input_i']}", flush=True)
+                if not args.dry_run:
+                    todo_list.mark(media_dir, "loudness-measure", "done")
+                _start_audio(reused)
+            elif args.dry_run:
+                print(
+                    "would measure program loudness beside the first picture segment; "
+                    "subtitles are not an input",
+                    flush=True,
+                )
+                _start_audio(None)
+            else:
+                measure_cmd = measure_program_cmd(media_dir, table)
+                print("$", " ".join(measure_cmd), flush=True)
+                print(
+                    "Loudnorm pass 1 running beside the first picture segment; "
+                    "audio encode starts when it finishes",
+                    flush=True,
+                )
+                measure_proc = subprocess.Popen(
+                    measure_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+                )
+                stderr_buf: list[str] = []
+
+                def _read_measure() -> None:
+                    if measure_proc is not None and measure_proc.stderr is not None:
+                        stderr_buf.append(measure_proc.stderr.read())
+
+                reader = threading.Thread(target=_read_measure, daemon=True)
+                reader.start()
+                measure_proc._stderr_buf = stderr_buf  # type: ignore[attr-defined]
+                measure_proc._stderr_thread = reader  # type: ignore[attr-defined]
             try:
                 for index, seg in enumerate(segments):
+                    if not args.dry_run:
+                        _consume_measure()
                     seg_path = work_dir / f"seg-{index:03d}.mp4"
                     cmd = confirmed_segment_cmd(
                         media_dir, table, seg, alpha_paths, modes, cues, measured,
@@ -1944,22 +2143,28 @@ def _export_from_program(args, media_dir: Path) -> int:
                     )
                     print("$", " ".join(cmd), flush=True)
                     if not args.dry_run:
-                        companions = []
-                        if index == 0 and audio_proc is not None and audio_proc.poll() is None:
-                            companions = [(audio_proc, "program audio")]
                         _run_segment_encode(
-                            cmd, f"segment {index + 1}/{len(segments)}", companions=companions,
+                            cmd, f"segment {index + 1}/{len(segments)}", companions=_companions(),
                         )
-                        if index == 0 and audio_proc is not None and audio_proc.poll() is None:
-                            _watch_group([(audio_proc, "program audio")])
                         if audio_proc is not None and audio_proc.returncode not in (0, None):
-                            raise subprocess.CalledProcessError(audio_proc.returncode, audio_cmd)
-                        _require_segment_frames(seg_path, seg.frames)
+                            raise subprocess.CalledProcessError(audio_proc.returncode, audio_cmd or [])
+                        _consume_measure()
+                        _require_segment_frames(seg_path, seg.frames, first=(index == 0))
                     segment_paths.append(seg_path)
+                if not args.dry_run:
+                    if measure_proc is not None and measure_proc.poll() is None:
+                        _watch_primary(measure_proc, "loudness-measure", [])
+                    _consume_measure()
+                    if audio_proc is not None and audio_proc.poll() is None:
+                        _watch_primary(audio_proc, "program audio", [])
+                    if audio_proc is None or audio_proc.returncode not in (0, None):
+                        code = 1 if audio_proc is None or not audio_proc.returncode else audio_proc.returncode
+                        raise subprocess.CalledProcessError(code, audio_cmd or [])
             finally:
-                if audio_proc is not None and audio_proc.poll() is None:
-                    audio_proc.kill()
-                    audio_proc.wait()
+                for proc in (measure_proc, audio_proc):
+                    if proc is not None and proc.poll() is None:
+                        proc.kill()
+                        proc.wait()
             listing = work_dir / "segments.ffconcat"
             _write_alpha_concat(tuple(segment_paths), listing)
             join = mux_final_cmd(listing, audio_path, output)
