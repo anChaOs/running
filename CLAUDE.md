@@ -81,21 +81,15 @@ inbox 碎片 / 灵光一闪 → skill `p3-library` 进主题库 → 有拍摄日
 
 默认模板 `tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml`：带地图，不放右上角。无地图版是 `...-landscape.xml`。默认字体 `/System/Library/Fonts/SFCompactRounded.ttf` 的 Black 字重，字色纯白、无描边。温度写 `°C`，不要写 `℃`（字体没有这个字）。右下是运动时长、日期、当天时间、`气温 °C / 体感 °C`、湿度；不再显示 GPS。运动时长用 FIT timer 起停，不含暂停。天气用 `--weather-city shanghai`（FIT 时间窗 + 上海城市场点，不发 GPS）；不需要时加 `--no-weather`。跑鞋 `-sk` 查 `training/logs/shoes.md`。默认把文件 `mtime` 当视频结束时间再对齐 FIT。HUD 优先加在 `run-*`，一般不加 `open`/`close`。生产默认出透明图层 `*-hud-alpha.mov`（`--overlay-only`）。看效果加 `--preview`，按原片同档（编码/码率/分辨率）叠成 `*-hud-preview.mp4`，不降码。不加这些 flag 仍会把 HUD 烤进 mp4。
 
+成片先记 `logs/program.json`（原片时钟和成片时间表），预览按这张表轻拼。记录 HUD 时不要加 `--preview`。时间表冻结后，用户校对字幕（只改错字和换行）可以和准备并行：`--prep-alpha` 按留下的入出点直接画透明层。8 核机器加 `-j 6`（默认仍是 2），留 1–2 核给系统和写 mov 的 ffmpeg；同一条原片加载一次 FIT。可选 `--measure-only` 测成片混音。确认字幕后只跑一次 `final_export.py --confirmed`，烧字幕并套用已测响度。默认透明层 `qtrle`。
+
 ```bash
 .venv/bin/python tools/hud/probe_video_times.py \
   ~/Movies/running-content/YYYY-MM-DD-topic/YYYY-MM-DD-run-a.mp4
 
 .venv/bin/python tools/hud/render_running_hud.py \
   --media-dir ~/Movies/running-content/YYYY-MM-DD-topic \
-  --overlay-only \
-  --preview \
-  --weather-city shanghai \
-  --dry-run
-
-.venv/bin/python tools/hud/render_running_hud.py \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-topic \
-  --overlay-only \
-  --preview \
+  --record-only \
   --weather-city shanghai \
   -sn Cumulus \
   -sk 642

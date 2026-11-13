@@ -38,6 +38,28 @@ def expect_exit(call, fragment: str) -> None:
         raise AssertionError(f"expected SystemExit containing {fragment!r}")
 
 
+def test_encode_cmd_limits_filter_complex_threads() -> None:
+    plan = final.InputPlan(
+        ("-ss", "1.500000", "-i", "clip.mp4", "-i", "alpha.mov"),
+        1,
+        (1,),
+        (),
+        0.0,
+    )
+    graph = "[0:v]null[v];[0:a]anull[a]"
+    out = Path("out.mp4")
+    for extra in ({}, {"test_codec": "libx264"}):
+        cmd = final.build_encode_cmd(plan, graph, out, **extra)
+        flag = cmd.index("-filter_complex_threads")
+        assert cmd[flag + 1] == "1"
+        assert flag < cmd.index("-i")
+        assert flag < cmd.index("-filter_complex")
+        assert "-filter_threads" not in cmd
+        assert "-threads" not in cmd
+    hevc = final.build_encode_cmd(plan, graph, out)
+    assert hevc[hevc.index("-c:v") + 1] == "hevc_videotoolbox"
+
+
 def test_specs() -> None:
     assert (FINAL_SPEC.timeline.width, FINAL_SPEC.timeline.height, FINAL_SPEC.timeline.fps) == (1920, 1080, 30)
     assert FINAL_SPEC.vcodec == "hevc_videotoolbox"
@@ -78,6 +100,24 @@ def _done_assets(episode: Path, *, subs: str = "done") -> None:
         encoding="utf-8",
     )
     (episode / "subtitles.txt").write_text("0:00:00.00–0:00:01.00  hi\n", encoding="utf-8")
+
+
+def test_final_qc_shape() -> None:
+    import final_qc
+
+    ok = {
+        "n_video": 1,
+        "n_audio": 1,
+        "duration": 10.0,
+        "video": {"codec": "hevc", "width": 1920, "height": 1080, "fps": 30.0, "tag": "hvc1"},
+        "audio": {"codec": "aac"},
+    }
+    assert final_qc.check_final(ok, expected_duration=10.0, loudness_i=-16.0) == []
+    bad = {**ok, "video": {**ok["video"], "tag": "hev1"}, "n_audio": 2}
+    problems = final_qc.check_final(bad, expected_duration=10.0, loudness_i=-20.0)
+    assert any("tag" in item for item in problems)
+    assert any("audio" in item for item in problems)
+    assert any("loudness" in item for item in problems)
 
 
 def test_final_gate_and_source_rejection() -> None:
@@ -471,6 +511,7 @@ def test_five_run_graph_uses_frame_aligned_winds() -> None:
 
 
 if __name__ == "__main__":
+    test_encode_cmd_limits_filter_complex_threads()
     test_specs()
     test_4k_timeline_loads_from_config()
     test_final_gate_and_source_rejection()
@@ -483,6 +524,7 @@ if __name__ == "__main__":
     test_review_preview_rejected_as_source_and_overlay()
     test_final_rejects_intermediate_overlays_before_input_plan()
     test_overlay_time_rejects_nonfinite_and_negative()
+    test_final_qc_shape()
     test_wind_and_xfade_snap_to_whole_frames()
     test_five_run_close_xfade_keeps_full_close()
     test_five_run_graph_uses_frame_aligned_winds()

@@ -20,7 +20,13 @@ description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/�
    - 标题名烧字成片 `.mp4`（已 MOVE 进 `upload/`，根目录无第二份）  
    - `cover-4x3-1920x1440.jpg`（另两张可并存，**投稿只用这张**）  
    - 可选 `subtitles.srt`（biliup 本次不挂外挂；创作中心可后补）
-2. `plan.md` 已有标题 +「### B 站」简介
+2. `plan.md` 已有标题 +「### B 站」简介。投稿前先数简介字数，超过 2000 字就停：
+
+```bash
+.venv/bin/python tools/publish/pack_upload.py --check-desc /tmp/bilibili-desc.txt
+```
+
+字数按 Python 的 Unicode 码位算。通过后才能 `biliup upload`。成功拿到 BV 之后，`todo_list.py mark bilibili done`（打包没完成时这条会拒绝）。
 3. Mac 上已装 `biliup`（`~/.local/bin/biliup`，PATH 含该目录）
 4. Cookie：`~/Movies/running-content/.biliup/cookies.json`  
    - 没有或 `renew`/`upload` 报登录失效 → 先登录（见下）

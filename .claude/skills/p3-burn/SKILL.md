@@ -5,7 +5,7 @@ description: 已废弃的旧烧字入口。最终字幕、响度和画面必须�
 
 # 已废弃
 
-正式流程不再使用 `burn_ass.py`。字幕源是 `episodes/YYYY-MM-DD-slug/subtitles.txt`，人工确认后由 `tools/assemble/final_export.py --confirmed` 临时生成 ASS，并在唯一最终编码中完成字幕和响度。
+正式流程不再使用 `burn_ass.py`。字幕源是 `episodes/YYYY-MM-DD-slug/subtitles.txt`，人工确认后由 `tools/assemble/final_export.py --confirmed` 按 `logs/program.json` 临时生成 ASS，并在唯一最终编码中完成裁切、HUD、字幕和响度。
 
 不要：
 
