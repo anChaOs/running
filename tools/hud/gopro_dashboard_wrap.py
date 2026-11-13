@@ -839,18 +839,17 @@ def _install_hud_range_window(start_s: str, end_s: str) -> None:
             self._inner = inner
 
         def steps(self):
-            yielded = False
-            for tick in self._inner.steps():
-                if tick < start_t:
-                    continue
-                if tick >= end_t:
-                    break
-                yielded = True
-                yield tick
-            if not yielded:
-                raise SystemExit(f"HUD range {start_s}..{end_s} contains no frames")
+            # 和 render_running_hud.kept_source_steps 同一套窗口。短于 0.1 秒、
+            # 落在两个取样点之间时补上起点，避免整段渲染退出。
+            from hud_window import iter_kept_ticks
+
+            try:
+                yield from iter_kept_ticks(self._inner.steps(), start_t, end_t)
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
 
         def __len__(self):
+            # 内层 steps() 每次调用都重新从头生成，多走一遍只数帧数，不会把渲染吃掉。
             return sum(1 for _ in self.steps())
 
     def stepper(self, step):

@@ -138,6 +138,62 @@ def edl_copy(value):
     return json.loads(json.dumps(value))
 
 
+def test_short_keep_between_hud_ticks_still_has_one_sample() -> None:
+    """最短语音 0.08 秒，可能落在 0.1 秒取样点之间。不能因为一帧都没有就退出。"""
+    ticks = [index / 10 for index in range(20)]
+    kept = hud.kept_source_steps(ticks, 1.02, 1.10)
+    assert kept == [1.02]
+    normal = hud.kept_source_steps([12.4, 12.5, 18.2, 18.25], 12.5, 18.25)
+    assert normal == [12.5, 18.2]
+    try:
+        hud.kept_source_steps(ticks, 1.10, 1.02)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("empty HUD window should fail")
+
+
+def test_prep_alpha_reaches_render_main_without_jobs_clash() -> None:
+    """--prep-alpha 的非 dry-run 会进 _render_main。jobs 不能同时当任务列表和并行路数。"""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        media, _episode = _stage(root, _table(partial=True), subs="waiting-review")
+        (media / "2026-01-02-run-data.fit").write_bytes(b"fit")
+        (media / "weather-hourly.json").write_text('{"hours":[]}\n', encoding="utf-8")
+        seen: list[dict] = []
+
+        def _write(**kwargs):
+            dest = Path(kwargs["output_path"])
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(b"alpha")
+            seen.append(kwargs)
+
+        venv_python = hud.REPO_ROOT / ".venv" / "bin" / "python"
+        real_exists = Path.exists
+
+        def _exists(self):
+            if self == venv_python:
+                return True
+            return real_exists(self)
+
+        with (
+            patch.object(hud, "_probe_duration", return_value=100.0),
+            patch.object(hud, "resolve_total_distance_meters", return_value=None),
+            patch.object(hud, "render_one_clip", side_effect=_write),
+            patch.object(Path, "exists", _exists),
+        ):
+            assert hud.main(["--media-dir", str(media), "--prep-alpha"]) == 0
+        assert len(seen) == 1
+        assert seen[0]["range_start"] == 12.0
+        assert seen[0]["range_end"] == 18.0
+        assert seen[0]["clip"].name == "2026-01-02-run-a.mp4"
+        assert "keeps" not in Path(seen[0]["output_path"]).parts
+        assert (media / "logs" / "hud-alpha.json").is_file()
+        assert not (media / "hud-renders" / "keeps").exists()
+        assert todo.load(media)["hud-render"] == "done"
+        assert todo.load(media)["subs"] == "waiting-review"
+
+
 def test_prep_runs_while_subtitles_are_still_open() -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -285,6 +341,8 @@ class _patches:
 if __name__ == "__main__":
     test_alpha_plan_does_not_need_keeps()
     test_loudness_reuse_allows_a_tiny_cut_only()
+    test_short_keep_between_hud_ticks_still_has_one_sample()
+    test_prep_alpha_reaches_render_main_without_jobs_clash()
     test_prep_runs_while_subtitles_are_still_open()
     test_confirmed_export_reuses_prep_and_encodes_once()
     test_confirmed_export_backfills_missing_prep_then_encodes_once()

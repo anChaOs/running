@@ -473,14 +473,11 @@ HUD_ALPHA_MANIFEST = "hud-alpha.json"
 
 def kept_source_steps(steps: list[float], start_s: float, end_s: float) -> list[float]:
     """原片时钟上的半开区间 [start, end)。透明层只画这些帧，不先裁出画面文件。"""
+    from hud_window import iter_kept_ticks
+
     start = float(start_s)
     end = float(end_s)
-    if end <= start:
-        raise ValueError(f"HUD keep range is empty: {start:.6f}..{end:.6f}")
-    kept = [float(step) for step in steps if start <= float(step) < end]
-    if not kept:
-        raise ValueError(f"HUD keep range {start:.6f}..{end:.6f} contains no frames")
-    return kept
+    return [float(tick) for tick in iter_kept_ticks((float(step) for step in steps), start, end)]
 
 
 def alpha_dest(media_dir: Path, job: dict, *, fps: int = 30) -> Path:
@@ -1142,7 +1139,7 @@ def _render_main(args) -> int:
             shoe_name=args.shoe_name,
             shoe_total_km_after_run=default_shoe_total_km_after_run,
             dry_run=args.dry_run,
-            jobs=args.jobs,
+            jobs_n=args.jobs,
         )
 
     if args.jobs < 1:
