@@ -506,6 +506,7 @@ def record_keeps(media_dir: Path, plans: list[dict]) -> None:
             todo_list.mark(media_dir, "subs", "stale")
         except ValueError as exc:
             print(f"todo subs not marked stale: {exc}")
+    todo_list.clear_prep(media_dir)
     try:
         todo_list.mark(media_dir, "edl", "done")
     except ValueError as exc:

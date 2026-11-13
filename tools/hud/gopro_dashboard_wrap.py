@@ -803,6 +803,72 @@ Overlay.__init__ = overlay_init
 map_widgets.OutLine.draw = _outline_draw
 map_widgets.Circuit.draw = _circuit_draw
 
+def _take_hud_range(argv: list[str]) -> tuple[list[str], str | None, str | None]:
+    """--hud-start/--hud-end 是本仓库加的，gopro-dashboard 不认识，先拿掉。"""
+    start = end = None
+    kept: list[str] = []
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if token == "--hud-start" and index + 1 < len(argv):
+            start = argv[index + 1]
+            index += 2
+            continue
+        if token == "--hud-end" and index + 1 < len(argv):
+            end = argv[index + 1]
+            index += 2
+            continue
+        kept.append(token)
+        index += 1
+    return kept, start, end
+
+
+def _install_hud_range_window(start_s: str, end_s: str) -> None:
+    """只把原片时钟上 [start, end) 的帧画进透明层。时间轴仍是整条原片，FIT 不用改。"""
+    from gopro_overlay.framemeta import FrameMeta
+    from gopro_overlay.timeunits import timeunits
+
+    if float(end_s) <= float(start_s):
+        raise SystemExit(f"HUD range is empty: {start_s}..{end_s}")
+    start_t = timeunits(seconds=float(start_s))
+    end_t = timeunits(seconds=float(end_s))
+    original = FrameMeta.stepper
+
+    class _RangedStepper:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def steps(self):
+            yielded = False
+            for tick in self._inner.steps():
+                if tick < start_t:
+                    continue
+                if tick >= end_t:
+                    break
+                yielded = True
+                yield tick
+            if not yielded:
+                raise SystemExit(f"HUD range {start_s}..{end_s} contains no frames")
+
+        def __len__(self):
+            return sum(1 for _ in self.steps())
+
+    def stepper(self, step):
+        return _RangedStepper(original(self, step))
+
+    FrameMeta.stepper = stepper
+
+
+_argv, _range_start, _range_end = _take_hud_range(sys.argv[1:])
+if _range_start is None:
+    _range_start = os.environ.get("HUD_RANGE_START") or None
+if _range_end is None:
+    _range_end = os.environ.get("HUD_RANGE_END") or None
+if (_range_start is None) != (_range_end is None):
+    raise SystemExit("HUD range needs both --hud-start and --hud-end")
+if _range_start is not None and _range_end is not None:
+    _install_hud_range_window(_range_start, _range_end)
+
 dashboard = Path(__file__).resolve().parent.parent.parent / ".venv" / "bin" / "gopro-dashboard.py"
-sys.argv = [str(dashboard), *sys.argv[1:]]
+sys.argv = [str(dashboard), *_argv]
 runpy.run_path(str(dashboard), run_name="__main__")

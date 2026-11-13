@@ -999,9 +999,11 @@ def main(argv: list[str] | None = None) -> int:
                 left, right = part.split("-", 1)
                 windows.append({"clip": args.clip, "src_start_s": float(left), "src_end_s": float(right)})
             save(media, upsert_keeps(table, windows))
+            todo_list.clear_prep(media)
         elif args.cmd == "adopt":
             table = load_or_init(media, args.episode)
             save(media, adopt_clips_on_disk(table, media))
+            todo_list.clear_prep(media)
             todo_list.mark(media, "edl", "done")
         elif args.cmd == "close-stats":
             table = load_media(media)
@@ -1015,7 +1017,10 @@ def main(argv: list[str] | None = None) -> int:
                 after = [round(float(seg["program_start_s"]), 4) for seg in table.get("program", [])]
                 if before and before != after:
                     table["subs_stale"] = True
-                save(media, table)
+                    save(media, table)
+                    todo_list.clear_prep(media)
+                else:
+                    save(media, table)
             if not any(seg["type"] == "run" for seg in table.get("program", [])):
                 raise SystemExit("program has no run segment")
             structural = [item for item in validate(table) if "stale" not in item]
@@ -1033,11 +1038,13 @@ def main(argv: list[str] | None = None) -> int:
                 overlay_profile=args.overlay_profile,
             ))
             todo_list.mark(media, "hud-record", "done")
+            todo_list.clear_prep(media, ("hud-render",))
         elif args.cmd == "lead":
             table = load_media(media)
             save(media, set_lead(table, {
                 "clip": args.clip, "src_start_s": args.start, "src_end_s": args.end, "hud": args.hud,
             }))
+            todo_list.clear_prep(media)
         elif args.cmd == "insert":
             table = load_media(media)
             save(media, add_insert(table, {
@@ -1045,6 +1052,7 @@ def main(argv: list[str] | None = None) -> int:
                 "src_end_s": args.end, "after_id": args.after_id,
                 "transition": args.transition,
             }))
+            todo_list.clear_prep(media)
         elif args.cmd == "overlay":
             table = load_media(media)
             save(media, add_overlay(table, {

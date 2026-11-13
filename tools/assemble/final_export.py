@@ -590,10 +590,15 @@ def measure_loudness(plan: InputPlan, graph: str) -> dict[str, str] | None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--media-dir", required=True)
-    parser.add_argument("--episode-dir", required=True)
+    parser.add_argument("--episode-dir")
     parser.add_argument("--subtitles", help="默认 <episode-dir>/subtitles.txt")
-    parser.add_argument("--out", required=True)
+    parser.add_argument("--out")
     parser.add_argument("--confirmed", action="store_true")
+    parser.add_argument(
+        "--measure-only",
+        action="store_true",
+        help="Measure loudnorm pass 1 from the frozen program mix. Does not write a final file and does not need confirmed subtitles",
+    )
     parser.add_argument("--test-codec", choices=("libx264",), help="仅隔离测试使用")
     parser.add_argument(
         "--overlays",
@@ -612,6 +617,12 @@ def main(argv: list[str] | None = None) -> int:
     except (AttributeError, OSError):
         pass
     media_dir = Path(args.media_dir).expanduser().resolve()
+    if args.measure_only:
+        with log_timeline.span(media_dir, "loudness-measure", enabled=not args.dry_run) as wall:
+            wall.rc = _measure_only(args, media_dir)
+            return wall.rc
+    if not args.episode_dir or not args.out:
+        raise SystemExit("final export requires --episode-dir and --out")
     with log_timeline.span(media_dir, "final-export", enabled=not args.dry_run) as wall:
         wall.rc = _export_episode(args)
         return wall.rc
@@ -841,6 +852,216 @@ def _program_overlay_chain(index: int, ov: dict, k: int, vin: str, vout: str, *,
     )
 
 
+# 刀点只挪了这么多秒时，沿用已测的响度。更大的时间表改动必须重测。
+TINY_LOUDNESS_DELTA_S = 1.0
+LOUDNESS_NAME = "loudness.json"
+
+
+def audio_signature(table: dict, fps: int = 30) -> dict:
+    """响度只看切点、风刮和 whoosh。字幕文字和时间不是输入。"""
+    timeline = edl.frame_timeline(table, fps)
+    return {
+        "duration_s": round(edl.frame_program_duration(table, fps), 3),
+        "slices": [
+            [sl["clip"], round(float(sl["src_start_s"]), 3), round(float(sl["src_end_s"]), 3)]
+            for sl in timeline
+        ],
+        "wind": [
+            [str(item.get("before_id")), round(float(item["duration_s"]), 3)]
+            for item in edl.wind_transitions(table)
+        ],
+    }
+
+
+def loudness_path(media_dir: Path) -> Path:
+    return media_dir / "logs" / LOUDNESS_NAME
+
+
+def read_loudness(media_dir: Path) -> dict | None:
+    path = loudness_path(media_dir)
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def write_loudness(media_dir: Path, table: dict, measured: dict[str, str]) -> Path:
+    path = loudness_path(media_dir)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": 1,
+        "tiny_delta_s": TINY_LOUDNESS_DELTA_S,
+        "signature": audio_signature(table),
+        "measured": measured,
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
+def loudness_reusable(saved: dict | None, table: dict) -> bool:
+    if not isinstance(saved, dict) or not isinstance(saved.get("measured"), dict):
+        return False
+    keys = ("input_i", "input_tp", "input_lra", "input_thresh", "target_offset")
+    if not all(key in saved["measured"] for key in keys):
+        return False
+    new = audio_signature(table)
+    old = saved.get("signature")
+    if old == new:
+        return True
+    if not isinstance(old, dict):
+        return False
+    old_slices = old.get("slices") or []
+    new_slices = new["slices"]
+    if not isinstance(old_slices, list) or len(old_slices) != len(new_slices):
+        return False
+    try:
+        if [row[0] for row in old_slices] != [row[0] for row in new_slices]:
+            return False
+        if len(old.get("wind") or []) != len(new["wind"]):
+            return False
+        duration_delta = abs(float(old.get("duration_s")) - float(new["duration_s"]))
+        shift = 0.0
+        for before, after in zip(old_slices, new_slices, strict=True):
+            shift += abs(float(before[1]) - float(after[1])) + abs(float(before[2]) - float(after[2]))
+    except (TypeError, ValueError, IndexError):
+        return False
+    return duration_delta <= TINY_LOUDNESS_DELTA_S and shift <= TINY_LOUDNESS_DELTA_S
+
+
+def program_audio_input_args(media_dir: Path, table: dict, spec: ExportSpec = FINAL_SPEC) -> list[str]:
+    """测响度只解码成片用到的音频。不读透明层、贴图或字幕。"""
+    args: list[str] = []
+    for sl in edl.export_slices(table, spec.timeline.fps):
+        start = float(sl["src_start_s"])
+        if source_is_seeked(start):
+            args.extend(["-ss", f"{start:.6f}"])
+        args.extend(["-i", str(media_dir / sl["clip"])])
+    if edl.wind_transitions(table):
+        if not WHOOSH_PATH.is_file():
+            raise SystemExit(f"wind transitions need whoosh audio: {WHOOSH_PATH}")
+        args.extend(["-i", str(WHOOSH_PATH)])
+    return args
+
+
+def build_program_audio_filter(
+    table: dict,
+    spec: ExportSpec = FINAL_SPEC,
+    measured: dict[str, str] | None = None,
+    apply_loudness: bool = True,
+) -> str:
+    """成片混音：切点、xfade、风刮接缝上的 whoosh。没有画面，也没有字幕。"""
+    fps = spec.timeline.fps
+    timeline = edl.frame_timeline(table, fps)
+    if not timeline:
+        raise ValueError("program timeline has no segments")
+    parts: list[str] = []
+    audio_labels: list[str] = []
+    for index, sl in enumerate(timeline):
+        start = float(sl["src_start_s"])
+        end = float(sl["src_end_s"])
+        dur = sl["frames"] / fps
+        if source_is_seeked(start):
+            trim_start, trim_end = 0.0, dur
+        else:
+            trim_start, trim_end = start, end
+        parts.append(
+            f"[{index}:a]atrim=start={trim_start:.6f}:end={trim_end:.6f},asetpts=PTS-STARTPTS,"
+            f"aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo,"
+            f"aresample=async=1:first_pts=0,apad=whole_dur={dur:.6f},atrim=0:{dur:.6f}[a{index}]"
+        )
+        audio_labels.append(f"a{index}")
+    winds = {item["before_id"]: item for item in edl.wind_transitions(table)}
+    acur = audio_labels[0]
+    whoosh_delays: list[int] = []
+    for index in range(1, len(timeline)):
+        fade_n = int(timeline[index]["fade_frames"])
+        if fade_n:
+            fade_t = fade_n / fps
+            parts.append(f"[{acur}][{audio_labels[index]}]acrossfade=d={fade_t:.6f}[ax{index}]")
+        else:
+            wind = winds.get(timeline[index]["id"])
+            if wind:
+                wind_n = max(1, snap_frames(float(wind["duration_s"]), fps))
+                seam = int(timeline[index]["program_start_frame"])
+                whoosh_delays.append(max(0, round(frames_to_time(max(0, seam - wind_n), fps) * 1000)))
+            parts.append(f"[{acur}][{audio_labels[index]}]concat=n=2:v=0:a=1[ax{index}]")
+        acur = f"ax{index}"
+    if winds and whoosh_delays:
+        parts.append(mix_whoosh(acur, len(timeline), whoosh_delays))
+        acur = "amixed"
+    if apply_loudness:
+        parts.append(f"[{acur}]{loudness_filter(spec, measured)}[a]")
+    else:
+        parts.append(f"[{acur}]aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo[a]")
+    graph = ";".join(parts)
+    if "subtitles=" in graph:
+        raise ValueError("loudness graph must not burn subtitles")
+    return graph
+
+
+def measure_program_loudness(media_dir: Path, table: dict) -> dict[str, str] | None:
+    graph = build_program_audio_filter(table, measured=None)
+    plan = InputPlan(tuple(program_audio_input_args(media_dir, table)), len(edl.export_slices(table)), (), (), 0.0)
+    return measure_loudness(plan, graph)
+
+
+def _loudness_for_export(media_dir: Path, table: dict, *, dry_run: bool) -> dict[str, str] | None:
+    saved = read_loudness(media_dir)
+    if loudness_reusable(saved, table):
+        measured = saved["measured"] if saved is not None else None
+        print(f"Loudnorm pass 1 reused I={measured['input_i']}", flush=True)
+        return measured
+    if dry_run:
+        print("would measure program loudness from the frozen timeline; subtitles are not an input", flush=True)
+        return None
+    measured = measure_program_loudness(media_dir, table)
+    if measured is not None:
+        print(f"Loudnorm pass 1: I={measured['input_i']} TP={measured['input_tp']}", flush=True)
+        write_loudness(media_dir, table, measured)
+    return measured
+
+
+def _is_keep_intermediate(path: Path) -> bool:
+    parts = path.parts
+    return "hud-renders" in parts and "keeps" in parts
+
+
+def _measure_only(args, media_dir: Path) -> int:
+    """校对字幕时可以先测。不写最终文件，也不看字幕确认没有。"""
+    if not edl.program_path(media_dir).is_file():
+        raise SystemExit("loudness measure needs logs/program.json")
+    table = edl.load_media(media_dir)
+    problems = edl.validate(table, require_frozen=True)
+    if problems:
+        raise SystemExit("program timeline: " + "; ".join(problems))
+    if todo_list.load(media_dir).get("preview") != "done":
+        raise SystemExit("loudness measure needs preview done; it does not need confirmed subtitles")
+    for sl in edl.export_slices(table):
+        _reject_program_source(sl["clip"])
+        if _is_keep_intermediate(media_dir / sl["clip"]):
+            raise SystemExit(f"loudness measure reads original clips, not keeps: {sl['clip']}")
+        if not (media_dir / sl["clip"]).is_file() and not args.dry_run:
+            raise SystemExit(f"program clip not found: {media_dir / sl['clip']}")
+    saved = read_loudness(media_dir)
+    if loudness_reusable(saved, table):
+        print(f"Loudnorm pass 1 reused I={saved['measured']['input_i']}", flush=True)
+        if not args.dry_run:
+            todo_list.mark(media_dir, "loudness-measure", "done")
+        return 0
+    if args.dry_run:
+        print("would measure program loudness from the frozen timeline; subtitles are not an input", flush=True)
+        return 0
+    measured = measure_program_loudness(media_dir, table)
+    if measured is None:
+        raise SystemExit("Loudnorm pass 1 failed")
+    write_loudness(media_dir, table, measured)
+    print(f"Loudnorm pass 1: I={measured['input_i']} TP={measured['input_tp']}", flush=True)
+    todo_list.mark(media_dir, "loudness-measure", "done")
+    return 0
+
+
 def program_input_args(
     media_dir: Path,
     table: dict,
@@ -909,24 +1130,39 @@ def _export_from_program(args, media_dir: Path) -> int:
     if output.exists() and not args.dry_run:
         raise SystemExit(f"Refusing to overwrite existing final output: {output}")
     durations = {}
-    for sl in edl.export_slices(table):
+    fps = FINAL_SPEC.timeline.fps
+    for sl in edl.export_slices(table, fps):
         path = media_dir / sl["clip"]
         if path.is_file() and sl["clip"] not in durations:
             durations[sl["clip"]] = probe_duration(path)
-    jobs = edl.hud_jobs(table)
+    jobs = edl.hud_jobs(table, fps)
     modes = [_program_alpha_mode(job, durations) for job in jobs]
-    alpha_paths = hud.export_alphas(media_dir, table, durations, dry_run=args.dry_run)
+    if hud.alphas_ready(media_dir, table, fps=fps):
+        alpha_paths = hud.planned_alpha_paths(media_dir, table, fps=fps)
+        print("HUD alpha reused", flush=True)
+    else:
+        alpha_paths = hud.export_alphas(media_dir, table, durations, dry_run=args.dry_run, fps=fps)
     if len(alpha_paths) != len(jobs):
         raise SystemExit("HUD alpha plan does not match kept run slices")
+    for path in alpha_paths:
+        if "keeps" in Path(path).parts:
+            raise SystemExit(f"final export cannot use keep intermediates as HUD: {path}")
+    if not args.dry_run:
+        todo_list.mark(media_dir, "hud-render", "done")
     ass = make_ass(subtitles)
     try:
+        measured = _loudness_for_export(media_dir, table, dry_run=args.dry_run)
+        if measured is not None and not args.dry_run:
+            todo_list.mark(media_dir, "loudness-measure", "done")
+        elif not args.dry_run:
+            print("Loudnorm pass 1 skipped; encode will use single-pass loudnorm", flush=True)
         plan_args = program_input_args(media_dir, table, alpha_paths)
-        plan = InputPlan(tuple(plan_args), len(edl.export_slices(table)), (), (), 0.0)
-        first = build_program_filter(table, modes, len(table.get("overlays") or []), ass, measured=None)
-        measured = None if args.dry_run else measure_loudness(plan, first)
+        plan = InputPlan(tuple(plan_args), len(edl.export_slices(table, fps)), (), (), 0.0)
         final_graph = build_program_filter(
             table, modes, len(table.get("overlays") or []), ass, measured=measured,
         )
+        if "subtitles=" not in final_graph or "loudnorm=" not in final_graph:
+            raise SystemExit("confirmed export must burn subtitles and apply loudness in one encode")
         cmd = build_encode_cmd(plan, final_graph, output, test_codec=args.test_codec)
         print("$", " ".join(cmd), flush=True)
         if args.dry_run:

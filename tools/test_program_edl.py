@@ -454,6 +454,34 @@ class SameTableTest(unittest.TestCase):
         self.assertNotIn("atrim=", document)
         self.assertNotIn("ffmpeg", document)
 
+        plans = hud.plan_alpha_jobs(Path("/media"), table)
+        self.assertEqual(len(plans), 1)
+        self.assertEqual(plans[0]["source"], Path("/media/2026-01-02-run-a.mp4"))
+        self.assertNotIn("keeps", plans[0]["dest"].parts)
+        self.assertNotIn("keeps", plans[0]["dest"].as_posix())
+        self.assertTrue(plans[0]["ranged"])
+        cmd = hud.hud_overlay_command(
+            gopro_python=Path("/venv/bin/python"),
+            gopro_dashboard=Path("/venv/bin/gopro-dashboard.py"),
+            clip=plans[0]["source"],
+            out=plans[0]["dest"],
+            font=Path("/font.otf"),
+            fit=Path("/media/run.fit"),
+            template=Path("/tmp/layout.xml"),
+            cache_dir=Path("/tmp/cache"),
+            video_end_time_mode="file-modified",
+            overlay_profile="qtrle",
+            shoe_name="Fly",
+            shoe_total_km_after_run=10,
+            range_start=plans[0]["src_start_s"],
+            range_end=plans[0]["src_end_s"],
+        )
+        self.assertLess(cmd.index("--hud-start"), cmd.index("--hud-end"))
+        self.assertEqual(cmd[2], str(plans[0]["source"]))
+        self.assertNotIn("libx264", cmd)
+        self.assertNotIn("hud-renders/keeps", " ".join(cmd))
+        self.assertEqual(hud.kept_source_steps([12.4, 12.5, 18.2, 18.25], 12.5, 18.25), [12.5, 18.2])
+
         keep = hud.hud_keep_trim_cmd(Path("/media/run.mp4"), Path("/tmp/keep.mp4"), 12.5, 18.25)
         keep_blob = " ".join(keep)
         self.assertLess(keep.index("-ss"), keep.index("-i"))
@@ -814,8 +842,15 @@ class TodoTest(unittest.TestCase):
             todo.mark(media, "edl", "done")
             todo.mark(media, "hud-record", "done")
             todo.mark(media, "layout", "done")
+            with self.assertRaises(ValueError):
+                todo.mark(media, "hud-render", "done")
             todo.mark(media, "preview", "done")
             todo.mark(media, "subs", "waiting-review")
+            todo.mark(media, "hud-render", "done")
+            todo.mark(media, "loudness-measure", "done")
+            self.assertEqual(todo.load(media)["subs"], "waiting-review")
+            with self.assertRaises(ValueError):
+                todo.mark(media, "final-export", "done")
             with self.assertRaises(ValueError):
                 todo.mark(media, "subs", "confirmed")
             todo.mark(media, "subs", "aligned")

@@ -17,6 +17,8 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("hud-record", "HUD 数据已记录，还没渲"),
     ("layout", "冷开场、贴图、插入已入表"),
     ("preview", "低成本预览"),
+    ("hud-render", "留下的区间已直接渲成 HUD 透明层"),
+    ("loudness-measure", "成片混音已测响度"),
     ("subs", "字幕"),
     ("final-export", "确认导出"),
     ("final-qc", "最终片 QC"),
@@ -28,12 +30,16 @@ STEPS: tuple[tuple[str, str], ...] = (
 )
 
 # 标成完成之前，这些步骤必须已经是 done（subs 见下面的特例）。
+# hud-render / loudness-measure 只要求预览已完成，不要求字幕确认，校对时可以先做。
+# final-export 仍要字幕 confirmed；缺的透明层和响度由 final_export --confirmed 自己补。
 REQUIRES: dict[str, tuple[str, ...]] = {
     "ingest": (),
     "edl": ("ingest",),
     "hud-record": ("ingest",),
     "layout": ("edl", "hud-record"),
     "preview": ("layout",),
+    "hud-render": ("preview",),
+    "loudness-measure": ("preview",),
     "subs": ("preview",),
     "final-export": ("preview",),
     "final-qc": ("final-export",),
@@ -43,6 +49,8 @@ REQUIRES: dict[str, tuple[str, ...]] = {
     "youtube": ("drive",),
     "published": ("bilibili", "youtube"),
 }
+
+PREP_STEPS = ("hud-render", "loudness-measure")
 
 DONE = "done"
 PENDING = "pending"
@@ -62,7 +70,8 @@ def render(status: dict[str, str]) -> str:
     lines = [
         "# 成片进度",
         "",
-        "做到哪看每一行。前面没完成时，后面不能打勾。",
+        "做到哪看每一行。有前置的步骤，前置没完成不能打勾。",
+        "校对字幕时可以先做 HUD 透明层和响度测量；确认导出仍要字幕已确认。",
         "",
     ]
     for key, label in STEPS:
@@ -130,6 +139,20 @@ def mark(media_dir: Path | str, step: str, state: str, *, confirmed: bool = Fals
     status[step] = state if step == "subs" else DONE
     write(media_dir, status)
     return status
+
+
+def clear_prep(media_dir: Path | str, steps: tuple[str, ...] = PREP_STEPS) -> None:
+    """时间表变了之后，把已经打勾的准备步骤改回 pending。文件还没写过就不动。"""
+    status = load(media_dir)
+    changed = False
+    for key in steps:
+        if key not in REQUIRES:
+            raise ValueError(f"unknown todo step: {key}")
+        if status.get(key) == DONE:
+            status[key] = PENDING
+            changed = True
+    if changed:
+        write(media_dir, status)
 
 
 def assert_export_allowed(media_dir: Path | str) -> None:
