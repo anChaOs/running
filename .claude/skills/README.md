@@ -35,7 +35,7 @@
   p3-hud          先只记录 HUD 数据；冻结后 --prep-alpha 直接画留下区间的透明层（8 核 -j 6）
   p3-assemble     按 program.json 写审片播放清单（不拼预览成片，不出最终片）
   p3-subs         字幕（转写→人改→对齐→人工确认）；校对时可并行准备
-  final_export.py  确认后一次烧字幕并套用已测响度；缺的准备自己补
+  final_export.py  确认后分段出画面、整片音频混一次；缺的准备自己补
   p3-loudness     已废弃（响度随 final_export 一次编码）
   p3-burn         已废弃（字幕随 final_export 一次编码）
   p3-publish      发布：写双链 / published / 合 PR / 复盘日志上 box / 清临时

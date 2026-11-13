@@ -9,7 +9,7 @@
 | `p3-hud` | 先把鞋、天气、透明层规格记进时间表；冻结后按入出点直接画透明层 | `logs/program.json` 的 `hud`，`hud-renders/<profile>/*-hud-alpha.mov` |
 | `p3-assemble` | 按时间表写审片播放清单并核对 | `*-review-preview.edl` |
 | `p3-subs` | 转写、人工改字、force_align、质检门；对口型前冻结时间表。校对可与准备并行 | `subtitles.txt`、外挂 SRT |
-| `final_export.py` | 确认后按同一张表分段编码：大约 120 秒一段，段界不切断风刮或 xfade。每一段裁自己用到的原片、叠这段的 HUD、做落在这段里的转场、烧字幕、套用已测响度。段与段流拷贝接成一个文件。缺准备会先补 | `*-run-final.mp4` |
+| `final_export.py` | 确认后画面按大约 120 秒分段，只出画面；整片音频用和测响度同一张图混一次，和第一段画面并行。画面流拷贝接起来再配上这一条音频。缺准备会先补 | `*-run-final.mp4` |
 | `p3-publish` | 双链、发布状态、复盘日志、清临时 | `published`、box 复盘 |
 | `p3-publish-report` | 复盘拷完后的发布报告 | 单屏 `publish-report.html` |
 | `p3-bilibili` / `p3-youtube` | 独立上传拿平台链接 | BV / YouTube URL |

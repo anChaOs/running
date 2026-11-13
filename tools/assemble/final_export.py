@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """字幕确认后的唯一最终导出入口。
 
-预览只用于人工检查。有时间表时，确认导出仍是一条命令、一个成片文件，但不再把
-大约 19 分钟塞进一张滤镜图。按大约两分钟切段，段界不切断风刮或 xfade。每一段
-只打开自己用到的原片和窗口透明层，`hevc_videotoolbox` 编码，再用 concat 解复用
-流拷贝接成最终 mp4。已测的 loudnorm 参数原样套到每一段。
+有时间表时，确认导出仍是一条命令、一个成片文件。画面按大约两分钟分段编码，
+段界不切断风刮或 xfade；每一段只出画面。整片音频用和测响度同一张图混一次、
+编一次 AAC，和第一段画面并行。最后把画面段流拷贝接起来，配上这一条音频。
 
 同一段里，一条原片只打开一次：`-ss` 到这段最早的入点，多段句间刀用 select 丢掉
 空隙，不再 split。split 会把还没读到的输出垫住，解码帧一直留到这段结束，16GB
@@ -764,13 +763,24 @@ def _source_pads(
     return openings, video_pads, audio_pads, windows
 
 
+# 输入 -t 多读的余量。select 不会自己结束，没有 -t 就会一直解码到原片末尾再丢掉。
+_INPUT_TAIL_S = 0.5
+
+
+def _opening_limit_args(opening: ClipOpening, slices: list[dict]) -> list[str]:
+    """-ss 和 -t 成对：只解码这一路最后一个出点之前的画面。"""
+    end = max(float(slices[index]["src_end_s"]) for index in opening.slices)
+    start = opening.seek_s or 0.0
+    args = ["-ss", f"{opening.seek_s:.6f}"] if opening.seek_s is not None else []
+    return args + ["-t", f"{end - start + _INPUT_TAIL_S:.6f}"]
+
+
 def _clip_input_args(media_dir: Path, slices: list[dict]) -> list[str]:
     args: list[str] = []
     for opening in clip_openings(slices):
-        if opening.seek_s is not None:
-            # 只跳过这段最早入点之前的画面。刀和刀之间的空隙仍会解码再丢掉。
-            # 和滤镜里「seek 之后从 0 量」是一对，不能只改一边。
-            args.extend(["-ss", f"{opening.seek_s:.6f}"])
+        # 只跳过这段最早入点之前的画面。刀和刀之间的空隙仍会解码再丢掉。
+        # 和滤镜里「seek 之后从 0 量」是一对，不能只改一边。
+        args.extend(_opening_limit_args(opening, slices))
         args.extend(["-i", str(media_dir / opening.clip)])
     return args
 
@@ -913,13 +923,17 @@ def _opening_video(
     height: int,
     fps: int,
 ) -> str:
-    """一次打开的画面只留一个消费者。多段句间刀用 select，不 split。"""
-    if len(ranges) == 1:
-        start, end = ranges[0]
-        head = f"trim=start={start:.6f}:end={end:.6f},setpts=PTS-STARTPTS"
-    else:
-        expr = "+".join(f"gte(t\\,{start:.6f})*lt(t\\,{end:.6f})" for start, end in ranges)
-        head = f"select='{expr}',setpts=N/FRAME_RATE/TB"
+    """一次打开的画面只留一个消费者。多段句间刀用 select，不 split。
+
+    先 fps 落到成片帧率，再按成片帧挑。原片是 30000/1001 时，在原片时间上挑再补帧，
+    每个区间会差半帧，一段两分钟累计少 1–4 帧，段接起来画面越来越早于声音。
+    窗口端点都是 1/fps 的整数倍，往前让半帧，挑出来的帧数恰好是区间帧数之和。
+    -ss 之后第一帧可能落在 0 之后不到一帧，start_time=0 让 fps 从 0 补齐，不然少第一帧。
+    """
+    half = 0.5 / fps
+    expr = "+".join(f"gte(t\\,{start - half:.6f})*lt(t\\,{end - half:.6f})" for start, end in ranges)
+    frames = sum(int(round((end - start) * fps)) for start, end in ranges)
+    head = f"fps={fps}:start_time=0,select='{expr}',setpts=N/{fps}/TB,trim=end_frame={frames}"
     label = f"ov{input_index}"
     parts.append(f"[{input_index}:v]{head},{_picture_chain(width, height, fps)}[{label}]")
     return label
@@ -941,8 +955,12 @@ def build_program_filter(
     measured: dict[str, str] | None = None,
     apply_loudness: bool = True,
     alpha_skip: dict[str, float] | None = None,
+    video_only: bool = False,
 ) -> str:
-    """按时间表裁切、叠 HUD、转场、贴图、烧字幕、响度。预览用的是同一组落帧区间。
+    """按时间表裁切、叠 HUD、转场、贴图、烧字幕、响度。
+
+    `video_only` 时不建音频支路，只出 [v]。确认导出的分段走这条：音频整片一次混好，
+    不再每段重启 dynaudnorm/loudnorm，也不让音频滤镜的几秒延迟把未压缩画面垫在内存里。预览用的是同一组落帧区间。
 
     句间刀先收成 open / 每一段跑 / close。一段跑上的窗口透明层已经在输入侧收成一条，
     这里只叠一次。画面用 select 或单段 trim，不用 split。测响度的音频图不走这条，
@@ -959,7 +977,8 @@ def build_program_filter(
     durations: list[float] = []
     winds = {item["before_id"]: item for item in edl.wind_transitions(table)}
     wind_ids = set(winds)
-    openings, _video_pads, audio_pads, windows = _source_pads(parts, timeline, video=False, wind_ids=wind_ids)
+    aparts: list[str] = [] if video_only else parts
+    openings, _video_pads, audio_pads, windows = _source_pads(aparts, timeline, video=False, wind_ids=wind_ids)
     video_of: dict[int, str] = {}
     for input_index, opening in enumerate(openings):
         label = _opening_video(
@@ -971,7 +990,7 @@ def build_program_filter(
         dur = sl["frames"] / fps
         durations.append(dur)
         trim_start, trim_end = windows[index]
-        parts.append(
+        aparts.append(
             f"[{audio_pads[index]}]atrim=start={trim_start:.6f}:end={trim_end:.6f},asetpts=PTS-STARTPTS,"
             f"aformat=sample_rates={spec.timeline.sample_rate}:channel_layouts=stereo,"
             f"aresample=async=1:first_pts=0,apad=whole_dur={dur:.6f},atrim=0:{dur:.6f}[a{index}]"
@@ -1011,7 +1030,7 @@ def build_program_filter(
             if not picture or picture[-1] != video_of[index]:
                 picture.append(video_of[index])
         vlabel = _concat_ready(parts, picture, video=True, tag=f"gv{act_i}", fps=fps)
-        alabel = _concat_ready(parts, [audio_labels[index] for index in act], video=False, tag=f"ga{act_i}", fps=fps)
+        alabel = _concat_ready(aparts, [audio_labels[index] for index in act], video=False, tag=f"ga{act_i}", fps=fps)
         if act_i in alpha_at:
             anchor = act[0]
             if len(act) == 1:
@@ -1057,7 +1076,7 @@ def build_program_filter(
             parts.append(
                 f"[{vcur}][{act_video[act_i]}]xfade=transition=fade:duration={fade_t:.6f}:offset={offset:.6f},settb=1/{fps}[vx{join}]"
             )
-            parts.append(f"[{acur}][{act_audio[act_i]}]acrossfade=d={fade_t:.6f}[ax{join}]")
+            aparts.append(f"[{acur}][{act_audio[act_i]}]acrossfade=d={fade_t:.6f}[ax{join}]")
         else:
             wind = winds.get(head["id"])
             if wind:
@@ -1067,13 +1086,13 @@ def build_program_filter(
             parts.append(
                 f"[{vcur}][{act_video[act_i]}]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[vx{join}]"
             )
-            parts.append(f"[{acur}][{act_audio[act_i]}]concat=n=2:v=0:a=1[ax{join}]")
+            aparts.append(f"[{acur}][{act_audio[act_i]}]concat=n=2:v=0:a=1[ax{join}]")
         vcur, acur = f"vx{join}", f"ax{join}"
 
     n_whoosh = 1 if winds else 0
     whoosh_index = len(openings) + len(alpha_at) if n_whoosh else None
     if whoosh_index is not None and whoosh_delays:
-        parts.append(mix_whoosh(acur, whoosh_index, whoosh_delays))
+        aparts.append(mix_whoosh(acur, whoosh_index, whoosh_delays))
         acur = "amixed"
     overlay_base = len(openings) + len(alpha_at) + n_whoosh
     for k, ov in enumerate(table.get("overlays") or []):
@@ -1088,6 +1107,8 @@ def build_program_filter(
         )
     else:
         parts.append(f"[{vcur}]format=yuv420p[v]")
+    if video_only:
+        return ";".join(parts)
     if apply_loudness:
         parts.append(f"[{acur}]{loudness_filter(spec, measured)}[a]")
     else:
@@ -1340,8 +1361,7 @@ def program_input_args(
     wind_ids = {str(item["before_id"]) for item in edl.wind_transitions(table)}
     args: list[str] = []
     for opening in program_openings(timeline, wind_ids):
-        if opening.seek_s is not None:
-            args.extend(["-ss", f"{opening.seek_s:.6f}"])
+        args.extend(_opening_limit_args(opening, timeline))
         args.extend(["-i", str(media_dir / opening.clip)])
     for index, group in enumerate(confirmed_alpha_groups(table, alpha_paths, fps)):
         if len(group) == 1:
@@ -1365,8 +1385,10 @@ def program_input_args(
 
 
 # 大约两分钟。整片那张图在 16GB 上足迹随成片时间涨，两分钟是留给桌面程序的上限。
-# select 之后预期足迹是平的；就算还在涨，一段也不该摸到 8–10GB。再短只是多几次 AAC 接缝。
+# 画面分段之后音频整片只混一次，段间不再有 AAC 接缝。
 SEGMENT_MAX_S = 120.0
+# 只并掉片尾的零头。10 秒以内不再单独开一段。
+SEGMENT_TAIL_MERGE_S = 10.0
 # 小分段图用 3。整片上百个 auto_scale 才会在默认多线程下 EAGAIN，那种图不再建。
 # 这一段若十几秒内起不来，退回 1。不要加 -threads 1。
 CONFIRMED_FILTER_THREADS = 3
@@ -1439,8 +1461,8 @@ def _choose_segment_end(start: int, total: int, blocked: set[int], max_frames: i
                 break
     if cut is None or cut <= start:
         cut = total
-    # 尾巴不到一秒就并进这一段，避免为几帧再起一个编码器。并到片尾不会切断转场。
-    if 0 < total - cut < fps:
+    # 片尾不到 10 秒就并进上一段。单独再起一个编码器不值得，并到片尾也不会切断转场。
+    if 0 < total - cut < int(round(SEGMENT_TAIL_MERGE_S * fps)):
         cut = total
     return cut
 
@@ -1567,23 +1589,165 @@ def concat_copy_cmd(listing: Path, output: Path) -> list[str]:
     ]
 
 
-def _run_segment_encode(cmd: list[str]) -> None:
+# 同时活着的 ffmpeg 合计常驻上限。超过就杀掉并报错，不等系统换页把整机拖死。
+# 模拟里一段画面大约 0.8–1.5GB；8GB 已经说明有东西在垫帧。
+SEGMENT_RSS_CAP_GB = 8.0
+_RSS_POLL_S = 2.0
+_FOOTPRINT_BIN = Path("/usr/bin/footprint")
+
+
+def _rss_gb(pid: int) -> float:
+    """ps 在 macOS 和 Linux 上都给 KB 的 RSS。拿不到就当 0，不让监控本身把导出弄挂。"""
+    try:
+        out = subprocess.run(
+            ["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True, timeout=5,
+        ).stdout
+        return int((out or "").strip() or 0) / 1048576
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0.0
+
+
+def parse_footprint_gb(text: str) -> float | None:
+    """从 `footprint -p` 的输出里读 phys_footprint，单位换成 GB。读不到就返回 None。"""
+    for line in text.splitlines():
+        if not re.search(r"phys_footprint\b", line, re.I):
+            continue
+        if re.search(r"peak", line, re.I):
+            continue
+        match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(bytes|[KMGT]B|B)?", line, re.I)
+        if match is None:
+            continue
+        value = float(match.group(1))
+        unit = (match.group(2) or "").upper()
+        scale = {"": 1.0, "B": 1.0, "BYTES": 1.0, "KB": 1024.0, "MB": 1024.0 ** 2, "GB": 1024.0 ** 3}
+        if unit not in scale:
+            continue
+        # 没有单位、数字又很大时，footprint 打的是字节。
+        if unit in ("", "B", "BYTES") and value >= 1024:
+            return value / (1024.0 ** 3)
+        if unit in ("", "B", "BYTES"):
+            return value / (1024.0 ** 3)
+        return value * scale[unit] / (1024.0 ** 3)
+    return None
+
+
+def _footprint_gb(pid: int) -> float | None:
+    if not _FOOTPRINT_BIN.is_file():
+        return None
+    try:
+        proc = subprocess.run(
+            [str(_FOOTPRINT_BIN), "-p", str(pid)],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return parse_footprint_gb(proc.stdout or "")
+
+
+def _process_memory_gb(pid: int) -> tuple[float, str]:
+    """macOS 上有 footprint 就读 phys_footprint，否则用 ps RSS。返回 (GB, 名字)。"""
+    footprint = _footprint_gb(pid)
+    if footprint is not None:
+        return footprint, "footprint"
+    return _rss_gb(pid), "rss"
+
+
+def _watch_group(items: list[tuple[subprocess.Popen, str]], cap_gb: float = SEGMENT_RSS_CAP_GB) -> None:
+    """盯着一组已经启动的 ffmpeg。每两秒加一次内存，合计超过上限就全杀掉，不重试。"""
+    peaks = {id(proc): 0.0 for proc, _label in items}
+    kinds = {id(proc): "rss" for proc, _label in items}
+    started = {id(proc): time.monotonic() for proc, _label in items}
+    finished: dict[int, float] = {}
+    killed = False
+    next_sample = time.monotonic()
+    while True:
+        alive = [(proc, label) for proc, label in items if proc.poll() is None]
+        for proc, _label in items:
+            if proc.poll() is not None and id(proc) not in finished:
+                finished[id(proc)] = time.monotonic()
+        if not alive:
+            break
+        now = time.monotonic()
+        if now >= next_sample:
+            total = 0.0
+            for proc, _label in alive:
+                gb, kind = _process_memory_gb(proc.pid)
+                peaks[id(proc)] = max(peaks[id(proc)], gb)
+                kinds[id(proc)] = kind
+                total += gb
+            if total > cap_gb and not killed:
+                names = ", ".join(label for _proc, label in alive)
+                print(
+                    f"memory {total:.1f}GB > cap {cap_gb:.1f}GB ({names}), killing; not retrying",
+                    flush=True,
+                )
+                for proc, _label in alive:
+                    proc.kill()
+                killed = True
+            next_sample = now + _RSS_POLL_S
+        try:
+            alive[0][0].wait(timeout=max(0.05, min(_RSS_POLL_S, next_sample - time.monotonic())))
+        except subprocess.TimeoutExpired:
+            pass
+    for proc, label in items:
+        wall = finished.get(id(proc), time.monotonic()) - started[id(proc)]
+        kind = kinds[id(proc)]
+        print(
+            f"{label}: rc={proc.returncode} peak_{kind}={peaks[id(proc)]:.2f}GB wall={wall:.1f}s",
+            flush=True,
+        )
+    if killed:
+        raise SystemExit(f"export exceeded the {cap_gb:.1f}GB memory cap; not retrying")
+
+
+def _run_segment_encode(
+    cmd: list[str],
+    label: str = "segment",
+    companions: list[tuple[subprocess.Popen, str]] | None = None,
+) -> None:
+    companions = list(companions or [])
     started = time.monotonic()
-    proc = subprocess.run(cmd)
-    if proc.returncode == 0:
+    proc = subprocess.Popen(cmd)
+    _watch_group([(proc, label), *companions])
+    rc = proc.returncode
+    if rc == 0:
         return
     threads = cmd[cmd.index("-filter_complex_threads") + 1]
-    # 负的返回码是信号（上一回是 SIGKILL）。再跑一遍只会再被杀掉。
-    if proc.returncode > 0 and threads != "1" and time.monotonic() - started < FILTER_THREAD_RETRY_S:
+    # 负的返回码是信号（上一回是 SIGKILL）。内存超限已经在 _watch_group 里停掉，不会走到这里重试。
+    still = [(peer, name) for peer, name in companions if peer.poll() is None]
+    if rc > 0 and threads != "1" and time.monotonic() - started < FILTER_THREAD_RETRY_S:
         print(
             "segment filter graph did not stay up; retrying with -filter_complex_threads 1",
             flush=True,
         )
         retry = list(cmd)
         retry[retry.index("-filter_complex_threads") + 1] = "1"
-        subprocess.run(retry, check=True)
+        proc = subprocess.Popen(retry)
+        _watch_group([(proc, label + " (threads 1)"), *still])
+        if proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, retry)
         return
-    raise subprocess.CalledProcessError(proc.returncode, cmd)
+    raise subprocess.CalledProcessError(rc if rc is not None else 1, cmd)
+
+
+def probe_video_frames(path: Path) -> int:
+    """数这一段实际写出的视频帧。和计划差一帧就停，不要把累计漂移接到成片里。"""
+    raw = subprocess.check_output(
+        [
+            "ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0",
+            "-show_entries", "stream=nb_read_frames", "-of", "default=nw=1:nk=1", str(path),
+        ],
+        text=True,
+    ).strip()
+    if not raw:
+        raise SystemExit(f"no video frames in {path}")
+    return int(raw)
+
+
+def _require_segment_frames(path: Path, expected: int) -> None:
+    got = probe_video_frames(path)
+    if got != expected:
+        raise SystemExit(f"{path.name} has {got} frames, plan is {expected}")
 
 
 def confirmed_segment_cmd(
@@ -1631,18 +1795,48 @@ def confirmed_segment_cmd(
         spec,
         measured=measured,
         alpha_skip=skips,
+        video_only=True,
     )
-    if "subtitles=" not in graph or "loudnorm=" not in graph:
-        raise SystemExit("confirmed export must burn subtitles and apply loudness in one encode")
-    plan = InputPlan(tuple(plan_args), len(openings), (), (), 0.0)
-    return build_encode_cmd(
-        plan,
-        graph,
-        output,
-        test_codec=test_codec,
-        spec=spec,
-        filter_threads=CONFIRMED_FILTER_THREADS,
-    )
+    if "subtitles=" not in graph:
+        raise SystemExit("confirmed export must burn subtitles in the picture encode")
+    if "[a]" in graph or "loudnorm=" in graph:
+        raise SystemExit("segment picture graph must not carry audio; audio is mixed once for the whole program")
+    del openings
+    return [
+        "ffmpeg", "-y", "-hide_banner", "-nostdin",
+        "-filter_complex_threads", str(CONFIRMED_FILTER_THREADS),
+        *plan_args,
+        "-filter_complex", graph, "-map", "[v]", "-an", "-frames:v", str(seg.frames),
+        *video_codec_args(spec, test_codec=test_codec),
+        "-pix_fmt", spec.timeline.pix_fmt,
+        "-f", "mp4", str(output),
+    ]
+
+
+def program_audio_cmd(media_dir: Path, table: dict, measured: dict[str, str] | None, output: Path,
+                      spec: ExportSpec = FINAL_SPEC) -> list[str]:
+    """整片音频一次混好、一次 AAC。和测响度是同一张音频图，已测参数原样对得上。
+
+    只解码原片的音轨，不碰画面。分段画面再多也只有这一条 AAC，没有段间 priming 接缝，
+    dynaudnorm/loudnorm 也不会在段界重启。"""
+    graph = build_program_audio_filter(table, spec, measured=measured, apply_loudness=True)
+    return [
+        "ffmpeg", "-y", "-hide_banner", "-nostdin",
+        *program_audio_input_args(media_dir, table, spec),
+        "-filter_complex", graph, "-map", "[a]", "-vn",
+        *audio_codec_args(spec), "-f", "mp4", str(output),
+    ]
+
+
+def mux_final_cmd(listing: Path, audio: Path, output: Path) -> list[str]:
+    """画面段流拷贝接起来，再配上整片那一条音频。不重编码。"""
+    return [
+        "ffmpeg", "-y", "-hide_banner", "-nostdin",
+        "-f", "concat", "-safe", "0", "-i", str(listing),
+        "-i", str(audio),
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-c", "copy", "-movflags", "+faststart", str(output),
+    ]
 
 
 def _reject_program_source(name: str) -> None:
@@ -1727,26 +1921,48 @@ def _export_from_program(args, media_dir: Path) -> int:
                 flush=True,
             )
             segment_paths: list[Path] = []
-            for index, seg in enumerate(segments):
-                seg_path = work_dir / f"seg-{index:03d}.mp4"
-                cmd = confirmed_segment_cmd(
-                    media_dir, table, seg, alpha_paths, modes, cues, measured,
-                    work_dir, index, seg_path, test_codec=args.test_codec,
-                )
-                inputs = [cmd[pos + 1] for pos, flag in enumerate(cmd) if flag == "-i"]
-                print(
-                    f"segment {index + 1}/{len(segments)} "
-                    f"{seg.start_frame / fps:.3f}-{seg.end_frame / fps:.3f}s "
-                    f"inputs={len(inputs)}",
-                    flush=True,
-                )
-                print("$", " ".join(cmd), flush=True)
-                if not args.dry_run:
-                    _run_segment_encode(cmd)
-                segment_paths.append(seg_path)
+            audio_path = work_dir / "program-audio.m4a"
+            audio_cmd = program_audio_cmd(media_dir, table, measured, audio_path)
+            # 整片音频和第一段画面一起跑。音频大约 0.2GB，第一段画面大约 1–2GB，合计仍在 8GB 内。
+            print("$", " ".join(audio_cmd), flush=True)
+            audio_proc: subprocess.Popen | None = None
+            if not args.dry_run:
+                audio_proc = subprocess.Popen(audio_cmd)
+            try:
+                for index, seg in enumerate(segments):
+                    seg_path = work_dir / f"seg-{index:03d}.mp4"
+                    cmd = confirmed_segment_cmd(
+                        media_dir, table, seg, alpha_paths, modes, cues, measured,
+                        work_dir, index, seg_path, test_codec=args.test_codec,
+                    )
+                    inputs = [cmd[pos + 1] for pos, flag in enumerate(cmd) if flag == "-i"]
+                    print(
+                        f"segment {index + 1}/{len(segments)} "
+                        f"{seg.start_frame / fps:.3f}-{seg.end_frame / fps:.3f}s "
+                        f"inputs={len(inputs)} frames={seg.frames}",
+                        flush=True,
+                    )
+                    print("$", " ".join(cmd), flush=True)
+                    if not args.dry_run:
+                        companions = []
+                        if index == 0 and audio_proc is not None and audio_proc.poll() is None:
+                            companions = [(audio_proc, "program audio")]
+                        _run_segment_encode(
+                            cmd, f"segment {index + 1}/{len(segments)}", companions=companions,
+                        )
+                        if index == 0 and audio_proc is not None and audio_proc.poll() is None:
+                            _watch_group([(audio_proc, "program audio")])
+                        if audio_proc is not None and audio_proc.returncode not in (0, None):
+                            raise subprocess.CalledProcessError(audio_proc.returncode, audio_cmd)
+                        _require_segment_frames(seg_path, seg.frames)
+                    segment_paths.append(seg_path)
+            finally:
+                if audio_proc is not None and audio_proc.poll() is None:
+                    audio_proc.kill()
+                    audio_proc.wait()
             listing = work_dir / "segments.ffconcat"
             _write_alpha_concat(tuple(segment_paths), listing)
-            join = concat_copy_cmd(listing, output)
+            join = mux_final_cmd(listing, audio_path, output)
             print("$", " ".join(join), flush=True)
             if args.dry_run:
                 return 0

@@ -58,4 +58,4 @@ iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-previ
 
 ## 完成后
 
-> 预览核对通过后走 `/p3-subs`，对口型前先冻结时间表。冻上之后，用户校对字幕的同时可以 `--prep-alpha` 和 `final_export.py --measure-only`。8 核机器画透明层加 `-j 6`（默认仍是 2），留 1–2 核给系统和写 mov 的 ffmpeg。同一条原片加载一次 FIT，再按窗口写出各自的 alpha。成片仍只走 `final_export.py --confirmed`，仍然只写出一个文件。确认导出按大约 120 秒分段编码：段界不切断风刮或 xfade，每一段只打开自己用到的原片，窗口 alpha 在这一段里收成一条再叠一次，套用已测响度，烧字幕，`hevc_videotoolbox`。`-filter_complex_threads` 是 3。段与段顺序编码，最后 concat 流拷贝接成片。不把 `hud-renders/keeps/` 当画面。
+> 预览核对通过后走 `/p3-subs`，对口型前先冻结时间表。冻上之后，用户校对字幕的同时可以 `--prep-alpha` 和 `final_export.py --measure-only`。8 核机器画透明层加 `-j 6`（默认仍是 2），留 1–2 核给系统和写 mov 的 ffmpeg。同一条原片加载一次 FIT，再按窗口写出各自的 alpha。成片仍只走 `final_export.py --confirmed`，仍然只写出一个文件。画面按大约 120 秒分段，只出画面：段界不切断风刮或 xfade，每一段只打开自己用到的原片，窗口 alpha 收成一条再叠一次，烧字幕，`hevc_videotoolbox`，`-filter_complex_threads` 是 3。整片音频用和测响度同一张图混一次，和第一段画面并行。每段记一次内存（macOS 用 footprint 的 phys_footprint，否则 RSS），超过 8GB 就停。画面段流拷贝接起来，再配上这一条音频。不把 `hud-renders/keeps/` 当画面。

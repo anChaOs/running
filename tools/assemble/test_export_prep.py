@@ -238,18 +238,29 @@ def test_confirmed_export_reuses_prep_and_encodes_once() -> None:
         render.assert_not_called()
         measure.assert_not_called()
         full_measure.assert_not_called()
-        filters, joins = _encode_calls(encode)
-        assert len(filters) == 1
+        videos, audios, joins = _encode_calls(encode)
+        assert len(videos) == 1
+        assert len(audios) == 1
         assert len(joins) == 1
-        cmd = filters[0]
+        cmd = videos[0]
         graph = cmd[cmd.index("-filter_complex") + 1]
         assert "subtitles=" in graph
-        assert "measured_I=-23.4" in graph
+        assert "loudnorm=" not in graph
+        assert "-an" in cmd
+        assert "fps=30:start_time=0" in graph
         assert cmd[cmd.index("-filter_complex_threads") + 1] == "3"
         assert cmd.index("-filter_complex_threads") < cmd.index("-i")
         assert "-threads" not in cmd
         assert "no-subs" not in " ".join(cmd)
         assert "hud-renders/keeps" not in " ".join(cmd)
+        assert cmd.count("hevc_videotoolbox") == 1
+        audio = audios[0]
+        audio_graph = audio[audio.index("-filter_complex") + 1]
+        assert "measured_I=-23.4" in audio_graph
+        assert "loudnorm=" in audio_graph
+        assert "subtitles=" not in audio_graph
+        assert "-vn" in audio
+        assert "hevc_videotoolbox" not in audio
         assert joins[0][joins[0].index("-c") + 1] == "copy"
         assert "hevc_videotoolbox" not in joins[0]
         assert joins[0][-1] == str(out)
@@ -283,17 +294,22 @@ def test_confirmed_export_backfills_missing_prep_then_encodes_once() -> None:
         assert render.call_args.kwargs["jobs"] == hud.HUD_EXPORT_JOBS
         measure.assert_called_once()
         full_measure.assert_not_called()
-        filters, joins = _encode_calls(encode)
-        assert len(filters) == 1
+        videos, audios, joins = _encode_calls(encode)
+        assert len(videos) == 1
+        assert len(audios) == 1
         assert len(joins) == 1
-        cmd = filters[0]
+        cmd = videos[0]
         graph = cmd[cmd.index("-filter_complex") + 1]
         assert "subtitles=" in graph
-        assert "loudnorm=" in graph
-        assert "measured_I=-23.4" in graph
+        assert "loudnorm=" not in graph
+        assert "-an" in cmd
         assert cmd[cmd.index("-filter_complex_threads") + 1] == "3"
         assert cmd.index("-filter_complex_threads") < cmd.index("-i")
         assert "-threads" not in cmd
+        assert cmd.count("hevc_videotoolbox") == 1
+        audio_graph = audios[0][audios[0].index("-filter_complex") + 1]
+        assert "loudnorm=" in audio_graph
+        assert "measured_I=-23.4" in audio_graph
         assert joins[0][-1] == str(out)
         assert joins[0][joins[0].index("-c") + 1] == "copy"
         assert todo.load(media)["hud-render"] == "done"
@@ -334,12 +350,53 @@ def test_export_refuses_without_confirmed_subs_and_writes_nothing() -> None:
 
 
 class _patches:
+    launched: list[list[str]] = []
+
     def __init__(self, render_side=None):
         self.render_side = render_side
 
     def __enter__(self):
+        type(self).launched = []
+
+        def _remember(cmd, **_kwargs):
+            if isinstance(cmd, (list, tuple)):
+                type(self).launched.append(list(cmd))
+            return subprocess.CompletedProcess(cmd, 0)
+
+        def _popen(cmd, **_kwargs):
+            argv = list(cmd)
+            type(self).launched.append(argv)
+
+            class _Proc:
+                def __init__(self) -> None:
+                    self.args = argv
+                    self.pid = 4242
+                    self.returncode = None
+
+                def wait(self, timeout=None):
+                    del timeout
+                    self.returncode = 0
+                    return 0
+
+                def poll(self):
+                    return self.returncode
+
+                def kill(self):
+                    self.returncode = -9
+
+            return _Proc()
+
+        def _frames(path):
+            for cmd in reversed(type(self).launched):
+                if cmd and str(cmd[-1]) == str(path) and "-frames:v" in cmd:
+                    return int(cmd[cmd.index("-frames:v") + 1])
+            raise AssertionError(f"no video command for {path}")
+
         self._stack = [
-            patch.object(final_export.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)),
+            patch.object(final_export.subprocess, "run", side_effect=_remember),
+            patch.object(final_export.subprocess, "Popen", side_effect=_popen),
+            patch.object(final_export, "_process_memory_gb", return_value=(0.1, "rss")),
+            patch.object(final_export, "probe_video_frames", side_effect=_frames),
             patch.object(hud, "export_alphas", side_effect=self.render_side),
             patch.object(final_export, "measure_program_loudness"),
             patch.object(final_export, "measure_loudness", side_effect=AssertionError("full-graph measure")),
@@ -347,7 +404,7 @@ class _patches:
         ]
         started = [item.__enter__() for item in self._stack]
         self.started = started
-        return started[0], started[1], started[2], started[3]
+        return started[0], started[4], started[5], started[6]
 
     def __exit__(self, exc_type, exc, tb):
         for item in reversed(self._stack):
@@ -566,12 +623,16 @@ def _input_paths(args: list[str]) -> list[str]:
     return [args[index + 1] for index, flag in enumerate(args) if flag == "-i"]
 
 
-def _encode_calls(encode) -> tuple[list[list[str]], list[list[str]]]:
-    """分段编码，再加最后那条流拷贝。不要把 concat 当成滤镜图。"""
-    cmds = [call.args[0] for call in encode.call_args_list]
-    filters = [cmd for cmd in cmds if "-filter_complex" in cmd]
-    joins = [cmd for cmd in cmds if "-filter_complex" not in cmd]
-    return filters, joins
+def _encode_calls(_encode=None) -> tuple[list[list[str]], list[list[str]], list[list[str]]]:
+    """画面段、整片音频、最后的流拷贝。画面和音频走 Popen，接片走 subprocess.run。"""
+    cmds = [list(cmd) for cmd in _patches.launched]
+    videos = [cmd for cmd in cmds if "-an" in cmd]
+    audios = [cmd for cmd in cmds if "-vn" in cmd]
+    joins = [
+        cmd for cmd in cmds
+        if "-c" in cmd and cmd[cmd.index("-c") + 1] == "copy"
+    ]
+    return videos, audios, joins
 
 
 def _many_slice_program() -> tuple[dict, list[str]]:
@@ -645,11 +706,12 @@ def test_confirmed_input_plan_opens_shared_clip_once() -> None:
 
     graph = final_export.build_program_filter(table, ["kept"] * 118, 0, None, apply_loudness=False)
     # 同一条原片的句间刀用 select，不再 split。split 会把解码帧留到这段结束。
-    assert "[0:v]select=" in graph
-    assert "[1:v]select=" in graph
+    assert "[0:v]fps=30:start_time=0,select=" in graph
+    assert "[1:v]fps=30:start_time=0,select=" in graph
     assert "]split=24" not in graph
     assert "]split=6" not in graph
-    assert "gte(t\\,1.500000)*lt(t\\,2.500000)" in graph
+    assert "fps=30:start_time=0" in graph
+    assert "gte(t\\,1.483333)*lt(t\\,2.483333)" in graph
     assert "atrim=start=1.500000:end=2.500000" in graph
     assert "concat=n=24:v=0:a=1" in graph
     assert "[7:v]trim=duration=24.000000" in graph
@@ -706,9 +768,9 @@ def test_rewound_source_opens_a_second_decoder() -> None:
     assert paths.count(run) == 2
     assert [args[index + 1] for index, flag in enumerate(args) if flag == "-ss"] == ["8.000000"]
     graph = final_export.build_program_filter(table, ["kept"], 0, None, apply_loudness=False)
-    assert "split=" not in graph
-    assert "[0:v]trim=start=0.000000:end=2.000000" in graph
-    assert "[1:v]trim=start=0.000000:end=2.000000" in graph
+    assert "]split=" not in graph
+    assert "[0:v]fps=30:start_time=0,select='gte(t\\,-0.016667)*lt(t\\,1.983333)'" in graph
+    assert "[1:v]fps=30:start_time=0,select='gte(t\\,-0.016667)*lt(t\\,1.983333)'" in graph
 
 
 def test_confirmed_command_opens_shared_run_once() -> None:
@@ -750,21 +812,26 @@ def test_confirmed_command_opens_shared_run_once() -> None:
             ) == 0
         render.assert_not_called()
         measure.assert_not_called()
-        filters, joins = _encode_calls(encode)
-        assert len(filters) == 1
+        videos, audios, joins = _encode_calls(encode)
+        assert len(videos) == 1
+        assert len(audios) == 1
         assert len(joins) == 1
-        cmd = filters[0]
+        cmd = videos[0]
         run = str((media / "2026-01-02-run-a.mp4").resolve())
         assert _input_paths(cmd).count(run) == 1
         assert cmd[cmd.index("-ss") + 1] == "12.000000"
+        run_at = cmd.index(run)
+        assert cmd[run_at - 3:run_at] == ["-t", "6.500000", "-i"]
         assert cmd[cmd.index("-filter_complex_threads") + 1] == "3"
         graph = cmd[cmd.index("-filter_complex") + 1]
-        assert "[1:v]select=" in graph
+        assert "[1:v]fps=30:start_time=0,select=" in graph
         assert "]split=2" not in graph
-        assert "gte(t\\,4.000000)*lt(t\\,6.000000)" in graph
-        assert "atrim=start=4.000000:end=6.000000" in graph
-        assert "concat=n=2:v=0:a=1" in graph
+        assert "gte(t\\,3.983333)*lt(t\\,5.983333)" in graph
+        assert "atrim=" not in graph
+        assert "loudnorm=" not in graph
+        assert "-an" in cmd
         assert graph.count("overlay=eof_action=pass:shortest=0:format=auto") == 1
+        assert "measured_I=-23.4" in audios[0][audios[0].index("-filter_complex") + 1]
         inputs = _input_paths(cmd)
         assert inputs.count(run) == 1
         assert sum(path.endswith(".ffconcat") for path in inputs) == 1
@@ -802,8 +869,9 @@ def test_confirmed_export_backfill_respects_jobs() -> None:
                 ]
             ) == 0
         assert seen["jobs"] == 6
-        filters, joins = _encode_calls(encode)
-        assert len(filters) == 1
+        videos, audios, joins = _encode_calls(encode)
+        assert len(videos) == 1
+        assert len(audios) == 1
         assert len(joins) == 1
         full_measure.assert_not_called()
 
@@ -894,9 +962,9 @@ def test_segments_do_not_cut_wind_or_xfade_and_keep_inputs_small() -> None:
             graph = cmd[cmd.index("-filter_complex") + 1]
             assert "]split=24" not in graph
             assert "]split=23" not in graph
-            assert "measured_I=-23.4" in graph
-            assert "measured_TP=-3.1" in graph
-            assert "offset=1.2" in graph
+            assert "loudnorm=" not in graph
+            assert "fps=30:start_time=0" in graph
+            assert "-an" in cmd
             assert "subtitles=" in graph
             ass = (work / f"seg-{index:03d}.ass").read_text(encoding="utf-8")
             # 119s–125s 的一句跨过 120s 的段界。前一段只留到段尾，后一段从 0 起算。
@@ -907,10 +975,20 @@ def test_segments_do_not_cut_wind_or_xfade_and_keep_inputs_small() -> None:
             if seg.start_frame == 120 * 30:
                 assert "Dialogue: 0,0:00:00.00,0:00:05.00,Default" in ass
                 assert "0:01:59.00" not in ass
-        join = final_export.concat_copy_cmd(work / "segments.ffconcat", Path("/tmp/final.mp4"))
+        audio = final_export.program_audio_cmd(
+            Path("/media"), table, dict(MEASURED), work / "program-audio.m4a",
+        )
+        audio_graph = audio[audio.index("-filter_complex") + 1]
+        assert "measured_I=-23.4" in audio_graph
+        assert "measured_TP=-3.1" in audio_graph
+        assert "offset=1.2" in audio_graph
+        assert "subtitles=" not in audio_graph
+        assert "-vn" in audio
+        join = final_export.mux_final_cmd(work / "segments.ffconcat", work / "program-audio.m4a", Path("/tmp/final.mp4"))
         assert join[join.index("-c") + 1] == "copy"
         assert "hevc_videotoolbox" not in join
         assert "-filter_complex" not in join
+        assert join[join.index("-map") + 1] == "0:v:0"
     # 这一期的切法：一段最多两条原片加透明层、whoosh 和贴图。
     assert counts == [3, 2, 5, 5, 5, 5, 3, 5, 3, 2]
     assert max(counts) == 5
@@ -967,34 +1045,99 @@ def test_subtitle_times_are_local_on_each_side_of_a_cut() -> None:
     assert final_export.cues_for_segment(cues, 20.0, 30.0) == []
 
 
+def _fake_proc(code: int):
+    def _popen(cmd, **_kwargs):
+        proc = type("Proc", (), {})()
+        proc.args = list(cmd)
+        proc.pid = 4242
+        proc.returncode = None
+        proc._code = code
+
+        def wait(timeout=None):
+            del timeout
+            proc.returncode = proc._code
+            return proc.returncode
+
+        def poll():
+            return proc.returncode
+
+        def kill():
+            proc.returncode = -9
+
+        proc.wait = wait
+        proc.poll = poll
+        proc.kill = kill
+        _popen.cmds.append(list(cmd))
+        return proc
+
+    _popen.cmds = []
+    return _popen
+
+
 def test_fast_init_failure_retries_once_with_one_filter_thread() -> None:
-    calls: list[str] = []
+    popen = _fake_proc(1)
+    real_code = popen
 
-    def _run(cmd, check=False):
-        del check
-        calls.append(cmd[cmd.index("-filter_complex_threads") + 1])
-        code = 1 if len(calls) == 1 else 0
-        return subprocess.CompletedProcess(cmd, code)
+    def _popen(cmd, **kwargs):
+        proc = real_code(cmd, **kwargs)
+        proc._code = 1 if len(real_code.cmds) == 1 else 0
+        return proc
 
-    with patch.object(final_export.subprocess, "run", side_effect=_run):
+    with (
+        patch.object(final_export.subprocess, "Popen", side_effect=_popen),
+        patch.object(final_export, "_process_memory_gb", return_value=(0.1, "rss")),
+    ):
         final_export._run_segment_encode(["ffmpeg", "-filter_complex_threads", "3", "-i", "clip.mp4"])
-    assert calls == ["3", "1"]
+    assert [cmd[cmd.index("-filter_complex_threads") + 1] for cmd in real_code.cmds] == ["3", "1"]
 
-    killed: list[int] = []
-
-    def _kill(cmd, check=False):
-        del check
-        killed.append(cmd[cmd.index("-filter_complex_threads") + 1] == "3")
-        return subprocess.CompletedProcess(cmd, -9)
-
-    with patch.object(final_export.subprocess, "run", side_effect=_kill):
+    killed = _fake_proc(-9)
+    with (
+        patch.object(final_export.subprocess, "Popen", side_effect=killed),
+        patch.object(final_export, "_process_memory_gb", return_value=(0.1, "rss")),
+    ):
         try:
             final_export._run_segment_encode(["ffmpeg", "-filter_complex_threads", "3", "-i", "clip.mp4"])
         except subprocess.CalledProcessError as exc:
             assert exc.returncode == -9
         else:
             raise AssertionError("SIGKILL should not be retried")
-    assert killed == [True]
+    assert len(killed.cmds) == 1
+
+
+def test_memory_cap_kills_the_segment_without_retry() -> None:
+    popen = _fake_proc(0)
+
+    def _slow(cmd, **kwargs):
+        proc = popen(cmd, **kwargs)
+
+        def wait(timeout=None):
+            del timeout
+            if proc.returncode is None:
+                raise subprocess.TimeoutExpired(cmd, 2)
+            return proc.returncode
+
+        proc.wait = wait
+        return proc
+
+    with (
+        patch.object(final_export.subprocess, "Popen", side_effect=_slow),
+        patch.object(final_export, "_process_memory_gb", return_value=(9.0, "footprint")),
+    ):
+        try:
+            final_export._run_segment_encode(["ffmpeg", "-filter_complex_threads", "3", "-i", "clip.mp4"])
+        except SystemExit as exc:
+            assert "not retrying" in str(exc)
+        else:
+            raise AssertionError("over-cap export should stop")
+    assert len(popen.cmds) == 1
+
+
+def test_footprint_text_is_phys_footprint_in_gb() -> None:
+    assert final_export.parse_footprint_gb("phys_footprint: 512 MB\n") == 512 / 1024
+    assert abs(final_export.parse_footprint_gb("phys_footprint: 1.5 GB\n") - 1.5) < 1e-9
+    text = "phys_footprint_peak: 9 GB\nphys_footprint: 2147483648\n"
+    assert abs(final_export.parse_footprint_gb(text) - 2) < 0.01
+    assert final_export.parse_footprint_gb("nothing here") is None
 
 
 def test_failed_segment_cleans_temp_files_and_partial_output() -> None:
@@ -1016,16 +1159,35 @@ def test_failed_segment_cleans_temp_files_and_partial_output() -> None:
                 super().__init__(*args, **kwargs)
                 dirs.append(Path(self.name))
 
-        def _boom(cmd, check=False):
-            del cmd, check
+        def _popen(cmd, **_kwargs):
             out.write_bytes(b"partial")
-            raise subprocess.CalledProcessError(1, ["ffmpeg"])
+            proc = type("Proc", (), {})()
+            proc.args = list(cmd)
+            proc.pid = 4242
+            proc.returncode = None
+
+            def wait(timeout=None):
+                del timeout
+                proc.returncode = 1
+                return 1
+
+            def poll():
+                return proc.returncode
+
+            def kill():
+                proc.returncode = -9
+
+            proc.wait = wait
+            proc.poll = poll
+            proc.kill = kill
+            return proc
 
         from contextlib import ExitStack
 
         contexts = (
             patch.object(tempfile, "TemporaryDirectory", _Dir),
-            patch.object(final_export.subprocess, "run", side_effect=_boom),
+            patch.object(final_export.subprocess, "Popen", side_effect=_popen),
+            patch.object(final_export, "_process_memory_gb", return_value=(0.1, "rss")),
             *_qc_ok(),
         )
         with ExitStack() as stack:
@@ -1069,5 +1231,7 @@ if __name__ == "__main__":
     test_segment_boundary_keeps_wind_and_xfade_intact()
     test_subtitle_times_are_local_on_each_side_of_a_cut()
     test_fast_init_failure_retries_once_with_one_filter_thread()
+    test_memory_cap_kills_the_segment_without_retry()
+    test_footprint_text_is_phys_footprint_in_gb()
     test_failed_segment_cleans_temp_files_and_partial_output()
     print("ok")
