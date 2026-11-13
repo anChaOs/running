@@ -24,7 +24,7 @@ p3-library / p3-topic / p3-scaffold
   → 冷开场 / 贴图 / 插入入表
   → p3-assemble（按表出低成本预览）
   → p3-subs（对口型前冻结时间表）
-  → 冻结后：用户校对字幕 ∥ `--prep-alpha` ∥ 可选 `--measure-only`
+  → 冻结后：用户校对字幕 ∥ `--prep-alpha`（8 核 `-j 6`，默认 2）∥ 可选 `--measure-only`
   → 确认字幕
   → final_export.py --confirmed（同一张表，一次编码）
   → publish

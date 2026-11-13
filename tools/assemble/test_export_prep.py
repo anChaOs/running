@@ -7,6 +7,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 from unittest.mock import patch
 
@@ -162,11 +163,13 @@ def test_prep_alpha_reaches_render_main_without_jobs_clash() -> None:
         (media / "weather-hourly.json").write_text('{"hours":[]}\n', encoding="utf-8")
         seen: list[dict] = []
 
-        def _write(**kwargs):
-            dest = Path(kwargs["output_path"])
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_bytes(b"alpha")
-            seen.append(kwargs)
+        def _write(batch, batch_index=0, **_kwargs):
+            for plan in batch:
+                dest = Path(plan["dest"])
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_bytes(b"alpha")
+            seen.extend(batch)
+            assert batch_index == 0
 
         venv_python = hud.REPO_ROOT / ".venv" / "bin" / "python"
         real_exists = Path.exists
@@ -179,15 +182,15 @@ def test_prep_alpha_reaches_render_main_without_jobs_clash() -> None:
         with (
             patch.object(hud, "_probe_duration", return_value=100.0),
             patch.object(hud, "resolve_total_distance_meters", return_value=None),
-            patch.object(hud, "render_one_clip", side_effect=_write),
+            patch.object(hud, "launch_alpha_batch", side_effect=_write),
             patch.object(Path, "exists", _exists),
         ):
             assert hud.main(["--media-dir", str(media), "--prep-alpha"]) == 0
         assert len(seen) == 1
-        assert seen[0]["range_start"] == 12.0
-        assert seen[0]["range_end"] == 18.0
-        assert seen[0]["clip"].name == "2026-01-02-run-a.mp4"
-        assert "keeps" not in Path(seen[0]["output_path"]).parts
+        assert seen[0]["src_start_s"] == 12.0
+        assert seen[0]["src_end_s"] == 18.0
+        assert Path(seen[0]["source"]).name == "2026-01-02-run-a.mp4"
+        assert "keeps" not in Path(seen[0]["dest"]).parts
         assert (media / "logs" / "hud-alpha.json").is_file()
         assert not (media / "hud-renders" / "keeps").exists()
         assert todo.load(media)["hud-render"] == "done"
@@ -270,6 +273,7 @@ def test_confirmed_export_backfills_missing_prep_then_encodes_once() -> None:
                 ]
             ) == 0
         render.assert_called_once()
+        assert render.call_args.kwargs["jobs"] == hud.HUD_EXPORT_JOBS
         measure.assert_called_once()
         full_measure.assert_not_called()
         assert encode.call_count == 1
@@ -338,6 +342,244 @@ class _patches:
         return False
 
 
+def _fake_plan(source, dest, start, end, *, ranged=True) -> dict:
+    return {
+        "clip": Path(source).name,
+        "source": Path(source),
+        "dest": Path(dest),
+        "src_start_s": start,
+        "src_end_s": end,
+        "overlay_profile": "qtrle",
+        "ranged": ranged,
+    }
+
+
+def _window_table(count: int) -> dict:
+    table = edl.empty_program("2026-01-02-demo")
+    edl.set_source_sync(
+        table,
+        [{"clip": "2026-01-02-run-a.mp4", "fit": "2026-01-02-run-data.fit", "offset_s": 0.0}],
+    )
+    keeps = [{"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 4.0}]
+    for index in range(count):
+        start = 10.0 + index * 2
+        keeps.append({"clip": "2026-01-02-run-a.mp4", "src_start_s": start, "src_end_s": start + 1.0})
+    keeps.append({"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 4.0})
+    edl.upsert_keeps(table, keeps)
+    edl.record_hud(table, shoe_name="Fly", shoe_km_after=100.0, weather_city="shanghai")
+    edl.freeze(table)
+    return table
+
+
+def _prep_launches(count: int, extra: list[str]) -> tuple[list[list[float]], list[int]]:
+    launches: list[list[float]] = []
+    pools: list[int] = []
+    lock = threading.Lock()
+
+    def _launch(batch, batch_index=0, **_kwargs):
+        del batch_index
+        with lock:
+            launches.append([float(item["src_start_s"]) for item in batch])
+        for item in batch:
+            dest = Path(item["dest"])
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if "keeps" in dest.parts:
+                raise AssertionError(dest)
+            dest.write_bytes(b"alpha")
+
+    real_pool = hud.ThreadPoolExecutor
+
+    class _Pool(real_pool):
+        def __init__(self, max_workers, **kwargs):
+            pools.append(max_workers)
+            super().__init__(max_workers=max_workers, **kwargs)
+
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        media, _episode = _stage(root, _window_table(count), subs="waiting-review")
+        (media / "2026-01-02-run-data.fit").write_bytes(b"fit")
+        (media / "weather-hourly.json").write_text('{"hours":[]}\n', encoding="utf-8")
+        venv_python = hud.REPO_ROOT / ".venv" / "bin" / "python"
+        real_exists = Path.exists
+
+        def _exists(self):
+            if self == venv_python:
+                return True
+            return real_exists(self)
+
+        with (
+            patch.object(hud, "_probe_duration", return_value=1000.0),
+            patch.object(hud, "resolve_total_distance_meters", return_value=None),
+            patch.object(hud, "launch_alpha_batch", side_effect=_launch),
+            patch.object(hud, "ThreadPoolExecutor", _Pool),
+            patch.object(hud, "HUD_EXPORT_JOBS", 2),
+            patch.object(Path, "exists", _exists),
+        ):
+            assert hud.main(["--media-dir", str(media), "--prep-alpha", *extra]) == 0
+        assert not (media / "hud-renders" / "keeps").exists()
+    return launches, pools
+
+
+def test_same_source_windows_do_not_fork_one_wrap_each() -> None:
+    """12 个窗口在同一条原片上。默认 2 路、指定 6 路、串行 1 路，启动次数都远少于窗口数。"""
+    default_launches, default_pools = _prep_launches(12, [])
+    assert hud.HUD_EXPORT_JOBS == 2
+    assert len(default_launches) == 2
+    assert sorted(len(batch) for batch in default_launches) == [6, 6]
+    assert default_pools == [2]
+    six_launches, six_pools = _prep_launches(12, ["--jobs", "6"])
+    assert len(six_launches) == 6
+    assert len(six_launches) < 12
+    assert sorted(len(batch) for batch in six_launches) == [2, 2, 2, 2, 2, 2]
+    assert six_pools == [6]
+    serial_launches, serial_pools = _prep_launches(12, ["--jobs", "1"])
+    assert len(serial_launches) == 1
+    assert len(serial_launches[0]) == 12
+    assert serial_pools == []
+
+
+def test_batch_plan_splits_only_the_dominant_source() -> None:
+    long = Path("/media/run-a.mp4")
+    short_b = Path("/media/run-b.mp4")
+    short_c = Path("/media/run-c.mp4")
+    plans = [_fake_plan(long, f"/out/a{i}.mov", i, i + 0.5) for i in range(12)]
+    plans += [_fake_plan(short_b, f"/out/b{i}.mov", i, i + 0.5) for i in range(2)]
+    plans += [_fake_plan(short_c, f"/out/c{i}.mov", i, i + 0.5) for i in range(2)]
+    batches = hud.batch_alpha_plans(plans, 6)
+    by_source: dict[str, list[int]] = {}
+    for batch in batches:
+        sources = {str(Path(plan["source"]).resolve()) for plan in batch}
+        assert len(sources) == 1
+        by_source.setdefault(sources.pop(), []).append(len(batch))
+    assert by_source[str(long.resolve())] == [2, 2, 2, 2, 2, 2]
+    assert by_source[str(short_b.resolve())] == [2]
+    assert by_source[str(short_c.resolve())] == [2]
+    assert len(batches) < len(plans)
+    even = [_fake_plan("/media/run-a.mp4", f"/out/a{i}.mov", i, i + 0.5) for i in range(6)]
+    even += [_fake_plan("/media/run-b.mp4", f"/out/b{i}.mov", i, i + 0.5) for i in range(6)]
+    even_batches = hud.batch_alpha_plans(even, 6)
+    assert len(even_batches) == 2
+    assert sorted(len(batch) for batch in even_batches) == [6, 6]
+    try:
+        hud.batch_alpha_plans(plans, 0)
+    except SystemExit as exc:
+        assert "jobs" in str(exc)
+    else:
+        raise AssertionError("--jobs 0 should stop")
+
+
+def test_batch_command_is_one_wrap_and_keeps_full_clip_unbounded() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        source = root / "run-a.mp4"
+        source.write_bytes(b"clip")
+        plans = [_fake_plan(source, root / f"w{i}.mov", 10 + i * 2, 11 + i * 2) for i in range(4)]
+        cmd = hud.alpha_batch_argv(
+            plans,
+            batch_index=3,
+            gopro_python=root / "python",
+            gopro_dashboard=root / "gopro_dashboard_wrap.py",
+            font=root / "font.otf",
+            fit=root / "run.fit",
+            resolved_template=root / "layout.xml",
+            video_end_time_mode="file-modified",
+            overlay_profile="qtrle",
+            shoe_name="Fly",
+            shoe_total_km_after_run=10,
+            cache_dir=root / "cache",
+        )
+        assert sum(part.endswith("gopro_dashboard_wrap.py") for part in cmd) == 1
+        assert "--hud-windows" in cmd
+        assert "--hud-start" not in cmd
+        assert "libx264" not in cmd
+        assert "keeps" not in " ".join(cmd)
+        assert str(source.resolve()) in cmd
+        spec = json.loads((root / "cache" / "windows.json").read_text(encoding="utf-8"))
+        assert len(spec["windows"]) == 4
+        assert [row["start"] for row in spec["windows"]] == [10, 12, 14, 16]
+        assert all(row["output"].endswith(".mov") for row in spec["windows"])
+        assert "hud-renders/keeps" not in json.dumps(spec)
+    full = _fake_plan("/media/run-a.mp4", "/out/full.mov", 0, 100, ranged=False)
+    spec = hud.alpha_windows_spec([full])
+    assert spec["windows"] == [
+        {"start": None, "end": None, "output": str(Path("/out/full.mov").resolve())}
+    ]
+
+
+def test_existing_alpha_is_reused_inside_the_shared_wrap() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        table = _window_table(4)
+        media, _episode = _stage(root, table, subs="waiting-review")
+        (media / "2026-01-02-run-data.fit").write_bytes(b"fit")
+        (media / "weather-hourly.json").write_text('{"hours":[]}\n', encoding="utf-8")
+        plans = hud.plan_alpha_jobs(media, table, {"2026-01-02-run-a.mp4": 1000.0})
+        assert len(plans) == 4
+        plans[0]["dest"].parent.mkdir(parents=True, exist_ok=True)
+        plans[0]["dest"].write_bytes(b"keep")
+        seen: list[list[float]] = []
+
+        def _launch(batch, batch_index=0, **_kwargs):
+            del batch_index
+            seen.append([float(item["src_start_s"]) for item in batch])
+            for item in batch:
+                Path(item["dest"]).parent.mkdir(parents=True, exist_ok=True)
+                Path(item["dest"]).write_bytes(b"new")
+
+        venv_python = hud.REPO_ROOT / ".venv" / "bin" / "python"
+        real_exists = Path.exists
+
+        def _exists(self):
+            if self == venv_python:
+                return True
+            return real_exists(self)
+
+        with (
+            patch.object(hud, "_probe_duration", return_value=1000.0),
+            patch.object(hud, "resolve_total_distance_meters", return_value=None),
+            patch.object(hud, "launch_alpha_batch", side_effect=_launch),
+            patch.object(hud, "_alpha_matches", side_effect=lambda path, _profile: Path(path).is_file()),
+            patch.object(Path, "exists", _exists),
+        ):
+            assert hud.main(["--media-dir", str(media), "--prep-alpha", "--jobs", "1"]) == 0
+        assert len(seen) == 1
+        assert len(seen[0]) == 3
+        assert plans[0]["src_start_s"] not in seen[0]
+        assert plans[0]["dest"].read_bytes() == b"keep"
+        assert not (media / "hud-renders" / "keeps").exists()
+
+
+def test_confirmed_export_backfill_respects_jobs() -> None:
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        media, episode = _stage(root, _table(partial=False), subs="done")
+        out = media / "2026-01-02-run-final.mp4"
+        alpha = media / "hud-renders" / "qtrle" / "run-a-hud-alpha.mov"
+        seen: dict[str, int] = {}
+
+        def _render(*_args, **kwargs):
+            seen["jobs"] = kwargs["jobs"]
+            alpha.parent.mkdir(parents=True, exist_ok=True)
+            alpha.write_bytes(b"alpha")
+            return [alpha]
+
+        with _patches(render_side=_render) as (encode, _render_mock, measure, full_measure):
+            measure.return_value = dict(MEASURED)
+            assert final_export.main(
+                [
+                    "--media-dir", str(media),
+                    "--episode-dir", str(episode),
+                    "--out", str(out),
+                    "--confirmed",
+                    "--jobs",
+                    "6",
+                ]
+            ) == 0
+        assert seen["jobs"] == 6
+        assert encode.call_count == 1
+        full_measure.assert_not_called()
+
+
 if __name__ == "__main__":
     test_alpha_plan_does_not_need_keeps()
     test_loudness_reuse_allows_a_tiny_cut_only()
@@ -347,4 +589,9 @@ if __name__ == "__main__":
     test_confirmed_export_reuses_prep_and_encodes_once()
     test_confirmed_export_backfills_missing_prep_then_encodes_once()
     test_export_refuses_without_confirmed_subs_and_writes_nothing()
+    test_same_source_windows_do_not_fork_one_wrap_each()
+    test_batch_plan_splits_only_the_dominant_source()
+    test_batch_command_is_one_wrap_and_keeps_full_clip_unbounded()
+    test_existing_alpha_is_reused_inside_the_shared_wrap()
+    test_confirmed_export_backfill_respects_jobs()
     print("ok")

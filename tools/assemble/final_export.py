@@ -611,6 +611,14 @@ def main(argv: list[str] | None = None) -> int:
         help="不烧硬字幕。默认仍按当前 skill 在一次编码里烧 ASS；需要只出外挂 SRT 时加这个开关。",
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=None,
+        help="补画 HUD 透明层的并行路数，默认 2。不改变确认导出这一次编码。"
+        "8 核机器建议 6，留 1 到 2 核给系统和写 mov 的 ffmpeg",
+    )
     args = parser.parse_args(argv)
     try:
         sys.stdout.reconfigure(line_buffering=True)
@@ -1137,11 +1145,16 @@ def _export_from_program(args, media_dir: Path) -> int:
             durations[sl["clip"]] = probe_duration(path)
     jobs = edl.hud_jobs(table, fps)
     modes = [_program_alpha_mode(job, durations) for job in jobs]
+    worker_count = hud.HUD_EXPORT_JOBS if args.jobs is None else args.jobs
+    if worker_count < 1:
+        raise SystemExit("--jobs must be >= 1")
     if hud.alphas_ready(media_dir, table, fps=fps):
         alpha_paths = hud.planned_alpha_paths(media_dir, table, fps=fps)
         print("HUD alpha reused", flush=True)
     else:
-        alpha_paths = hud.export_alphas(media_dir, table, durations, dry_run=args.dry_run, fps=fps)
+        alpha_paths = hud.export_alphas(
+            media_dir, table, durations, dry_run=args.dry_run, fps=fps, jobs=worker_count,
+        )
     if len(alpha_paths) != len(jobs):
         raise SystemExit("HUD alpha plan does not match kept run slices")
     for path in alpha_paths:

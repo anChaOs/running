@@ -141,7 +141,18 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-variant.xm
   -sk 642
 ```
 
-这条只把鞋、天气和透明层规格写进 `logs/program.json`。不要加 `--preview`：那会在渲透明层的同时把未剪原片再压一遍。时间表冻结后用 `--prep-alpha`，按留下的入出点直接画透明层，不先切 `hud-renders/keeps/`。确认导出若发现清单对不上，会自己补画。
+这条只把鞋、天气和透明层规格写进 `logs/program.json`。不要加 `--preview`：那会在渲透明层的同时把未剪原片再压一遍。时间表冻结后用 `--prep-alpha`，按留下的入出点直接画透明层，不先切 `hud-renders/keeps/`。确认导出若发现清单对不上，会自己补画，并认同一套 `--jobs`。
+
+8 核机器建议：
+
+```bash
+.venv/bin/python tools/hud/render_running_hud.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  --prep-alpha \
+  -j 6
+```
+
+`-j` / `--jobs` 的默认仍是 2。6 路是把 8 核里的 1–2 核留给系统和写 mov 的 ffmpeg。同一条原片只起一个 wrap，FIT 和模板加载一次，再按窗口写成 `hud-renders/<profile>/` 里各自的 alpha mov。一条原片占了大部分窗口时，最多拆成 `-j` 个进程，每个进程仍然一次加载、连续画多段。已经对得上的文件直接复用。确认导出仍然只跑 `final_export.py --confirmed` 这一次编码。
 
 默认透明层编码是 **qtrle**（QuickTime Animation。比 ProRes 4444 小；alpha 是无损压缩。开发机没有媒体盘，没有做实机画质对比）。导出画面不能接受，或剪映要 ProRes 时：
 

@@ -466,7 +466,9 @@ def _alpha_matches(path: Path, profile: str) -> bool:
     return codec == expected or codec.startswith(expected)
 
 
-# 和渲染器默认 --jobs、已发布期次用过的并行度一致。每段缓存目录按文件名分开。
+# 没传 --jobs 时的并行度，和渲染器默认、已发布期次用过的一致。
+# --prep-alpha 和确认导出补画都把命令行 --jobs 传进来，不用这个数盖掉。
+# 8 核机器建议 -j 6，留 1–2 核给系统和写 mov 的 ffmpeg。
 HUD_EXPORT_JOBS = 2
 HUD_ALPHA_MANIFEST = "hud-alpha.json"
 
@@ -556,8 +558,13 @@ def hud_overlay_command(
     range_start: float | None = None,
     range_end: float | None = None,
     config_dir: Path | None = None,
+    windows_file: Path | None = None,
 ) -> list[str]:
-    """对原片画透明层。切开的区间用 --hud-start/--hud-end，不另写画面文件。"""
+    """对原片画透明层。切开的区间用 --hud-start/--hud-end，不另写画面文件。
+
+    windows_file 列出同一条原片上的多个窗口。一个 wrap 进程加载一次 FIT 和模板，
+    再按文件里的输出路径逐段写 alpha。不要和 --hud-start/--hud-end 一起用。
+    """
     cmd = [
         str(gopro_python),
         str(gopro_dashboard),
@@ -591,11 +598,85 @@ def hud_overlay_command(
         "--shoe-total-km-after-run",
         str(shoe_total_km_after_run),
     ]
-    if range_start is not None or range_end is not None:
+    if windows_file is not None:
+        cmd.extend(["--hud-windows", str(windows_file)])
+    elif range_start is not None or range_end is not None:
         if range_start is None or range_end is None:
             raise ValueError("HUD range needs both start and end")
         cmd.extend(["--hud-start", f"{float(range_start):.6f}", "--hud-end", f"{float(range_end):.6f}"])
     return cmd
+
+
+def _plan_source_key(plan: dict) -> tuple[str, str]:
+    return (str(Path(plan["source"]).resolve()), str(plan["overlay_profile"]))
+
+
+def _dominant_processes(size: int, jobs: int) -> int:
+    """一条原片最多拆成 jobs 个进程。段数够时每路至少两段，避免退回一段一进程。"""
+    paired = max(1, size // 2)
+    return max(1, min(size, jobs, paired))
+
+
+def _split_group(windows: list[dict], count: int) -> list[list[dict]]:
+    count = max(1, min(count, len(windows)))
+    size = len(windows)
+    batches: list[list[dict]] = []
+    start = 0
+    for index in range(count):
+        length = size // count + (1 if index < (size % count) else 0)
+        batches.append(windows[start:start + length])
+        start += length
+    return [batch for batch in batches if batch]
+
+
+def batch_alpha_plans(plans: list[dict], jobs: int) -> list[list[dict]]:
+    """按原片归组。一个进程只画一条原片上的多段。
+
+    某一条原片的窗口占了大多数时，把它拆给最多 jobs 个进程，避免短片结束后只剩一路。
+    拆开的每一路仍然一次加载、连续画自己那几段。
+    """
+    if jobs < 1:
+        raise SystemExit("--jobs must be >= 1")
+    grouped: dict[tuple[str, str], list[dict]] = {}
+    for plan in plans:
+        grouped.setdefault(_plan_source_key(plan), []).append(plan)
+    if not grouped:
+        return []
+    groups = sorted(grouped.values(), key=len, reverse=True)
+    sizes = [len(group) for group in groups]
+    counts = [1] * len(groups)
+    if jobs > 1 and sizes[0] > sum(sizes) - sizes[0]:
+        counts[0] = _dominant_processes(sizes[0], jobs)
+    batches: list[list[dict]] = []
+    for group, count in zip(groups, counts, strict=True):
+        batches.extend(_split_group(group, count))
+    return batches
+
+
+def alpha_windows_spec(batch: list[dict]) -> dict:
+    """交给一个 wrap 的窗口清单。整段留下的原片不写 start/end，透明层从原片 0 起。"""
+    windows = []
+    for plan in batch:
+        if plan.get("ranged"):
+            start: float | None = float(plan["src_start_s"])
+            end: float | None = float(plan["src_end_s"])
+        else:
+            start = end = None
+        windows.append(
+            {
+                "start": start,
+                "end": end,
+                "output": str(Path(plan["dest"]).resolve()),
+            }
+        )
+    return {"windows": windows}
+
+
+def _plans_by_profile(plans: list[dict]) -> dict[str, list[dict]]:
+    groups: dict[str, list[dict]] = {}
+    for plan in plans:
+        groups.setdefault(str(plan["overlay_profile"]), []).append(plan)
+    return groups
 
 
 def hud_keep_trim_cmd(src: Path, dest: Path, start: float, end: float) -> list[str]:
@@ -756,12 +837,17 @@ def export_alphas(
     *,
     dry_run: bool,
     fps: int = 30,
+    jobs: int | None = None,
 ) -> list[Path]:
     """按留下的入出点直接画透明层。不写 hud-renders/keeps/。
 
-    整段留下的原片不限窗口，透明层时间从原片 0 起。切开的区间把窗口交给
-    gopro 包装脚本，只画这一段；原片像素留到确认导出时再解一次。
+    整段留下的原片不限窗口，透明层时间从原片 0 起。同一条原片的切开区间
+    交给同一个 wrap：FIT 和模板加载一次，每段仍写成自己的 alpha mov。
+    原片像素留到确认导出时再解一次。jobs 是这一步的并行路数，默认 2。
     """
+    worker_count = HUD_EXPORT_JOBS if jobs is None else jobs
+    if worker_count < 1:
+        raise SystemExit("--jobs must be >= 1")
     hud = table.get("hud") or {}
     if not hud.get("recorded"):
         raise SystemExit("HUD data is not recorded on the program timeline")
@@ -790,23 +876,30 @@ def export_alphas(
                 f"{window} profile={plan['overlay_profile']}"
             )
     if dry_run:
+        if pending:
+            batch_count = sum(
+                len(batch_alpha_plans(group, worker_count))
+                for group in _plans_by_profile(pending).values()
+            )
+            usable = min(worker_count, batch_count) if batch_count else 0
+            _log(
+                f"would start {batch_count} wrap process(es) for {len(pending)} window(s) "
+                f"with --jobs {usable}"
+            )
         return [plan["dest"] for plan in plans]
-    groups: dict[str, list[dict]] = {}
-    for plan in pending:
-        groups.setdefault(plan["overlay_profile"], []).append(plan)
-    for profile, jobs in groups.items():
+    for profile, profile_plans in _plans_by_profile(pending).items():
         argv = overlay_render_argv(
             render_dir=media_dir,
-            clips=[job["clip"] for job in jobs],
+            clips=list(dict.fromkeys(plan["clip"] for plan in profile_plans)),
             output_dir=media_dir / "hud-renders" / profile,
             fit=fit,
             hud=hud,
             weather=weather,
             profile=profile,
-            jobs=HUD_EXPORT_JOBS,
+            jobs=worker_count,
         )
         args = _parse_args(argv)
-        args.alpha_jobs = jobs
+        args.alpha_jobs = profile_plans
         # 不走 main()：调用方决定墙钟记在 hud-render 还是 final-export。
         rc = _render_main(args)
         if rc:
@@ -818,8 +911,141 @@ def export_alphas(
     return [plan["dest"] for plan in plans]
 
 
+def alpha_batch_argv(
+    batch: list[dict],
+    *,
+    batch_index: int,
+    gopro_python: Path,
+    gopro_dashboard: Path,
+    font: Path,
+    fit: Path,
+    resolved_template: Path,
+    video_end_time_mode: str,
+    overlay_profile: str,
+    shoe_name: str,
+    shoe_total_km_after_run: float,
+    cache_dir: Path | None = None,
+) -> list[str]:
+    """一条原片、一个 wrap。窗口清单写在该进程自己的缓存目录里。"""
+    if not batch:
+        raise SystemExit("HUD batch is empty")
+    source = Path(batch[0]["source"]).resolve()
+    profile = str(batch[0]["overlay_profile"])
+    if profile != overlay_profile:
+        raise SystemExit(f"HUD batch profile {profile} does not match {overlay_profile}")
+    dests: list[str] = []
+    for plan in batch:
+        if Path(plan["source"]).resolve() != source or str(plan["overlay_profile"]) != profile:
+            raise SystemExit("HUD batch must stay on one source and one profile")
+        dest = Path(plan["dest"])
+        if "keeps" in dest.parts:
+            raise SystemExit(f"HUD alpha must not be written under keeps: {dest}")
+        dests.append(str(dest.resolve()))
+    if len(dests) != len(set(dests)):
+        raise SystemExit("HUD batch windows share an output path")
+    cache = cache_dir or (DEFAULT_CACHE_DIR / f"{source.stem}-{profile}-batch-{batch_index}")
+    cache.mkdir(parents=True, exist_ok=True)
+    windows_path = cache / "windows.json"
+    windows_path.write_text(
+        json.dumps(alpha_windows_spec(batch), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    for plan in batch:
+        Path(plan["dest"]).parent.mkdir(parents=True, exist_ok=True)
+    return hud_overlay_command(
+        gopro_python=gopro_python,
+        gopro_dashboard=gopro_dashboard,
+        clip=source,
+        out=Path(batch[0]["dest"]),
+        font=font,
+        fit=fit,
+        template=resolved_template,
+        cache_dir=cache,
+        video_end_time_mode=video_end_time_mode,
+        overlay_profile=overlay_profile,
+        shoe_name=shoe_name,
+        shoe_total_km_after_run=shoe_total_km_after_run,
+        windows_file=windows_path,
+    )
+
+
+def launch_alpha_batch(
+    batch: list[dict],
+    *,
+    batch_index: int,
+    gopro_python: Path,
+    gopro_dashboard: Path,
+    font: Path,
+    fit: Path,
+    resolved_template: Path,
+    video_end_time_mode: str,
+    overlay_profile: str,
+    shoe_name: str,
+    shoe_total_km_after_run: float,
+    dry_run: bool,
+) -> None:
+    source = Path(batch[0]["source"])
+    cmd = alpha_batch_argv(
+        batch,
+        batch_index=batch_index,
+        gopro_python=gopro_python,
+        gopro_dashboard=gopro_dashboard,
+        font=font,
+        fit=fit,
+        resolved_template=resolved_template,
+        video_end_time_mode=video_end_time_mode,
+        overlay_profile=overlay_profile,
+        shoe_name=shoe_name,
+        shoe_total_km_after_run=shoe_total_km_after_run,
+    )
+    log_path = Path(batch[0]["dest"]).parent / f"{source.stem}-batch-{batch_index}-hud-render.log"
+    run(cmd, dry_run=dry_run, log_path=None if dry_run else log_path, label=source.name)
+
+
+def render_alpha_batches(batches: list[list[dict]], worker_count: int, launch) -> None:
+    """同时最多 worker_count 个 wrap。短片先启动，长片的拆分块留在队列里接上。"""
+    if worker_count < 1:
+        raise SystemExit("--jobs must be >= 1")
+    if not batches:
+        return
+    workers = min(worker_count, len(batches))
+    window_count = sum(len(batch) for batch in batches)
+    _log(
+        f"Rendering {window_count} HUD window(s) in {len(batches)} wrap process(es) "
+        f"with --jobs {workers}"
+    )
+    ordered = sorted(enumerate(batches), key=lambda item: (len(item[1]), item[0]))
+
+    def _one(item: tuple[int, list[dict]]) -> None:
+        index, batch = item
+        launch(batch, batch_index=index)
+
+    failures: list[str] = []
+    if workers == 1:
+        for item in ordered:
+            try:
+                _one(item)
+            except Exception as exc:
+                failures.append(str(exc))
+                _log(f"ERROR: {exc}")
+    else:
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="hud-alpha") as pool:
+            futures = [pool.submit(_one, item) for item in ordered]
+            for fut in as_completed(futures):
+                try:
+                    fut.result()
+                except Exception as exc:
+                    failures.append(str(exc))
+                    _log(f"ERROR: {exc}")
+    if failures:
+        _log("\nHUD render failed for:")
+        for item in failures:
+            _log(f"  - {item}")
+        raise SystemExit(1)
+
+
 def _render_alpha_jobs(
-    jobs: list[dict],
+    plans: list[dict],
     *,
     gopro_python: Path,
     gopro_dashboard: Path,
@@ -833,57 +1059,26 @@ def _render_alpha_jobs(
     dry_run: bool,
     jobs_n: int,
 ) -> int:
-    """每个留下的区间单独画。源文件是原片，窗口用 --hud-start/--hud-end。"""
-    if jobs_n < 1:
-        raise SystemExit("--jobs must be >= 1")
-    workers = min(jobs_n, len(jobs))
-    _log(f"Rendering {len(jobs)} HUD alpha range(s) with --jobs {workers}")
+    """按原片合并启动 wrap。每个窗口仍然写成自己的 alpha mov。"""
+    batches = batch_alpha_plans(plans, jobs_n)
 
-    def _one(job: dict) -> None:
-        start = float(job["src_start_s"]) if job.get("ranged") else None
-        end = float(job["src_end_s"]) if job.get("ranged") else None
-        render_one_clip(
-            clip=Path(job["source"]),
-            output_dir=Path(job["dest"]).parent,
+    def _launch(batch: list[dict], batch_index: int) -> None:
+        launch_alpha_batch(
+            batch,
+            batch_index=batch_index,
             gopro_python=gopro_python,
             gopro_dashboard=gopro_dashboard,
             font=font,
             fit=fit,
             resolved_template=resolved_template,
             video_end_time_mode=video_end_time_mode,
-            overlay_only=True,
             overlay_profile=overlay_profile,
-            preview=False,
             shoe_name=shoe_name,
             shoe_total_km_after_run=shoe_total_km_after_run,
             dry_run=dry_run,
-            output_path=Path(job["dest"]),
-            range_start=start,
-            range_end=end,
         )
 
-    failures: list[str] = []
-    if workers == 1:
-        for job in jobs:
-            try:
-                _one(job)
-            except Exception as exc:
-                failures.append(str(exc))
-                _log(f"ERROR: {exc}")
-    else:
-        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="hud-alpha") as pool:
-            futures = [pool.submit(_one, job) for job in jobs]
-            for fut in as_completed(futures):
-                try:
-                    fut.result()
-                except Exception as exc:
-                    failures.append(str(exc))
-                    _log(f"ERROR: {exc}")
-    if failures:
-        _log("\nHUD render failed for:")
-        for item in failures:
-            _log(f"  - {item}")
-        raise SystemExit(1)
+    render_alpha_batches(batches, jobs_n, _launch)
     return 0
 
 
@@ -921,7 +1116,7 @@ def _prep_alpha(args) -> int:
             if not args.dry_run:
                 raise
     with log_timeline.span(media_dir, "hud-render", enabled=not args.dry_run) as wall:
-        export_alphas(media_dir, table, durations, dry_run=args.dry_run)
+        export_alphas(media_dir, table, durations, dry_run=args.dry_run, jobs=args.jobs)
         if not args.dry_run:
             todo_list.mark(media_dir, "hud-render", "done")
         wall.rc = 0
@@ -1006,7 +1201,8 @@ def _parse_args(argv: list[str] | None = None):
         "--prep-alpha",
         action="store_true",
         help="After logs/program.json is frozen, draw HUD alpha for kept ranges only. "
-        "Does not write hud-renders/keeps and does not wait for confirmed subtitles",
+        "Does not write hud-renders/keeps and does not wait for confirmed subtitles. "
+        "Uses --jobs. On an 8-core machine, -j 6 leaves 1-2 cores for the system and ffmpeg",
     )
     parser.add_argument(
         "--preview",
@@ -1029,7 +1225,9 @@ def _parse_args(argv: list[str] | None = None):
         "--jobs",
         type=int,
         default=2,
-        help="Parallel clip renders (default: 2). Use 1 for serial.",
+        help="Parallel HUD workers (default: 2). --prep-alpha and confirmed-export HUD backfill "
+        "use this value. On an 8-core machine, --prep-alpha -j 6 leaves 1-2 cores for the "
+        "system and the ffmpeg that writes each mov. Use 1 for serial.",
     )
     return parser.parse_args(argv)
 

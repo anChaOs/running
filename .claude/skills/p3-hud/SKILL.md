@@ -62,10 +62,15 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json，�
 ```bash
 .venv/bin/python tools/hud/render_running_hud.py \
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
-  --prep-alpha
+  --prep-alpha \
+  -j 6
 ```
 
-脚本把 `hud-render` 标成 done，墙钟记在 `hud-render`。切开的区间在命令里是 `--hud-start` / `--hud-end`，输入仍是原片。整段留下的原片不限窗口。清单写在 `logs/hud-alpha.json`。对不上当前表时，`final_export.py --confirmed` 会自己重画，不用人记顺序。
+8 核机器用 `-j 6`，留 1–2 核给系统和写 mov 的 ffmpeg。默认仍是 2，核少就拿掉 `-j`。命令行上的数字会进渲染工人数。
+
+同一条原片起一个 wrap：FIT 和模板加载一次，再按留下的窗口逐段写成 `hud-renders/<profile>/` 里各自的 alpha mov。一条原片占了大部分窗口时，最多拆成 `-j` 个进程，每个进程仍然一次加载、连续画多段。短窗补起点，透明层时间从 0 起，可以叠到 `-ss` 放在 `-i` 前面的原片切片上。已经对得上的文件直接复用。不写 `hud-renders/keeps/`，也不解码重编原片画面。
+
+脚本把 `hud-render` 标成 done，墙钟记在 `hud-render`。切开的区间由这一次加载后的窗口步进器来画，输入仍是原片。整段留下的原片不限窗口。清单写在 `logs/hud-alpha.json`。对不上当前表时，`final_export.py --confirmed -j 6` 会自己重画，工人数同样认 `--jobs`。确认导出仍然只编码一次。
 
 响度测量不是这一步。要提前测用 `final_export.py --measure-only`。
 

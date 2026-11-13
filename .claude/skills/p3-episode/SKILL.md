@@ -38,8 +38,9 @@ review-preview
               → 冻结后，用户只改错字和换行；同时可以画 HUD、测响度
 
 frozen，字幕还在校对
-  render_running_hud.py --prep-alpha
-              → 按留下的入出点直接画透明层，不写 hud-renders/keeps/
+  render_running_hud.py --prep-alpha -j 6
+              → 8 核建议 -j 6（默认 2）。同一条原片加载一次 FIT，按窗口写出各自的 alpha
+              → 不写 hud-renders/keeps/
   final_export.py --measure-only
               → 只测切点 + 风刮/whoosh 的成片混音，不读字幕
 
@@ -97,7 +98,7 @@ subs: done，且时间表已冻结、logs/todo.md 允许导出
 | 只做 HUD | 已命名 `run-*` + FIT + `-sk`，时间表已有原片对齐 | `p3-shoes` → `p3-hud`（只记录，不渲） |
 | 只做预览 | `logs/program.json` 已排好成片时间 | `p3-assemble` |
 | 只做字幕 | 审片播放清单已写出，且刀点不再改 | `p3-subs` |
-| 冻结后的准备 | 时间表已冻结、预览已完成；字幕可以还在校对 | `render_running_hud.py --prep-alpha`，可选 `final_export.py --measure-only` |
+| 冻结后的准备 | 时间表已冻结、预览已完成；字幕可以还在校对 | `render_running_hud.py --prep-alpha`（8 核加 `-j 6`，默认 2），可选 `final_export.py --measure-only` |
 | 最终导出 | `subs: done` + `qc: done` + 用户确认 + 时间表已冻结 + `logs/todo.md` 允许导出 | `final_export.py --confirmed` |
 | 发布 / 清临时 | 双链或用户说发完了 | `p3-publish` |
 | 发布报告 | 已 published，复盘已拷 | `p3-publish-report` |

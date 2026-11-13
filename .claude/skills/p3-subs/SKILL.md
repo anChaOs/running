@@ -197,14 +197,15 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
 ```bash
 .venv/bin/python tools/hud/render_running_hud.py \
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
-  --prep-alpha
+  --prep-alpha \
+  -j 6
 
 .venv/bin/python tools/assemble/final_export.py \
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
   --measure-only
 ```
 
-`--prep-alpha` 按留下的入出点直接画透明层，不写 `hud-renders/keeps/`。`--measure-only` 只测切点和风刮之后的成片混音，不读字幕。两条都会改 `logs/todo.md`，而且不要求 `subs confirmed`。之后若改了刀点，准备步骤会回到 pending。只挪了大约 1 秒以内、片段顺序没变，响度可以不重测；改动更大必须重测。
+`--prep-alpha` 按留下的入出点直接画透明层，不写 `hud-renders/keeps/`。8 核机器用 `-j 6`，留 1–2 核给系统和写 mov 的 ffmpeg；默认仍是 2。同一条原片加载一次 FIT，再按窗口写成各自的 alpha。`--measure-only` 只测切点和风刮之后的成片混音，不读字幕。两条都会改 `logs/todo.md`，而且不要求 `subs confirmed`。之后若改了刀点，准备步骤会回到 pending。只挪了大约 1 秒以内、片段顺序没变，响度可以不重测；改动更大必须重测。
 
 > 切条已按易错规则扫过。这一轮抽听核对、改错字即可。优先动 `episodes/YYYY-MM-DD-slug/subtitles.txt`。时间先别动。改好了直接发：
 >

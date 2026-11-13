@@ -47,4 +47,4 @@ iina --no-stdin --mpv-geometry=320x180-8+8 \
 
 ## 完成后
 
-还没有字幕：`/p3-subs`。时间表已冻结、人还在改错字时，可以同时 `--prep-alpha` 和 `final_export.py --measure-only`。字幕用户确认后：一次 `final_export.py --confirmed`。已经导出并要上传：`/p3-publish`。
+还没有字幕：`/p3-subs`。时间表已冻结、人还在改错字时，可以同时 `--prep-alpha`（8 核加 `-j 6`）和 `final_export.py --measure-only`。字幕用户确认后：一次 `final_export.py --confirmed`。已经导出并要上传：`/p3-publish`。
