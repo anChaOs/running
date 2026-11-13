@@ -243,6 +243,9 @@ def test_confirmed_export_reuses_prep_and_encodes_once() -> None:
         graph = cmd[cmd.index("-filter_complex") + 1]
         assert "subtitles=" in graph
         assert "measured_I=-23.4" in graph
+        assert cmd[cmd.index("-filter_complex_threads") + 1] == "1"
+        assert cmd.index("-filter_complex_threads") < cmd.index("-i")
+        assert "-threads" not in cmd
         assert cmd[-1] == str(out)
         assert "no-subs" not in " ".join(cmd)
         assert "hud-renders/keeps" not in " ".join(cmd)
@@ -282,6 +285,9 @@ def test_confirmed_export_backfills_missing_prep_then_encodes_once() -> None:
         assert "subtitles=" in graph
         assert "loudnorm=" in graph
         assert "measured_I=-23.4" in graph
+        assert cmd[cmd.index("-filter_complex_threads") + 1] == "1"
+        assert cmd.index("-filter_complex_threads") < cmd.index("-i")
+        assert "-threads" not in cmd
         assert cmd[-1] == str(out)
         assert todo.load(media)["hud-render"] == "done"
         assert todo.load(media)["loudness-measure"] == "done"

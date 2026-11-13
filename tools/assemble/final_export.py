@@ -562,9 +562,14 @@ def build_encode_cmd(
     test_codec: str | None = None,
     spec: ExportSpec = FINAL_SPEC,
 ) -> list[str]:
+    # 大时间表上 ffmpeg 会插入上百个 auto_scale。默认滤镜图多线程在重配时
+    # 返回 EAGAIN（-35），一帧都写不出来。这是全局参数，必须放在第一个输入之前。
+    # 不要加 -threads 1，那会限制 VideoToolbox；-filter_threads 1 也解决不了。
     codec_args = video_codec_args(spec, test_codec=test_codec)
     return [
-        "ffmpeg", "-y", "-hide_banner", *plan.args,
+        "ffmpeg", "-y", "-hide_banner",
+        "-filter_complex_threads", "1",
+        *plan.args,
         "-filter_complex", graph, "-map", "[v]", "-map", "[a]",
         *codec_args,
         "-pix_fmt", spec.timeline.pix_fmt,
