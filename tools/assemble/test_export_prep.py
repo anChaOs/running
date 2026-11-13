@@ -593,14 +593,33 @@ def test_confirmed_input_plan_opens_shared_clip_once() -> None:
     assert len({row["clip"] for row in timeline}) == 7
     assert sum(1 for row in timeline if row["hud"]) == 118
     alphas = [Path(f"/media/hud-renders/qtrle/{index}.mov") for index in range(118)]
-    args = final_export.program_input_args(Path("/media"), table, alphas)
+    groups = final_export.confirmed_alpha_groups(table, alphas)
+    assert [len(group) for group in groups] == [24, 24, 24, 23, 23]
+    assert groups[0][0] == alphas[0]
+    assert groups[0][-1] == alphas[23]
+    assert groups[1][0] == alphas[24]
+    assert set(groups[0]).isdisjoint(groups[1])
+    with tempfile.TemporaryDirectory() as td:
+        list_dir = Path(td)
+        args = final_export.program_input_args(Path("/media"), table, alphas, list_dir=list_dir)
+        listing = (list_dir / "alpha-00.ffconcat").read_text(encoding="utf-8")
+        assert listing.startswith("ffconcat version 1.0\n")
+        assert listing.count("\nfile ") == 24
+        assert "file '/media/hud-renders/qtrle/0.mov'" in listing
+        assert "file '/media/hud-renders/qtrle/24.mov'" not in listing
+        other = (list_dir / "alpha-01.ffconcat").read_text(encoding="utf-8")
+        assert "file '/media/hud-renders/qtrle/24.mov'" in other
+        assert "file '/media/hud-renders/qtrle/0.mov'" not in other
     paths = _input_paths(args)
-    clip_paths = paths[:7]
-    assert len(paths) == 7 + 118 + 1
+    clip_paths = [path for path in paths if path.endswith(".mp4")]
+    # 7 条原片 + 5 条按原片收好的 alpha + whoosh。不再是 118 个窗口各一个 -i。
+    assert len(paths) == 7 + 5 + 1
+    assert len(clip_paths) == 7
     assert len(set(clip_paths)) == 7
-    assert all(path.endswith(".mp4") for path in clip_paths)
     assert paths[0].endswith("2026-01-02-open.mp4")
     assert paths[6].endswith("2026-01-02-close.mp4")
+    assert sum(path.endswith(".ffconcat") for path in paths) == 5
+    assert not any(path.endswith(".mov") for path in paths)
     for name in runs:
         assert clip_paths.count(str(Path("/media") / name)) == 1
     seeks = [args[index + 1] for index, flag in enumerate(args) if flag == "-ss"]
@@ -612,13 +631,27 @@ def test_confirmed_input_plan_opens_shared_clip_once() -> None:
     graph = final_export.build_program_filter(table, ["kept"] * 118, 0, None, apply_loudness=False)
     assert "[0:v]split=6" in graph
     assert "[1:v]split=24" in graph
+    assert "concat=n=24:v=1:a=0" in graph
     assert "trim=start=1.500000:end=2.500000" in graph
     assert "atrim=start=1.500000:end=2.500000" in graph
-    assert "[7:v]trim=duration=" in graph
-    assert "[124:v]" in graph
-    assert "[125:a]" in graph
+    assert "[7:v]trim=duration=24.000000" in graph
+    assert "[10:v]trim=duration=23.000000" in graph
+    assert "[11:v]trim=duration=23.000000" in graph
+    assert graph.count("overlay=eof_action=pass:shortest=0:format=auto") == 5
+    assert "[12:a]" in graph
+    assert "[13:v]" not in graph
+    assert "[124:v]" not in graph
+    assert "[125:a]" not in graph
     assert "[130:v]" not in graph
-    assert "[248:a]" not in graph
+    cmd = final_export.build_encode_cmd(
+        final_export.InputPlan(tuple(args), 7, (), (), 0.0),
+        graph,
+        Path("/tmp/2026-01-02-run-final.mp4"),
+    )
+    assert cmd[cmd.index("-filter_complex_threads") + 1] == "1"
+    assert cmd.index("-filter_complex_threads") < cmd.index("-i")
+    assert cmd.count("hevc_videotoolbox") == 1
+    assert "hud-renders/keeps" not in " ".join(cmd)
     audio_args = final_export.program_audio_input_args(Path("/media"), table)
     assert len(_input_paths(audio_args)) == 8
     audio = final_export.build_program_audio_filter(table, apply_loudness=False)
@@ -708,8 +741,16 @@ def test_confirmed_command_opens_shared_run_once() -> None:
         graph = cmd[cmd.index("-filter_complex") + 1]
         assert "[1:v]split=2" in graph
         assert "trim=start=4.000000:end=6.000000" in graph
+        assert "concat=n=2:v=1:a=0" in graph
+        assert graph.count("overlay=eof_action=pass:shortest=0:format=auto") == 1
+        inputs = _input_paths(cmd)
+        assert inputs.count(run) == 1
+        assert sum(path.endswith(".ffconcat") for path in inputs) == 1
+        assert not any(path.endswith(".mov") for path in inputs)
+        concat_list = next(path for path in inputs if path.endswith(".ffconcat"))
+        assert not Path(concat_list).exists()
         assert "hud-renders/keeps" not in " ".join(cmd)
-        assert "hevc_videotoolbox" in cmd
+        assert cmd.count("hevc_videotoolbox") == 1
 
 
 def test_confirmed_export_backfill_respects_jobs() -> None:

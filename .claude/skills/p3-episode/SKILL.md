@@ -47,7 +47,9 @@ frozen，字幕还在校对
 subs: done，且时间表已冻结、logs/todo.md 允许导出
   final_export.py --confirmed
               → 缺的透明层或响度自己补上
-              → 同一张表：裁原片、叠 HUD、xfade、风刮和 whoosh、贴图、烧字幕、套用已测响度，一次编码
+              → 同一张表：每条原片的句间刀收成一段，窗口 alpha 收成一条再叠一次
+              → 然后 xfade、风刮和 whoosh、贴图、烧字幕、套用已测响度，一次编码
+              → 不把 hud-renders/keeps/ 当画面
               → YYYY-MM-DD-run-final.mp4
 
 双链齐

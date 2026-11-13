@@ -681,6 +681,55 @@ class SameTableTest(unittest.TestCase):
         self.assertIn("atrim=start=0.000000:end=4.000000", graph)
         self.assertNotIn("trim=start=8.000000", graph)
 
+    def test_window_alphas_collapse_to_one_track_per_run(self) -> None:
+        sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
+        import final_export
+
+        table = edl.empty_program("2026-01-02-demo")
+        edl.set_source_sync(
+            table,
+            [
+                {"clip": "2026-01-02-run-a.mp4", "fit": "run.fit", "offset_s": 0.0},
+                {"clip": "2026-01-02-run-b.mp4", "fit": "run.fit", "offset_s": 1.0},
+            ],
+        )
+        rows = [{"clip": "2026-01-02-open.mp4", "src_start_s": 0.0, "src_end_s": 2.0}]
+        for name in ("2026-01-02-run-a.mp4", "2026-01-02-run-b.mp4"):
+            for index in range(3):
+                start = 4.0 + index * 2
+                rows.append({"clip": name, "src_start_s": start, "src_end_s": start + 1.0})
+        rows.append({"clip": "2026-01-02-close.mp4", "src_start_s": 0.0, "src_end_s": 2.0})
+        edl.upsert_keeps(table, rows)
+        alphas = [Path(f"/media/hud-renders/qtrle/{index}.mov") for index in range(6)]
+        groups = final_export.confirmed_alpha_groups(table, alphas)
+        self.assertEqual([len(group) for group in groups], [3, 3])
+        self.assertEqual(groups[0], tuple(alphas[:3]))
+        self.assertEqual(groups[1], tuple(alphas[3:]))
+        with tempfile.TemporaryDirectory() as td:
+            args = final_export.program_input_args(Path("/media"), table, alphas, list_dir=Path(td))
+        inputs = [args[index + 1] for index, flag in enumerate(args) if flag == "-i"]
+        self.assertEqual(sum(path.endswith(".mp4") for path in inputs), 4)
+        self.assertEqual(inputs.count(str(Path("/media/2026-01-02-run-a.mp4"))), 1)
+        self.assertEqual(inputs.count(str(Path("/media/2026-01-02-run-b.mp4"))), 1)
+        self.assertEqual(sum(path.endswith(".ffconcat") for path in inputs), 2)
+        self.assertFalse(any(path.endswith(".mov") for path in inputs))
+        self.assertNotIn("hud-renders/keeps", " ".join(args))
+        graph = final_export.build_program_filter(table, ["kept"] * 6, 0, None, apply_loudness=False)
+        self.assertEqual(graph.count("overlay=eof_action=pass:shortest=0:format=auto"), 2)
+        self.assertIn("[4:v]trim=duration=3.000000", graph)
+        self.assertIn("[5:v]trim=duration=3.000000", graph)
+        self.assertNotIn("[6:v]trim=duration=", graph)
+        self.assertIn("[1:v]split=3", graph)
+        self.assertIn("concat=n=3:v=1:a=0", graph)
+        cmd = final_export.build_encode_cmd(
+            final_export.InputPlan(tuple(args), 4, (), (), 0.0),
+            graph,
+            Path("/tmp/out.mp4"),
+        )
+        self.assertEqual(cmd[cmd.index("-filter_complex_threads") + 1], "1")
+        self.assertLess(cmd.index("-filter_complex_threads"), cmd.index("-i"))
+        self.assertEqual(cmd.count("hevc_videotoolbox"), 1)
+
     def test_unaligned_keeps_do_not_push_close_xfade_past_the_picture(self) -> None:
         sys.path.insert(0, str(Path(__file__).resolve().parent / "assemble"))
         import final_export

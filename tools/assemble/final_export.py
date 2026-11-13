@@ -4,7 +4,9 @@
 预览只用于人工检查；本入口直接读取原片和 HUD 透明层，在一次最终编码中完成
 转场拼接、数据图叠加、中段 overlays.json、字幕和响度处理。
 
-同一条原片只打开一次解码器：`-ss` 到这组切片最早的入点，句间刀在滤镜里 trim / split。
+同一条原片只打开一次解码器：`-ss` 到这组切片最早的入点，句间刀在滤镜里 trim / split，
+再接成这一段。这条原片上已经画好的窗口透明层收成一条 alpha，只叠一次。
+风刮和 xfade 在 open、各段跑、close 之间。不要按窗口各留一个 ARGB 解码器。
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -802,6 +805,76 @@ def _program_wind_visual(
     return f"{tag}p"
 
 
+def _program_acts(timeline: list[dict], wind_ids: set[str]) -> list[tuple[int, ...]]:
+    """把时间表收成几段：同一条原片上连续、顺向、没有转场的句间刀合成一段。
+
+    open、每一段跑、close 各是一段。换原片、原片时间往回、xfade、风刮，
+    或者 HUD 开关变了，都另起一段。这样一段里面的窗口能接成一条再叠一次。
+    """
+    acts: list[list[int]] = []
+    for index, sl in enumerate(timeline):
+        if not acts:
+            acts.append([index])
+            continue
+        prev = timeline[acts[-1][-1]]
+        forward = float(sl["src_start_s"]) >= float(prev["src_end_s"]) - 1e-6
+        if (
+            sl["clip"] == prev["clip"]
+            and forward
+            and int(sl["fade_frames"]) == 0
+            and sl["id"] not in wind_ids
+            and bool(sl["hud"]) == bool(prev["hud"])
+        ):
+            acts[-1].append(index)
+        else:
+            acts.append([index])
+    return [tuple(act) for act in acts]
+
+
+def _concat_ready(parts: list[str], labels: list[str], *, video: bool, tag: str, fps: int) -> str:
+    """一段里只有一个切片时不插 concat，滤镜串和原先逐段拼接保持一致。"""
+    if len(labels) == 1:
+        return labels[0]
+    joined = "".join(f"[{label}]" for label in labels)
+    if video:
+        parts.append(f"{joined}concat=n={len(labels)}:v=1:a=0,fps={fps},settb=1/{fps}[{tag}]")
+    else:
+        parts.append(f"{joined}concat=n={len(labels)}:v=0:a=1[{tag}]")
+    return tag
+
+
+def _ffconcat_quote(path: Path) -> str:
+    text = str(path).replace("\\", "\\\\").replace("'", "\\'")
+    return "'" + text + "'"
+
+
+def _write_alpha_concat(paths: tuple[Path, ...], dest: Path) -> None:
+    """把短窗口 mov 列进 concat 解复用清单。不重编码，也不铺成整段透明底。"""
+    lines = ["ffconcat version 1.0"]
+    lines.extend("file " + _ffconcat_quote(path) for path in paths)
+    dest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def confirmed_alpha_groups(table: dict, alpha_paths: list[Path], fps: int = 30) -> list[tuple[Path, ...]]:
+    """每个要画 HUD 的段一条 alpha。同一条原片的窗口按成片顺序排在一组里。"""
+    timeline = edl.frame_timeline(table, fps)
+    wind_ids = {str(item["before_id"]) for item in edl.wind_transitions(table)}
+    acts = _program_acts(timeline, wind_ids)
+    hud_indexes = [index for index, sl in enumerate(timeline) if sl["hud"]]
+    if len(hud_indexes) != len(alpha_paths):
+        raise ValueError("HUD alpha count does not match hud slices")
+    path_at = {index: alpha_paths[pos] for pos, index in enumerate(hud_indexes)}
+    groups: list[tuple[Path, ...]] = []
+    for act in acts:
+        group = tuple(path_at[index] for index in act if index in path_at)
+        if not group:
+            continue
+        if len(group) != len(act):
+            raise ValueError("HUD windows in one act must cover every slice of that act")
+        groups.append(group)
+    return groups
+
+
 def build_program_filter(
     table: dict,
     alpha_modes: list[str],
@@ -811,7 +884,11 @@ def build_program_filter(
     measured: dict[str, str] | None = None,
     apply_loudness: bool = True,
 ) -> str:
-    """按时间表裁切、叠 HUD、转场、贴图、烧字幕、响度。预览用的是同一组落帧区间。"""
+    """按时间表裁切、叠 HUD、转场、贴图、烧字幕、响度。预览用的是同一组落帧区间。
+
+    句间刀先收成 open / 每一段跑 / close。一段跑上的窗口透明层已经在输入侧收成一条，
+    这里只叠一次。测响度的音频图不走这条，仍按切片拼接，好让已测的 loudness.json 继续对得上。
+    """
     fps = spec.timeline.fps
     timeline = edl.frame_timeline(table, fps)
     if not timeline:
@@ -839,72 +916,101 @@ def build_program_filter(
         video_labels.append(f"v{index}")
         audio_labels.append(f"a{index}")
 
-    hud_slices = [sl for sl in timeline if sl["hud"]]
-    if len(alpha_modes) != len(hud_slices):
+    hud_count = sum(1 for sl in timeline if sl["hud"])
+    if len(alpha_modes) != hud_count:
         raise ValueError("HUD alpha count does not match hud slices")
-    alpha_base = len(openings)
+    modes_at: dict[int, str] = {}
     hud_at = 0
     for index, sl in enumerate(timeline):
         if not sl["hud"]:
             continue
-        mode = alpha_modes[hud_at]
-        alpha_index = alpha_base + hud_at
+        modes_at[index] = alpha_modes[hud_at]
         hud_at += 1
-        if mode == "full":
-            trim = f"trim=start={sl['src_start_s']:.6f}:end={sl['src_end_s']:.6f},setpts=PTS-STARTPTS"
-        else:
-            trim = f"trim=duration={durations[index]:.6f},setpts=PTS-STARTPTS"
-        parts.append(f"[{alpha_index}:v]{trim},fps={fps},format=rgba[ha{index}]")
-        parts.append(f"[{video_labels[index]}][ha{index}]overlay=eof_action=pass:shortest=0:format=auto[vh{index}]")
-        video_labels[index] = f"vh{index}"
-
     winds = {item["before_id"]: item for item in edl.wind_transitions(table)}
-    wind_out = {}
+    wind_ids = set(winds)
+    acts = _program_acts(timeline, wind_ids)
+    alpha_at: dict[int, int] = {}
+    next_input = len(openings)
+    for act_i, act in enumerate(acts):
+        if any(timeline[index]["hud"] for index in act):
+            alpha_at[act_i] = next_input
+            next_input += 1
+    wind_out: dict[str, dict] = {}
     for index, sl in enumerate(timeline[:-1]):
         nxt = timeline[index + 1]["id"]
         if nxt in winds:
             wind_out[sl["id"]] = winds[nxt]
-    for index, sl in enumerate(timeline):
-        incoming = winds.get(sl["id"])
-        outgoing = wind_out.get(sl["id"])
-        if not incoming and not outgoing:
-            continue
-        wind_n = max(1, snap_frames(float((incoming or outgoing)["duration_s"]), fps))
-        video_labels[index] = _program_wind_visual(
-            parts, video_labels[index], int(sl["frames"]), wind_n,
-            bool(incoming), bool(outgoing), f"rw{index}", fps, width, height,
-        )
 
-    vcur, acur = video_labels[0], audio_labels[0]
+    act_video: list[str] = []
+    act_audio: list[str] = []
+    for act_i, act in enumerate(acts):
+        # 一段里的切片先接成一条。只有一个切片时标签不变，单窗图和以前一致。
+        vlabel = _concat_ready(parts, [video_labels[index] for index in act], video=True, tag=f"gv{act_i}", fps=fps)
+        alabel = _concat_ready(parts, [audio_labels[index] for index in act], video=False, tag=f"ga{act_i}", fps=fps)
+        if act_i in alpha_at:
+            anchor = act[0]
+            if len(act) == 1:
+                mode = modes_at[anchor]
+                sl = timeline[anchor]
+                if mode == "full":
+                    trim = f"trim=start={sl['src_start_s']:.6f}:end={sl['src_end_s']:.6f},setpts=PTS-STARTPTS"
+                else:
+                    trim = f"trim=duration={durations[anchor]:.6f},setpts=PTS-STARTPTS"
+            else:
+                if any(modes_at[index] == "full" for index in act):
+                    raise ValueError("a run with several windows cannot use a full-length HUD alpha")
+                frames = sum(int(timeline[index]["frames"]) for index in act)
+                trim = f"trim=duration={frames / fps:.6f},setpts=PTS-STARTPTS"
+            parts.append(f"[{alpha_at[act_i]}:v]{trim},fps={fps},format=rgba[ha{anchor}]")
+            parts.append(f"[{vlabel}][ha{anchor}]overlay=eof_action=pass:shortest=0:format=auto[vh{anchor}]")
+            vlabel = f"vh{anchor}"
+        first, last = timeline[act[0]], timeline[act[-1]]
+        incoming = winds.get(first["id"])
+        outgoing = wind_out.get(last["id"])
+        if incoming or outgoing:
+            wind_n = max(1, snap_frames(float((incoming or outgoing)["duration_s"]), fps))
+            frames = sum(int(timeline[index]["frames"]) for index in act)
+            vlabel = _program_wind_visual(
+                parts, vlabel, frames, wind_n,
+                bool(incoming), bool(outgoing), f"rw{act[0]}", fps, width, height,
+            )
+        act_video.append(vlabel)
+        act_audio.append(alabel)
+
+    vcur, acur = act_video[0], act_audio[0]
     whoosh_delays: list[int] = []
-    for index in range(1, len(timeline)):
-        fade_n = int(timeline[index]["fade_frames"])
+    for act_i in range(1, len(acts)):
+        head = timeline[acts[act_i][0]]
+        # 段内已经接好。这里只在段和段之间做 xfade 或硬切，offset 仍是下一段第一帧。
+        # 每段恰好一个切片时，段号就是时间表下标，转场标签和以前逐段拼接相同。
+        join = acts[act_i][0] if len(acts) == len(timeline) else act_i
+        fade_n = int(head["fade_frames"])
         if fade_n:
             # offset 用落帧后的起点。浮点累计会比 fps 滤镜的真实长度长出几帧，close 就会被 xfade 丢掉。
-            offset = timeline[index]["program_start_frame"] / fps
+            offset = head["program_start_frame"] / fps
             fade_t = fade_n / fps
             parts.append(
-                f"[{vcur}][{video_labels[index]}]xfade=transition=fade:duration={fade_t:.6f}:offset={offset:.6f},settb=1/{fps}[vx{index}]"
+                f"[{vcur}][{act_video[act_i]}]xfade=transition=fade:duration={fade_t:.6f}:offset={offset:.6f},settb=1/{fps}[vx{join}]"
             )
-            parts.append(f"[{acur}][{audio_labels[index]}]acrossfade=d={fade_t:.6f}[ax{index}]")
+            parts.append(f"[{acur}][{act_audio[act_i]}]acrossfade=d={fade_t:.6f}[ax{join}]")
         else:
-            wind = winds.get(timeline[index]["id"])
+            wind = winds.get(head["id"])
             if wind:
                 wind_n = max(1, snap_frames(float(wind["duration_s"]), fps))
-                seam = int(timeline[index]["program_start_frame"])
+                seam = int(head["program_start_frame"])
                 whoosh_delays.append(max(0, round(frames_to_time(max(0, seam - wind_n), fps) * 1000)))
             parts.append(
-                f"[{vcur}][{video_labels[index]}]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[vx{index}]"
+                f"[{vcur}][{act_video[act_i]}]concat=n=2:v=1:a=0,fps={fps},settb=1/{fps}[vx{join}]"
             )
-            parts.append(f"[{acur}][{audio_labels[index]}]concat=n=2:v=0:a=1[ax{index}]")
-        vcur, acur = f"vx{index}", f"ax{index}"
+            parts.append(f"[{acur}][{act_audio[act_i]}]concat=n=2:v=0:a=1[ax{join}]")
+        vcur, acur = f"vx{join}", f"ax{join}"
 
     n_whoosh = 1 if winds else 0
-    whoosh_index = alpha_base + len(hud_slices) if n_whoosh else None
+    whoosh_index = len(openings) + len(alpha_at) if n_whoosh else None
     if whoosh_index is not None and whoosh_delays:
         parts.append(mix_whoosh(acur, whoosh_index, whoosh_delays))
         acur = "amixed"
-    overlay_base = alpha_base + len(hud_slices) + n_whoosh
+    overlay_base = len(openings) + len(alpha_at) + n_whoosh
     for k, ov in enumerate(table.get("overlays") or []):
         nxt = f"vov{k}"
         parts.append(_program_overlay_chain(overlay_base + k, ov, k, vcur, nxt, height=height))
@@ -1155,11 +1261,26 @@ def program_input_args(
     table: dict,
     alpha_paths: list[Path],
     spec: ExportSpec = FINAL_SPEC,
+    *,
+    list_dir: Path | None = None,
 ) -> list[str]:
-    """确认导出的输入。原片按条打开，透明层、whoosh 和贴图仍是各自的文件。"""
+    """确认导出的输入。原片按条打开。一段跑的窗口透明层收成一个输入。
+
+    多个短 mov 用 concat 解复用列在一张清单里，滤镜图只看到一条 alpha。
+    不在滤镜图里为每个窗口留一个输入：那些 ARGB 解码器会一起常驻，16GB 机器会被杀掉。
+    清单只是这几条短文件的路径，不是整段未压缩透明底，用完要删。
+    """
     args = _clip_input_args(media_dir, edl.export_slices(table, spec.timeline.fps))
-    for path in alpha_paths:
-        args.extend(["-i", str(path)])
+    for index, group in enumerate(confirmed_alpha_groups(table, alpha_paths, spec.timeline.fps)):
+        if len(group) == 1:
+            args.extend(["-i", str(group[0])])
+            continue
+        if list_dir is None:
+            raise ValueError("confirmed export needs list_dir to concat HUD window alphas")
+        list_dir.mkdir(parents=True, exist_ok=True)
+        listing = list_dir / f"alpha-{index:02d}.ffconcat"
+        _write_alpha_concat(group, listing)
+        args.extend(["-f", "concat", "-safe", "0", "-i", str(listing)])
     if edl.wind_transitions(table):
         if not WHOOSH_PATH.is_file():
             raise SystemExit(f"wind transitions need whoosh audio: {WHOOSH_PATH}")
@@ -1238,13 +1359,19 @@ def _export_from_program(args, media_dir: Path) -> int:
     if not args.dry_run:
         todo_list.mark(media_dir, "hud-render", "done")
     ass = make_ass(subtitles)
+    list_dir: Path | None = None
     try:
         measured = _loudness_for_export(media_dir, table, dry_run=args.dry_run)
         if measured is not None and not args.dry_run:
             todo_list.mark(media_dir, "loudness-measure", "done")
         elif not args.dry_run:
             print("Loudnorm pass 1 skipped; encode will use single-pass loudnorm", flush=True)
-        plan_args = program_input_args(media_dir, table, alpha_paths)
+        # 清单放临时目录，不写进媒体目录。编码结束就删，不管成功失败。
+        list_dir = Path(tempfile.mkdtemp(prefix="running-alpha-concat-"))
+        groups = confirmed_alpha_groups(table, alpha_paths, fps)
+        windows = sum(len(group) for group in groups)
+        print(f"HUD alpha: {windows} windows → {len(groups)} tracks", flush=True)
+        plan_args = program_input_args(media_dir, table, alpha_paths, list_dir=list_dir)
         openings = clip_openings(edl.export_slices(table, fps))
         plan = InputPlan(tuple(plan_args), len(openings), (), (), 0.0)
         final_graph = build_program_filter(
@@ -1275,6 +1402,8 @@ def _export_from_program(args, media_dir: Path) -> int:
         # final-qc 要等抽帧看过字幕、HUD、贴图。结构检查通过只代表这一次编码可以留下。
         todo_list.mark(media_dir, "final-export", "done")
     finally:
+        if list_dir is not None:
+            shutil.rmtree(list_dir, ignore_errors=True)
         if ass is not None:
             ass.unlink(missing_ok=True)
     return 0

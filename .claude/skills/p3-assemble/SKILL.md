@@ -58,4 +58,4 @@ iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-previ
 
 ## 完成后
 
-> 预览核对通过后走 `/p3-subs`，对口型前先冻结时间表。冻上之后，用户校对字幕的同时可以 `--prep-alpha` 和 `final_export.py --measure-only`。8 核机器画透明层加 `-j 6`（默认仍是 2），留 1–2 核给系统和写 mov 的 ffmpeg。同一条原片加载一次 FIT，再按窗口写出各自的 alpha。成片仍只走 `final_export.py --confirmed`。
+> 预览核对通过后走 `/p3-subs`，对口型前先冻结时间表。冻上之后，用户校对字幕的同时可以 `--prep-alpha` 和 `final_export.py --measure-only`。8 核机器画透明层加 `-j 6`（默认仍是 2），留 1–2 核给系统和写 mov 的 ffmpeg。同一条原片加载一次 FIT，再按窗口写出各自的 alpha。成片仍只走 `final_export.py --confirmed`：同一条原片的窗口 alpha 收成一条再叠一次，风刮和 xfade 在这几段之间，只编码一次。
