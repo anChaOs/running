@@ -1,8 +1,8 @@
-# 2026-11-13 素材索引
+# 2026-11-17 素材索引
 
 ## 本地素材目录
 
-`~/Movies/running-content/2026-11-13-carbon-plate/`
+`~/Movies/running-content/2026-11-17-carbon-plate/`
 
 ## 重命名结果
 
@@ -20,10 +20,10 @@
 
 ## 素材关联
 
-- 开场：`2026-11-13-open.mp4`
-- 跑中 A：`2026-11-13-run-a.mp4`
-- 收尾：`2026-11-13-close.mp4`
-- FIT：`2026-11-13-run-data.fit`
+- 开场：`2026-11-17-open.mp4`
+- 跑中 A：`2026-11-17-run-a.mp4`
+- 收尾：`2026-11-17-close.mp4`
+- FIT：`2026-11-17-run-data.fit`
 
 ## 制作状态
 

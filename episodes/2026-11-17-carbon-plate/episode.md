@@ -1,13 +1,13 @@
 ---
-date: 2026-11-13
+date: 2026-11-17
 slug: carbon-plate
 title: 碳板鞋为什么更省力？
 status: planned
 series: 破三实验室
-media: ~/Movies/running-content/2026-11-13-carbon-plate/
+media: ~/Movies/running-content/2026-11-17-carbon-plate/
 ---
 
-# 2026-11-13 碳板鞋为什么更省力？
+# 2026-11-17 碳板鞋为什么更省力？
 
 一句话：用故事讲清碳板跑鞋更省力，主要是厚而回弹好的中底泡沫，碳板不是弹簧；再从能量守恒说明这是少浪费、不是无中生有；最后聊我自己穿碳板鞋的感受。不讲选购清单，也不把实验室的 4% 套到轻松跑上。
 
