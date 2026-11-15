@@ -54,16 +54,18 @@ MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间�
 
 用户确认后加 `--apply`。源文件已在目标目录里则只改名；从相册拷来则 `copy2` 保留时间。
 
-`--apply` 之后会给 **open / close** 做句间停顿粗剪（**不剪原片 `run-*`**，HUD 要靠 mtime 和 FIT 1:1。跑中口播的句间粗剪在 HUD preview 上做，见 `p3-hud`）：
+`--apply` 之后会锁原片↔FIT（写 `logs/program.json` 的 `source_sync`），并给 open / run / close 做句间检测。**只把保留区间写进时间表，不重编码。** 不要再 `--apply` 去压一套接近原片码率的粗剪成片。
 
 ```bash
 .venv/bin/python tools/ingest/trim_talk_pauses.py \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  --record \
+  --targets open,close,run
 ```
 
-默认 dry-run，列出要剪短的间隔。确认后加 `--apply`。原片改名为 `*-open-raw.mp4` / `*-close-raw.mp4`，工作文件仍是 `*-open.mp4` / `*-close.mp4`。停顿门槛等实现在 `tools/ingest/trim_talk_pauses.py`；skill 不复述算法。默认 **保留片头**（`keep_lead_silence=True`，含 open/close）；VAD 可能漏检短开口词，裁 lead 会吞第一句。要掐片头加 `--no-keep-lead-silence`。**跑流程时只调用脚本看打印/退出码，不要为执行本步去 Read 源码**（改算法 / 排错除外）。音画必须同一起止 trim 再 concat，不要用 `select`/`aselect` 分轨切（会漂）。不要剪 `run-*`，也不要动 `run-*` 的 mtime。不需要粗剪时，ingest 加 `--skip-pause-trim`。
+默认 dry-run，列出要剪短的间隔。确认后加 `--record`。停顿门槛在 `tools/ingest/trim_talk_pauses.py`；skill 不复述算法。默认保留片头（`keep_lead_silence=True`）。要掐片头加 `--no-keep-lead-silence`。跑流程时只调用脚本看打印和退出码。被剪掉的秒只从成片时间表消失，原片文件和它的 mtime 不动，HUD 仍按原片时间取样。不需要句间刀时，ingest 加 `--skip-pause-trim`。
 
-ingest `--apply` 会直接跑粗剪 `--apply`。已经收过的素材，单独跑上面这条。
+ingest `--apply` 会直接跑上面的 `--record`。已经收过的素材，单独跑这条。`--apply`（编码那条旧路径）不要作为默认。
 
 ## 记日志
 
@@ -71,7 +73,8 @@ ingest `--apply` 会直接跑粗剪 `--apply`。已经收过的素材，单独�
 
 ## 完成
 
-- 媒体目录有 `open` / `run-*` / `close` / `*-run-data.fit`；open/close 若粗剪过，另有 `*-raw.mp4`
+- 媒体目录有 `open` / `run-*` / `close` / `*-run-data.fit`。句间刀在 `logs/program.json`，原片文件还在
+- `logs/todo.md` 的 `ingest` 已是 done；有句间刀时 `edl` 也是 done
 - `episodes/YYYY-MM-DD-slug/assets.md` 有原名映射和制作状态 `ingest: done`
 - `episode.md` 至少 `shot`
 

@@ -135,32 +135,32 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-variant.xm
 ```bash
 .venv/bin/python tools/hud/render_running_hud.py \
   --media-dir ~/Movies/running-content/2026-04-23-first-video \
-  --overlay-only \
-  --preview \
+  --record-only \
+  --weather-city shanghai \
   -sn Cumulus \
   -sk 642
 ```
 
-这条命令会：
+这条只把鞋、天气和透明层规格写进 `logs/program.json`。不要加 `--preview`：那会在渲透明层的同时把未剪原片再压一遍。时间表冻结后用 `--prep-alpha`，按留下的入出点直接画透明层，不先切 `hud-renders/keeps/`。确认导出若发现清单对不上，会自己补画，并认同一套 `--jobs`。
 
-- 在 `media-dir` 中寻找 `*-run-data.fit`
-- 自动处理 `*-run-*.mp4`（不处理 `open` / `close`）
-- 渲透明 HUD 层
-- 再按统一 preview 规格叠成可看的审片文件。整条审片预览拼接这些文件；最终导出不读取它们
-
-```text
-hud-renders/YYYY-MM-DD-run-a-hud-alpha.mov      # ProRes 4444 透明层
-hud-renders/YYYY-MM-DD-run-a-hud-preview.mp4    # 整条审片预览直接拼接；最终导出不读取
-```
-
-默认编码是 **ProRes 4444**（剪映专业版能认 alpha）。文件会比较大。若体积太大，可改：
+8 核机器建议：
 
 ```bash
+.venv/bin/python tools/hud/render_running_hud.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  --prep-alpha \
+  -j 6
+```
+
+`-j` / `--jobs` 的默认仍是 2。6 路是把 8 核里的 1–2 核留给系统和写 mov 的 ffmpeg。同一条原片只起一个 wrap，FIT 和模板加载一次，再按窗口写成 `hud-renders/<profile>/` 里各自的 alpha mov。一条原片占了大部分窗口时，最多拆成 `-j` 个进程，每个进程仍然一次加载、连续画多段。已经对得上的文件直接复用。确认导出仍然只跑 `final_export.py --confirmed`，写出一个文件。它按大约 120 秒分段：每一段里，同一条原片的窗口 alpha 收成一条再叠一次，不按窗口各开一个输入。段与段流拷贝接起来。
+
+默认透明层编码是 **qtrle**（QuickTime Animation。比 ProRes 4444 小；alpha 是无损压缩。开发机没有媒体盘，没有做实机画质对比）。导出画面不能接受，或剪映要 ProRes 时：
+
+```bash
+--overlay-only --overlay-profile prores4444
+
 # PNG-in-MOV，透明区域多时通常更小
 --overlay-only --overlay-profile png
-
-# QuickTime Animation，体积更小，剪映兼容性不如 ProRes
---overlay-only --overlay-profile qtrle
 ```
 
 不加 `--overlay-only` 时，仍会把 HUD 直接烤进 `*-hud.mp4`（旧行为）。FIT 对齐逻辑两种模式相同：`--use-fit-only --video-time-end file-modified`。

@@ -19,11 +19,11 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 ## 前置
 
-通常已走完 `final_export.py`，并完成最终片人工核对。用户说「没问题了 / 可以发了」时可先给上传清单；真正写链接与清临时要等双链到手。
+通常已走完一次 `final_export.py --confirmed`，并完成最终片人工核对。HUD 透明层和响度测量可以在字幕校对时先做完；确认导出仍然是烧进字幕的那一次命令，不是先出无字幕成片再补。用户说「没问题了 / 可以发了」时可先给上传清单；真正写链接与清临时要等双链到手。
 
 ## 上传清单（用户说可以发了时给）
 
-从 `plan.md` 抄标题、封面句、简介。最终导出文件改名与外挂文件名按 `upload/` 现有打包规则处理；不要重新编码成片。
+从 `plan.md` 抄标题、封面句、简介。最终导出文件改名与外挂文件名按 `upload/` 现有打包规则处理；不要重新编码成片。文件名里的 ASCII `/` 换成全角 `／`（`pack_upload.py --print-filename`），平台标题仍用 `plan.md` 原文。打包前 `logs/todo.md` 必须是最终导出和最终 QC 都完成，否则 `pack_upload.py` 会停。
 
 核对：
 - `upload/` 已有：标题烧字 `.mp4`、三封面（4:3→3:4→16:9）、`subtitles.srt`（`pack_upload.py` 打好）
@@ -60,7 +60,7 @@ Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上�
 
 | 来源 | 放到 | 说明 |
 | --- | --- | --- |
-| 媒体 `logs/timeline.txt`、`logs/failures.md` | `<slug>/logs/` | 文件在就必拷 |
+| 媒体 `logs/timeline.txt`、`logs/todo.md`、`logs/program.json`、`logs/pack-sha256.txt`、`logs/failures.md` | `<slug>/logs/` | 文件在就必拷 |
 | `logs/` 里其它小文件 | `<slug>/logs/` | 有用就带；跳过 `.pid` |
 | 本期 `episode.md`、`plan.md`；`assets.md` 不大也带 | `<slug>/episode-repo/` | 拷的是刚写上 `published` 的那份 |
 | box `/workspace/youtube-upload/` 的 `upload_result.json`，以及同目录 `upload_progress.json`、`upload_run*.log` | `<slug>/youtube-upload/` | 用结果里的 `url` / `title` 对一下本期；没有或不是本期就跳过 |
@@ -82,7 +82,7 @@ Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上�
 | 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
 | 成片 | **仅一份**：`upload/<标题>.mp4`；根目录不要再留同名成片；勿留 `*-no-burn` / 额外 `run-final` |
 | 封面 / 外挂 | `upload/` 内三封面（4:3→3:4→16:9）+ `subtitles.srt`；根目录若仍有同名，须为硬链（同 inode），勿再 copy 一份 |
-| 媒体字幕产物 | 制作期 `YYYY-MM-DD-run-final.srt`、烧字 `subtitles.ass` |
+| 媒体字幕产物 | 上传用 `subtitles.srt`。审片清单旁可以有同名 `.srt`。不要在烧字成片旁边留 `*-run-final.srt` |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
 | 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
 | `logs/` | 制作日志。复盘已拷到 box；本地留到满 7 天归档，清临时不删 |
@@ -117,7 +117,7 @@ Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上�
 
 ## 记日志
 
-`pack_upload.py` 会写 `pack-upload`。写上 `published` 时用 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start published`，再 `end`。脚本或 helper 已写的行不要重复；失败用 `fail`。
+`pack_upload.py` 会写 `pack-upload`，并在 `logs/pack-sha256.txt` 记下成片的 SHA-256。写上 `published` 之前，`logs/todo.md` 里 B 站和 YouTube 都必须是 done，否则不要改 `episode.md`。写的时候用 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start published`，再 `end`，并 `todo_list.py mark published done`。脚本或 helper 已写的行不要重复；失败用 `fail`。
 
 ## 完成后
 

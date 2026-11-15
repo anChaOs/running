@@ -4,11 +4,17 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import pack_upload as pu
+import todo_list
 
 
 class PackUploadTest(unittest.TestCase):
@@ -21,7 +27,16 @@ class PackUploadTest(unittest.TestCase):
         for name in pu.COVERS:
             self._touch(media / name, b"jpg-" + name.encode())
         self._touch(media / "subtitles.srt", b"1\n")
+        self._allow_pack(media)
         return title
+
+    def _allow_pack(self, media: Path) -> None:
+        for step in ("ingest", "edl", "hud-record", "layout", "preview"):
+            todo_list.mark(media, step, "done")
+        todo_list.mark(media, "subs", "waiting-review")
+        todo_list.mark(media, "subs", "confirmed", confirmed=True)
+        todo_list.mark(media, "final-export", "done")
+        todo_list.mark(media, "final-qc", "done")
 
     def test_pack_moves_mp4_hardlinks_small(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -102,6 +117,55 @@ class PackUploadTest(unittest.TestCase):
             self.assertFalse(pu.is_excluded_mp4("今天体感不错？.mp4"))
             self._seed(media, "今天体感不错？.mp4")
             self.assertEqual(pu.find_title_mp4(media).name, "今天体感不错？.mp4")
+
+    def test_exclude_preview_and_stats_and_slash(self) -> None:
+        self.assertTrue(pu.is_excluded_mp4("2026-11-12-review-preview.mp4"))
+        self.assertTrue(pu.is_excluded_mp4("2026-11-12-close-stats.mp4"))
+        self.assertTrue(pu.is_excluded_mp4("run-a-hud-preview.mp4"))
+        self.assertTrue(pu.is_excluded_mp4("2026-11-12-run-final-no-subs.mp4"))
+        self.assertTrue(pu.is_excluded_mp4("2026-11-12-run-final-truncated.mp4"))
+        self.assertEqual(pu.filename_from_title("80/20是什么？"), "80／20是什么？.mp4")
+        self.assertEqual(pu.check_bilibili_desc("a" * 2000), 2000)
+        with self.assertRaises(SystemExit):
+            pu.check_bilibili_desc("a" * 2001)
+
+    def test_failed_rename_restores_previous_upload(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            media = Path(td)
+            self._seed(media, "标题.mp4")
+            pu.pack(media)
+            fresh = self._touch(media / "标题.mp4", b"v2")
+            real_rename = os.rename
+
+            def boom(src, dst):
+                if Path(src) == fresh:
+                    raise OSError("cross-device")
+                real_rename(src, dst)
+
+            with patch("pack_upload.os.rename", side_effect=boom):
+                with self.assertRaises(SystemExit):
+                    pu.place_title_mp4(fresh, media / "upload" / "标题.mp4")
+            self.assertEqual((media / "upload" / "标题.mp4").read_bytes(), b"video")
+            self.assertEqual(fresh.read_bytes(), b"v2")
+
+    def test_pack_records_sha256(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            media = Path(td)
+            self._seed(media, "标题.mp4")
+            pu.pack(media)
+            line = (media / "logs" / "pack-sha256.txt").read_text(encoding="utf-8")
+            self.assertTrue(line.startswith(pu.sha256_file(media / "upload" / "标题.mp4")))
+            self.assertIn("标题.mp4", line)
+
+    def test_pack_refuses_without_qc(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            media = Path(td)
+            self._touch(media / "标题.mp4", b"video")
+            for name in pu.COVERS:
+                self._touch(media / name, b"j")
+            self._touch(media / "subtitles.srt", b"1\n")
+            with self.assertRaises(SystemExit):
+                pu.pack(media)
 
 
 if __name__ == "__main__":
