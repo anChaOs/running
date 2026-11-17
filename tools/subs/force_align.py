@@ -21,7 +21,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import log_timeline  # noqa: E402
+import program_edl as edl  # noqa: E402
 import subs_core as sc  # noqa: E402
+import todo_list  # noqa: E402
 
 LEAD = 0.10              # 入点比开口早一点
 SNAP_IN = 0.35           # 开口前这么近有人声岛起点，就贴上去
@@ -342,6 +344,25 @@ def _align(args) -> int:
         for r in interp + unanch:
             print(f"  #{r['i']:>4} {sc.fmt_clock(r['new'][0])}  {r['source']:<10} {r['text']}")
     print(f"\n写入 {out}\n报告 {report}\n下一步：tools/subs/check_subs.py 质检，再 txt_to_subs.py 回写 SRT。")
+    media_dir = _media_dir_from_audio(wav)
+    program = edl.program_path(media_dir)
+    if program.is_file():
+        table = edl.load(program)
+        if table.get("subs_stale"):
+            print("timeline changed since the last alignment; this pass replaces those cue times", file=sys.stderr)
+            table["subs_stale"] = False
+        if not table.get("frozen"):
+            try:
+                edl.save(media_dir, edl.freeze(table))
+                print(f"froze {program}")
+            except ValueError as exc:
+                print(f"program not frozen: {exc}", file=sys.stderr)
+        else:
+            edl.save(media_dir, table)
+    try:
+        todo_list.mark(media_dir, "subs", "aligned")
+    except ValueError as exc:
+        print(f"todo not updated: {exc}", file=sys.stderr)
     return 0
 
 

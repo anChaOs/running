@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import os
@@ -803,6 +804,255 @@ Overlay.__init__ = overlay_init
 map_widgets.OutLine.draw = _outline_draw
 map_widgets.Circuit.draw = _circuit_draw
 
+class _HudFrameWriter:
+    """画帧时写进当前窗口的 ffmpeg。每个窗口单独起进程，PTS 从 0 起。"""
+
+    def __init__(self, batch: "_HudBatchWriter"):
+        self._batch = batch
+
+    def write(self, data):
+        stdin = self._batch._stdin
+        if stdin is None:
+            raise SystemExit("HUD frame was drawn before the window ffmpeg started")
+        return stdin.write(data)
+
+    def flush(self):
+        stdin = self._batch._stdin
+        if stdin is not None:
+            stdin.flush()
+
+
+class _HudBatchWriter:
+    """同一条原片的多个窗口共用已经加载的 FIT。每段自己的 mov 单独封装。"""
+
+    def __init__(self, overlay_cls, original_generate):
+        self._overlay_cls = overlay_cls
+        self._original_generate = original_generate
+        self.rendering = False
+        self._cm = None
+        self._stdin = None
+        self._template = None
+        self.proxy = _HudFrameWriter(self)
+
+    def bind(self, overlay_ffmpeg) -> None:
+        self._template = overlay_ffmpeg
+
+    def open(self, output: str) -> None:
+        # 新的 rawvideo ffmpeg，帧从这一窗的第一张画起。确认导出用 -ss 在 -i 前
+        # 切开的原片，可以直接叠这层从 0 起的透明层。
+        self.close()
+        template = self._template
+        if template is None:
+            raise SystemExit("HUD batch ffmpeg is not ready")
+        dest = Path(output)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        print(f"HUD window -> {dest}", flush=True)
+        overlay = self._overlay_cls(
+            ffmpeg=template.exe,
+            output=dest,
+            options=template.options,
+            overlay_size=template.overlay_size,
+            execution=template.execution,
+            creation_time=template.creation_time,
+        )
+        cm = self._original_generate.__get__(overlay, self._overlay_cls)()
+        stdin = cm.__enter__()
+        self._cm = cm
+        self._stdin = stdin
+
+    def close(self) -> None:
+        cm = self._cm
+        self._cm = None
+        self._stdin = None
+        if cm is not None:
+            cm.__exit__(None, None, None)
+
+
+def _take_hud_windows(argv: list[str]) -> tuple[list[str], str | None]:
+    """--hud-windows 是本仓库加的，gopro-dashboard 不认识，先拿掉。"""
+    path = None
+    kept: list[str] = []
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if token == "--hud-windows" and index + 1 < len(argv):
+            path = argv[index + 1]
+            index += 2
+            continue
+        kept.append(token)
+        index += 1
+    return kept, path
+
+
+def _load_hud_windows(path: str) -> list[dict]:
+    try:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"HUD windows file: {exc}") from exc
+    rows = payload.get("windows") if isinstance(payload, dict) else None
+    if not isinstance(rows, list) or not rows:
+        raise SystemExit(f"HUD windows file is empty: {path}")
+    windows = []
+    outputs: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("output"):
+            raise SystemExit(f"HUD window is missing output: {row!r}")
+        start = row.get("start")
+        end = row.get("end")
+        if (start is None) != (end is None):
+            raise SystemExit("HUD window needs both start and end, or neither")
+        if start is not None and float(end) <= float(start):
+            raise SystemExit(f"HUD range is empty: {start}..{end}")
+        output = str(row["output"])
+        outputs.append(output)
+        windows.append(
+            {
+                "start": None if start is None else float(start),
+                "end": None if end is None else float(end),
+                "output": output,
+            }
+        )
+    if len(outputs) != len(set(outputs)):
+        raise SystemExit("HUD windows share an output path")
+    return windows
+
+
+def _install_batched_windows(windows: list[dict]) -> None:
+    """一个进程加载一次 FIT/模板，再按窗口逐段写 alpha。不把多段拼成一个文件。"""
+    from gopro_overlay.ffmpeg_overlay import FFMPEGOverlay
+    from gopro_overlay.framemeta import FrameMeta
+    from gopro_overlay.timeunits import timeunits
+
+    ctl = _HudBatchWriter(FFMPEGOverlay, FFMPEGOverlay.generate)
+    original = FrameMeta.stepper
+
+    class _BatchStepper:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def _ticks(self, window: dict):
+            start = window["start"]
+            end = window["end"]
+            if start is None or end is None:
+                yield from self._inner.steps()
+                return
+            from hud_window import iter_kept_ticks
+
+            try:
+                yield from iter_kept_ticks(
+                    self._inner.steps(),
+                    timeunits(seconds=float(start)),
+                    timeunits(seconds=float(end)),
+                )
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+
+        def _iter(self, *, draw: bool):
+            for window in windows:
+                opened = False
+                try:
+                    if draw and ctl.rendering:
+                        ctl.open(window["output"])
+                        opened = True
+                    yield from self._ticks(window)
+                finally:
+                    if opened:
+                        ctl.close()
+
+        def steps(self):
+            # 数帧时 draw=False，避免把 ffmpeg 提前打开。短窗补起点和单窗 stepper 同一套。
+            yield from self._iter(draw=True)
+
+        def __len__(self):
+            return sum(1 for _ in self._iter(draw=False))
+
+    def stepper(self, step):
+        return _BatchStepper(original(self, step))
+
+    @contextlib.contextmanager
+    def generate(self):
+        ctl.bind(self)
+        ctl.rendering = True
+        try:
+            yield ctl.proxy
+        finally:
+            ctl.rendering = False
+            ctl.close()
+
+    FrameMeta.stepper = stepper
+    FFMPEGOverlay.generate = generate
+
+
+def _take_hud_range(argv: list[str]) -> tuple[list[str], str | None, str | None]:
+    """--hud-start/--hud-end 是本仓库加的，gopro-dashboard 不认识，先拿掉。"""
+    start = end = None
+    kept: list[str] = []
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if token == "--hud-start" and index + 1 < len(argv):
+            start = argv[index + 1]
+            index += 2
+            continue
+        if token == "--hud-end" and index + 1 < len(argv):
+            end = argv[index + 1]
+            index += 2
+            continue
+        kept.append(token)
+        index += 1
+    return kept, start, end
+
+
+def _install_hud_range_window(start_s: str, end_s: str) -> None:
+    """只把原片时钟上 [start, end) 的帧画进透明层。时间轴仍是整条原片，FIT 不用改。"""
+    from gopro_overlay.framemeta import FrameMeta
+    from gopro_overlay.timeunits import timeunits
+
+    if float(end_s) <= float(start_s):
+        raise SystemExit(f"HUD range is empty: {start_s}..{end_s}")
+    start_t = timeunits(seconds=float(start_s))
+    end_t = timeunits(seconds=float(end_s))
+    original = FrameMeta.stepper
+
+    class _RangedStepper:
+        def __init__(self, inner):
+            self._inner = inner
+
+        def steps(self):
+            # 和 render_running_hud.kept_source_steps 同一套窗口。短于 0.1 秒、
+            # 落在两个取样点之间时补上起点，避免整段渲染退出。
+            from hud_window import iter_kept_ticks
+
+            try:
+                yield from iter_kept_ticks(self._inner.steps(), start_t, end_t)
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+
+        def __len__(self):
+            # 内层 steps() 每次调用都重新从头生成，多走一遍只数帧数，不会把渲染吃掉。
+            return sum(1 for _ in self.steps())
+
+    def stepper(self, step):
+        return _RangedStepper(original(self, step))
+
+    FrameMeta.stepper = stepper
+
+
+_argv, _windows_path = _take_hud_windows(sys.argv[1:])
+_argv, _range_start, _range_end = _take_hud_range(_argv)
+if _windows_path:
+    # 批量窗口自己切换 stepper。不要再套一层单窗过滤，否则每段都会被收成同一个区间。
+    _install_batched_windows(_load_hud_windows(_windows_path))
+else:
+    if _range_start is None:
+        _range_start = os.environ.get("HUD_RANGE_START") or None
+    if _range_end is None:
+        _range_end = os.environ.get("HUD_RANGE_END") or None
+    if (_range_start is None) != (_range_end is None):
+        raise SystemExit("HUD range needs both --hud-start and --hud-end")
+    if _range_start is not None and _range_end is not None:
+        _install_hud_range_window(_range_start, _range_end)
+
 dashboard = Path(__file__).resolve().parent.parent.parent / ".venv" / "bin" / "gopro-dashboard.py"
-sys.argv = [str(dashboard), *sys.argv[1:]]
+sys.argv = [str(dashboard), *_argv]
 runpy.run_path(str(dashboard), run_name="__main__")
