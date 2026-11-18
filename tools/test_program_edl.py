@@ -1259,11 +1259,16 @@ class TodoTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 todo.assert_publish_allowed(media)
             text = todo.todo_path(media).read_text(encoding="utf-8")
-            self.assertIn("subs: confirmed", text)
+            self.assertRegex(text, r"- \[x\] subs: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} confirmed —")
+            self.assertRegex(text, r"- \[ \] cleanup: pending —")
             self.assertIn("原片对齐", text)
             again = todo.parse(text)
             self.assertEqual(again["subs"], "confirmed")
             self.assertEqual(again["youtube"], "pending")
+            self.assertEqual(again["cleanup"], "pending")
+            self.assertEqual(again.times["youtube"], "")
+            self.assertEqual(again.times["cleanup"], "")
+            self.assertRegex(again.times["subs"], r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
 
     def test_export_gate_requires_confirmed_subs(self) -> None:
         with tempfile.TemporaryDirectory() as td:

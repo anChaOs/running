@@ -53,7 +53,7 @@ description: 备选主题库。用户灵光一闪扔来一个主题、先记下�
 
 ## 落盘
 
-1. 新建或改 `topics/<slug>.md`（模板 `templates/topic-library.md`）。slug 短英文或拼音，**不要**用拍摄日期当文件名。
+1. 新建或改 `topics/<slug>.md`（模板 `templates/topic-library.md`）。slug 短英文或拼音，**不要**用拍摄日期当文件名。落盘只改主题卡和 wiki，不跑成片脚本。不要读、也不要改媒体目录的 `logs/todo.md`。有拍摄日再走 `/p3-topic`。
 2. 更新 `topics/index.md` 一行：slug、一句话、种类、体量、状态。
 3. 调研要进 wiki 时：原文 `knowledge/raw/<category>/`，概念 `knowledge/wiki/<category>/`，改 `wiki/index.md` 和 `wiki/log.md`。
 

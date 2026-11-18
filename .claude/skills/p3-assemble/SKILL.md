@@ -28,7 +28,9 @@ description: 按 logs/program.json 写一份 mpv 播放清单来审片（不拼�
 mpv ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl
 ```
 
-mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 1.5.1 能直接打开这份 `.edl`。需要当场播再加 `--play`；本机没有 mpv 时清单仍然写好，并说明启动失败。打不开播放器不算这步失败。
+mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 1.5.1 能直接打开这份 `.edl`。需要当场播再加 `--play`；本机没有 mpv 时清单仍然写好，并说明启动失败。打不开播放器不算这步失败。打开播放器不是 `logs/todo.md` 上的等待点。
+
+不加 `--dry-run` 的那次写完立刻读 `logs/todo.md`，`preview` 应为 done。没标上就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
 `subtitles.txt` 还没写就不要传 `--subtitles`。传了只在清单旁边写一份外挂 `.srt`，时间用虚拟时间线（和 txt 里的成片时间同一套），不烧进画面。没有字幕文件就不要造。不要在成片旁边留同名 `.srt`。
 
@@ -50,7 +52,7 @@ iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-previ
 
 ## 核对
 
-预览用来听旁白、对字幕错别字和换行，不必对着画面逐帧对时间。画面和时间对齐是导出成片的事。确认没有明显缺段之后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表这次审片核对，不代表字幕已确认。脚本成功时会把 `logs/todo.md` 的 `preview` 标成 done；没标上就不算这步完成。下一步是 `/p3-subs`。
+预览用来听旁白、对字幕错别字和换行，不必对着画面逐帧对时间。画面和时间对齐是导出成片的事。确认没有明显缺段之后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表这次审片核对，不代表字幕已确认。进度以 `logs/todo.md` 为准：脚本成功时 `preview` 应为 done；没标上就不算这步完成。不要拿 `assets.md` 当进度。下一步是 `/p3-subs`。
 
 ## 记日志
 

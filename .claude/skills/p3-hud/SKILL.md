@@ -34,7 +34,7 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json，�
   ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-a.mp4
 ```
 
-先确认原片对齐已经写进 `logs/program.json`。然后只记录，不渲染：
+探测不改 `logs/todo.md`。先确认原片对齐已经写进 `logs/program.json`。然后只记录，不渲染：
 
 ```bash
 .venv/bin/python tools/hud/render_running_hud.py \
@@ -49,11 +49,13 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json，�
 
 `-sn` / `-sk` 用 `p3-shoes` 刚确认的这一场，不要抄上一期。
 
+`--record-only` 跑完立刻读 `logs/todo.md`，`hud-record` 应为 done。重记鞋或规格把 `hud-render` 打回 pending 时，那一行的时间也是新的。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
+
 明确不要天气时把 `--weather-city` 换成 `--no-weather`。已有 `weather-hourly.json` 时用 `--weather-json <该文件>`。
 
 记录步的产物是 `logs/program.json` 里的 `hud.recorded=true`，外加已有的 FIT。不要在这里产出 `*-hud-preview.mp4`。
 
-句间刀用 `tools/ingest/trim_talk_pauses.py --record`，只把保留区间写进同一张表，不编码。画面和 HUD 以后都按这张表切。skill 不复述停顿算法。
+句间刀用 `tools/ingest/trim_talk_pauses.py --record`，只把保留区间写进同一张表，不编码。画面和 HUD 以后都按这张表切。skill 不复述停顿算法。`--record` 写完立刻读 `logs/todo.md`。有句间刀时 `edl` 应为 done；准备步骤被打回 pending 时，那一行的时间也是新的。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
 ## 冻结之后画透明层
 
@@ -66,7 +68,7 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json，�
   -j 6
 ```
 
-8 核机器用 `-j 6`，留 1–2 核给系统和写 mov 的 ffmpeg。默认仍是 2，核少就拿掉 `-j`。命令行上的数字会进渲染工人数。
+8 核机器用 `-j 6`，留 1–2 核给系统和写 mov 的 ffmpeg。默认仍是 2，核少就拿掉 `-j`。命令行上的数字会进渲染工人数。`--prep-alpha` 跑完立刻读 `logs/todo.md`，`hud-render` 应为 done。字幕还在 `waiting-review` 也不挡这一步。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
 同一条原片起一个 wrap：FIT 和模板加载一次，再按留下的窗口逐段写成 `hud-renders/<profile>/` 里各自的 alpha mov。一条原片占了大部分窗口时，最多拆成 `-j` 个进程，每个进程仍然一次加载、连续画多段。短窗补起点，透明层时间从 0 起。已经对得上的文件直接复用。不写 `hud-renders/keeps/`，也不解码重编原片画面。
 

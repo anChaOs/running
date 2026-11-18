@@ -45,7 +45,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 
 ## 前置
 
-需要 `logs/program.json`，以及按它写出的 `YYYY-MM-DD-review-preview.edl`。没有清单则先 `/p3-assemble`。不要找、也不要生成 `YYYY-MM-DD-review-preview.mp4`。预览和最终导出共用这张表。只改字不重转写。对口型之前先冻结时间表（`program_edl.py freeze`）；`force_align.py` 在表还没冻时会自己冻。冻上之后若改了刀点、冷开场或插入段，表会变成 `subs_stale`，必须按新表重跑对齐，不能把旧字幕套到新成片上。
+需要 `logs/program.json`，以及按它写出的 `YYYY-MM-DD-review-preview.edl`。没有清单则先 `/p3-assemble`。不要找、也不要生成 `YYYY-MM-DD-review-preview.mp4`。预览和最终导出共用这张表。只改字不重转写。对口型之前先冻结时间表（`program_edl.py freeze`）；`force_align.py` 在表还没冻时会自己冻。`freeze` 跑完立刻读 `logs/todo.md`。`layout` 还没 done 时脚本会补上。清单不对就停。不要拿文件名或 `assets.md` 当进度。冻上之后若改了刀点、冷开场或插入段，表会变成 `subs_stale`，必须按新表重跑对齐，不能把旧字幕套到新成片上。
 
 依赖（一次）：`.venv/bin/pip install -r tools/subs/requirements.txt`。Apple Silicon 上 pip 直接装，CPU 跑。模型首次运行自动从 ModelScope 拉到 `~/Movies/running-content/.models/faster-whisper-large-v3-turbo/`（约 1.6 GB），不连 Hugging Face。
 
@@ -74,7 +74,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
   --txt episodes/YYYY-MM-DD-slug/subtitles.txt
 ```
 
-转写后脚本会按专名表统一英文专名大小写/空格并打印清单；中文同音字仍按上面「同音字扫描」人工过。
+转写后脚本会按专名表统一英文专名大小写/空格并打印清单；中文同音字仍按上面「同音字扫描」人工过。`draft_subs.py` 跑完立刻读 `logs/todo.md`，`subs` 应为 `waiting-review`。写不上就补，补不上就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
 产物：`asr/*.words.json`、`asr/*.draft.srt`（不要覆盖）、`subtitles.txt`。txt 已存在时脚本拒绝覆盖；要重来加 `--force`。
 
@@ -114,7 +114,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
 
 - 这一轮用户**抽听核对、改错字**即可；优先改 `subtitles.txt`，时间不要动。保持单行。
 
-没说改好之前，`assets.md` 写 `subs: waiting-review`。`draft_subs.py` 会把 `logs/todo.md` 的字幕状态写成 `waiting-review`（预览还没入账时写不上，要补）。写不上就不算这步完成。
+没说改好之前，`assets.md` 写 `subs: waiting-review`。`logs/todo.md` 的 `subs` 必须是 `waiting-review`。这是清单上的等待点：等用户改错字和换行。用户说改好了、并且字幕 `confirmed` 之前，不要跑 `final_export.py --confirmed`。HUD 透明层和响度测量可以并行。写不上就不算这步完成。不要拿 `assets.md` 当进度。
 
 ## 改好字之后：对口型
 
@@ -129,6 +129,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
    ```
 
    - 对齐前若发现切条问题，先按「切条易错」改切分，再对齐。
+   - `force_align.py` 跑完立刻读 `logs/todo.md`，`subs` 应为 `aligned`。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
    - 脚本列出的 `interp` / `unanchored` 必须对着成片听，手改 txt 时间。
    - **质检门：**
 
@@ -138,7 +139,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
        --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav
      ```
 
-     **机器过门 ≠ 可以写 `subs: done`**：硬失败行必须给人听。漏盖若是路人说话或删掉的磕巴，人听过确认后在回复里说明。用户写的括号注释保留。
+     **机器过门 ≠ 可以写 `subs: done`**：硬失败行必须给人听。漏盖若是路人说话或删掉的磕巴，人听过确认后在回复里说明。用户写的括号注释保留。必听硬失败不是 `logs/todo.md` 上的等待点，不要另写一个等待状态。`check_subs.py` 跑完立刻读清单，确认还停在 `aligned`，不要提前标 `confirmed`。清单不对就停。
    - 对完扫一遍：单行；用词跟口播；没有被改写成另一种说法。
    - 时间表变了（`subs_stale`）就用对得上新表的同一条 wav 重跑这一步。不要重渲预览片，也不要为了对齐再抽一条 wav。
 
@@ -150,7 +151,7 @@ open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt
   mark subs confirmed --confirmed
 ```
 
-agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_align.py` 只把 todo 标到 `aligned`。
+agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_align.py` 只把 todo 标到 `aligned`。这条 `mark` 跑完立刻读 `logs/todo.md`，`subs` 应为带时间的 `confirmed`。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
 然后生成外挂（对齐会改时间，不要提前生成）：
 
@@ -159,7 +160,7 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
   --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto
 ```
 
-更新媒体目录的 `subtitles.srt`。有 `YYYY-MM-DD-review-preview.edl`（或旧的预览 mp4）时，脚本另拷同名 `.srt`。IINA 不会自动挂，要用 `-- --sub-files=`。不要在烧字成片旁边留 `YYYY-MM-DD-run-final.srt`。最终导出并移进 `upload/` 后，外挂仍是 `subtitles.srt`。
+更新媒体目录的 `subtitles.srt`。有 `YYYY-MM-DD-review-preview.edl`（或旧的预览 mp4）时，脚本另拷同名 `.srt`。IINA 不会自动挂，要用 `-- --sub-files=`。不要在烧字成片旁边留 `YYYY-MM-DD-run-final.srt`。最终导出并移进 `upload/` 后，外挂仍是 `subtitles.srt`。`txt_to_subs.py` 跑完立刻读 `logs/todo.md`。字幕状态应仍是 `confirmed`。清单不对就停。不要拿文件名或 `assets.md` 当进度。
 
 然后才写简介：读校准后的 `subtitles.txt`，短句总结本期实际说了什么，写入该期 `plan.md` 的简介栏。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。大多数期没有「参考」，只写摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI。视频优先用当前平台的地址：B 站简介用 B 站链接，YouTube 简介用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没念到的不列。摘要两个平台相同，有参考时参考按平台分开。
 
@@ -205,7 +206,7 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
   --measure-only
 ```
 
-`--prep-alpha` 按留下的入出点直接画透明层，不写 `hud-renders/keeps/`。8 核机器用 `-j 6`，留 1–2 核给系统和写 mov 的 ffmpeg；默认仍是 2。同一条原片加载一次 FIT，再按窗口写成各自的 alpha。`--measure-only` 只测切点和风刮之后的成片混音，不读字幕。两条都会改 `logs/todo.md`，而且不要求 `subs confirmed`。之后若改了刀点，准备步骤会回到 pending。只挪了大约 1 秒以内、片段顺序没变，响度可以不重测；改动更大必须重测。
+`--prep-alpha` 按留下的入出点直接画透明层，不写 `hud-renders/keeps/`。8 核机器用 `-j 6`，留 1–2 核给系统和写 mov 的 ffmpeg；默认仍是 2。同一条原片加载一次 FIT，再按窗口写成各自的 alpha。`--measure-only` 只测切点和风刮之后的成片混音，不读字幕。两条都会改 `logs/todo.md`，而且不要求 `subs confirmed`。每条跑完立刻读清单：`--prep-alpha` 后 `hud-render` 应为 done，`--measure-only` 后 `loudness-measure` 应为 done，`subs` 仍是 `waiting-review`。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。之后若改了刀点，准备步骤会回到 pending，那一行的时间也更新。只挪了大约 1 秒以内、片段顺序没变，响度可以不重测；改动更大必须重测。
 
 > 切条已按易错规则扫过。这一轮抽听核对、改错字即可。优先动 `episodes/YYYY-MM-DD-slug/subtitles.txt`。时间先别动。改好了直接发：
 >
@@ -221,6 +222,6 @@ iina --no-stdin --mpv-geometry=320x180-8+8 \
   -- --sub-files=~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.srt
 ```
 
-没有 sidecar 就不要加 `-- --sub-files=`。不要用 `--mpv-sub-file`，IINA 会静默丢掉。
+没有 sidecar 就不要加 `-- --sub-files=`。不要用 `--mpv-sub-file`，IINA 会静默丢掉。打开审片预览不是清单上的等待点。发出这条之前 `logs/todo.md` 的 `subs` 应已是 `confirmed`。接着跑 `final_export.py --confirmed` 时，命令返回后立刻再读清单，`final-export` 应为 done。清单不对就停。不要拿文件名或 `assets.md` 当进度。
 
 > 下一步：用户确认字幕后走一次 `final_export.py --confirmed`。透明层或响度还没测，这条命令会自己补上再编码，不会先出一条无字幕成片。还要 60–90 秒短视频才提 `/p3-jianying`。

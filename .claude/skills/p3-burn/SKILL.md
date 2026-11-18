@@ -14,4 +14,4 @@ description: 已废弃的旧烧字入口。最终字幕、响度和画面必须�
 - 把 `*-hud-preview.mp4`、`*-close-stats.mp4` 当最终输入；
 - 修改 `.srt` / `.ass` 代替 `subtitles.txt`。
 
-字幕写错后改 `subtitles.txt`，用户确认后重新执行 `final_export.py --confirmed`。旧脚本仅为历史素材维护保留，不属于本期成片管线。
+字幕写错后改 `subtitles.txt`，用户确认后重新执行 `final_export.py --confirmed`。这条命令跑完立刻读 `logs/todo.md`，该标的马上标。`subs` 还是 `waiting-review` 就不要导出。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。旧脚本仅为历史素材维护保留，不属于本期成片管线。

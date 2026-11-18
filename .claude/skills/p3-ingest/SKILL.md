@@ -17,7 +17,7 @@ description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/ru
 
 1. `querySportRecords` 按**拍摄日**筛跑步记录。对上视频时间窗的那一场。同一天有多场，按开跑时间和视频重叠来挑，不要拿相邻那天的课。
 2. `downloadActivityFitFiles` 拉该场 FIT。客户端吃不下二进制时改用 `queryActivityFitFileDownloadUrls`，再 `curl` 到媒体目录。
-3. 保存为 `~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-data.fit`。多场只留和跑步重叠的那一个。
+3. 保存为 `~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-data.fit`。多场只留和跑步重叠的那一个。FIT 落地不标 `ingest`。`--apply` 成功才标，标完立刻读 `logs/todo.md`。
 4. FIT 日限额大约 50 个，一场只下一份。
 
 MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间窗，不要把 FIT GPS 发给天气接口。MCP 不可用时，才退回手机导出的 FIT（文件名可能是 `上海市_跑步*.fit` 或课表名）。
@@ -52,7 +52,7 @@ MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间�
 
 `VID_` 文件名是开始时间。脚本若发现 `mtime` 和「开始 + 时长」相差超过 5 分钟，会把 `mtime` 改成结束时间。这是 HUD `--video-end-time-mode file-modified` 的前提。把将要改写的 mtime 打给用户看一眼。
 
-用户确认后加 `--apply`。源文件已在目标目录里则只改名；从相册拷来则 `copy2` 保留时间。
+用户确认后加 `--apply`。源文件已在目标目录里则只改名；从相册拷来则 `copy2` 保留时间。`--apply` 之后立刻读 `logs/todo.md`，`ingest` 应为 done。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
 `--apply` 之后会锁原片↔FIT（写 `logs/program.json` 的 `source_sync`），并给 open / run / close 做句间检测。**只把保留区间写进时间表，不重编码。** 不要再 `--apply` 去压一套接近原片码率的粗剪成片。
 
@@ -63,13 +63,13 @@ MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间�
   --targets open,close,run
 ```
 
-默认 dry-run，列出要剪短的间隔。确认后加 `--record`。停顿门槛在 `tools/ingest/trim_talk_pauses.py`；skill 不复述算法。默认保留片头（`keep_lead_silence=True`）。要掐片头加 `--no-keep-lead-silence`。跑流程时只调用脚本看打印和退出码。被剪掉的秒只从成片时间表消失，原片文件和它的 mtime 不动，HUD 仍按原片时间取样。不需要句间刀时，ingest 加 `--skip-pause-trim`。
+默认 dry-run，列出要剪短的间隔。确认后加 `--record`。`--record` 写完立刻再读 `logs/todo.md`。有句间刀时 `edl` 应为 done。准备步骤被打回 pending 时，那一行的时间也是新的。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。停顿门槛在 `tools/ingest/trim_talk_pauses.py`；skill 不复述算法。默认保留片头（`keep_lead_silence=True`）。要掐片头加 `--no-keep-lead-silence`。跑流程时只调用脚本看打印和退出码。被剪掉的秒只从成片时间表消失，原片文件和它的 mtime 不动，HUD 仍按原片时间取样。不需要句间刀时，ingest 加 `--skip-pause-trim`。
 
 ingest `--apply` 会直接跑上面的 `--record`。已经收过的素材，单独跑这条。`--apply`（编码那条旧路径）不要作为默认。
 
 ## 记日志
 
-`ingest_run_media.py --apply` 会写 `ingest`（不加 `--apply` 不写）。脚本已写就不要再记一条。单独重跑、脚本没写上时，用 `tools/log_timeline.py` 补 `START`/`END`；失败用 `fail`。
+`ingest_run_media.py --apply` 会写 `ingest`（不加 `--apply` 不写）。脚本已写就不要再记一条。单独重跑、脚本没写上时，用 `tools/log_timeline.py` 补 `START`/`END`；失败用 `fail`。补记之后立刻读 `logs/todo.md`，该标的马上标。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
 ## 完成
 
