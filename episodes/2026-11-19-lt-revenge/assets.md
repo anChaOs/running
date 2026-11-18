@@ -44,12 +44,12 @@
 
 - ingest: done
 - shoes: done（Plaid 1.5，跑完后 -sk 550.68；本场 FIT 18.151 km）
-- hud: done（`--record-only`；鞋/天气已入表，透明层导出时或 `--prep-alpha` 再渲；规格 qtrle）
+- hud: done（`--record-only` + `--prep-alpha -j 6`；-sn Plaid 1.5 -sk 550.68；规格 qtrle）
 - cover: done（句「6x2km乳酸阈间歇 | 复仇之战」；字号硬性下限下排版断行 `6x2km|乳酸阈|复仇之战`，省略「间歇」；自拍 rembg + 设计底 `cover-work/bg.jpg`；三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`）
 - preview: done（`2026-11-19-review-preview.edl`；layout 含 close 左右对比数据图三对同步轮播）
 - qc: pending
 - subs: waiting-review（`episodes/2026-11-19-lt-revenge/subtitles.txt`；等用户改错字和换行）
-- loudness: pending（可与字幕校对并行 `--measure-only`）
+- loudness: done（`--measure-only` 已测）
 - burn: deprecated
 - final: pending
 - upload: pending
