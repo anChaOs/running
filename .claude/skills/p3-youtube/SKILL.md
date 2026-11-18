@@ -57,7 +57,7 @@ Mac upload/  →  Google Drive「跑步成片」/YYYY-MM-DD-slug/  （暂存 mp4
 3. API 还是空的，**不要**把同一条成片再 `cp` 进「跑步成片」。上次第一条还在传，就撞出 `…2.mp4` / `…3.mp4`。
 4. 默认路径始终是 Drive → `DownloadFile` → YouTube API。
 5. 一期只暂存一份：`跑步成片/YYYY-MM-DD-slug/` 里已经有这条成片，就不要再拷。等 API id；要重来，先有意清掉再拷。
-6. `stage_drive_chunks.py` 写完 `drive-stage` 之后，把 `logs/todo.md` 的 `drive` 标成 done。YouTube Data API 公开上传成功、拿到链接之后，再标 `youtube` done。Drive 没完成不能标 YouTube。禁止从 Mac 把成片 CopyToBox 分片。
+6. `stage_drive_chunks.py` 写完 `drive-stage` 之后，立刻读 `logs/todo.md`，把 `drive` 标成 done，再读一遍确认是带时间的 done。YouTube Data API 公开上传成功、拿到链接之后，再标 `youtube` done，并立刻再读清单。Drive 没完成不能标 YouTube。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。禁止从 Mac 把成片 CopyToBox 分片。
 
 ## box 上传脚本模式
 
@@ -82,7 +82,7 @@ Mac upload/  →  Google Drive「跑步成片」/YYYY-MM-DD-slug/  （暂存 mp4
 | `privacyStatus` | **`public`** |
 | 语言 | `zh-Hans`（defaultLanguage / defaultAudioLanguage） |
 
-上传前确认视频文件存在且体积合理；跑完读 `upload_result.json`，确认 `privacyStatus=public` 与 `https://youtu.be/<id>`。
+上传前确认视频文件存在且体积合理；跑完读 `upload_result.json`，确认 `privacyStatus=public` 与 `https://youtu.be/<id>`。上传脚本返回后立刻读 `logs/todo.md`。公开成功才标 `youtube` done。清单不对就停。不要拿文件名或 `assets.md` 当进度。
 
 ### 字幕
 
@@ -92,12 +92,12 @@ Mac upload/  →  Google Drive「跑步成片」/YYYY-MM-DD-slug/  （暂存 mp4
 
 ## 记日志
 
-`tools/publish/stage_drive_chunks.py` 在源文件位于 `upload/` 时会写 `drive-stage`；不在 `upload/` 时用 helper 补记。box 上的 YouTube 上传没有仓库脚本：开始 `start youtube-upload`，成功 `end`，失败 `fail`（`.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug`）。已有的行不要重复。
+`tools/publish/stage_drive_chunks.py` 在源文件位于 `upload/` 时会写 `drive-stage`；不在 `upload/` 时用 helper 补记。box 上的 YouTube 上传没有仓库脚本：开始 `start youtube-upload`，成功 `end`，失败 `fail`（`.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug`）。已有的行不要重复。`end` 或 `fail` 写完立刻读 `logs/todo.md`。成功才标 `youtube` done；失败不要标 done。清单不对就停。
 
 ## 成功后
 
 1. 把 `https://youtu.be/…` 写入该期 `episode.md`「发布」栏「YouTube：」（B 站仍空则 **不要** 改 `published`）
-2. **立刻**把 Drive「跑步成片」里本期暂存的 mp4/封面/srt **进废纸篓**（文件夹可留空）
+2. **立刻**把 Drive「跑步成片」里本期暂存的 mp4/封面/srt **进废纸篓**（文件夹可留空）。这不是 `logs/todo.md` 的 `cleanup`。`cleanup` 只在 `p3-publish` 里、用户确认清媒体目录临时文件之后标。清完 Drive 暂存立刻读清单，`youtube` 应为 done，`cleanup` 不要在这里标。清单不对就停。
 3. 清理 box 上 `/workspace/yt-stage/YYYY-MM-DD-slug/` 大文件（可留结果 json 备查）
 4. 推当期 episode 分支；**只有 B+YT 双链都齐** 才轮到 `/p3-publish`（写齐、改 `published`、squash episode PR、复盘日志上 box、清临时）——那是 publish 的事，本 skill 不做
 

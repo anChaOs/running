@@ -65,7 +65,7 @@ description: 边跑边说选题对谈。用户说选题、想拍什么、没主�
 
 有拍摄日、期还没建：先 `/p3-scaffold`，把口播写入该期 `talk.md`。`status` 用 `idea` 或 `planned`。口播里会说到的产品名、人名、英文缩写，用顿号写进 `episode.md` 的 `专名：`，给 `p3-subs` 当识别提示。
 
-期已经在：只改 `talk.md`。素材目录 `~/Movies/running-content/YYYY-MM-DD-slug` 不在，就按 `p3-scaffold` 把目录和 `logs/` 补上，不要另建一期。
+期已经在：只改 `talk.md`。素材目录 `~/Movies/running-content/YYYY-MM-DD-slug` 不在，就按 `p3-scaffold` 把目录、`logs/timeline.txt` 和初始 `logs/todo.md` 一起补上，不要另建一期。补完立刻读 `logs/todo.md`。每一行都应是带时间的 pending，最后一行是 `cleanup`。清单不对就停。写 `talk.md` 本身不改清单步骤，不要拿文件名或 `assets.md` 当进度。
 
 还没拍摄日：走 `/p3-library` 进 `topics/`，不要写 `talk.md`。
 

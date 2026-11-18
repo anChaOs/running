@@ -45,7 +45,7 @@ rsync -a --no-owner --no-group --exclude '.DS_Store' --exclude '._*' \
   "/Volumes/My Passport/running-content/YYYYMM/"
 ```
 
-一次多期时按期 `rsync`，不要把多期内容摊进同一个月目录。拷得久时：**已经拷完的期先核、先删本地**，不要等全部结束才腾空间。
+一次多期时按期 `rsync`，不要把多期内容摊进同一个月目录。拷得久时：**已经拷完的期先核、先删本地**，不要等全部结束才腾空间。`rsync` 结束立刻读该期 `logs/todo.md`。归档不改清单步骤。清单和这期状态对不上就停，不要拿目录名当进度。
 
 ### 3. 核对
 
@@ -53,7 +53,7 @@ rsync -a --no-owner --no-group --exclude '.DS_Store' --exclude '._*' \
 
 ### 4. 删本地
 
-只删核对通过的那一期媒体目录。本机空闲变化报给用户。
+只删核对通过的那一期媒体目录。删之前再读 `logs/todo.md`。这期若还停在未完成就停，不要只看目录在不在。本机空闲变化报给用户。
 
 ## 完成
 

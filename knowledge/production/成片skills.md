@@ -33,4 +33,4 @@ p3-library / p3-topic / p3-scaffold
 
 最终导出不读取 HUD preview、review preview 或 close-stats 视频。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 是历史旁路，不属于新流程。仓库只跟踪 `subtitles.txt`；SRT/ASS 是生成物。
 
-时间表是媒体目录 `logs/program.json`。进度清单是 `logs/todo.md`，和 `logs/timeline.txt` 一起写到发布完成。操作以 `p3-episode` 为准。
+时间表是媒体目录 `logs/program.json`。进度清单是 `logs/todo.md`，和 `logs/timeline.txt` 一起写到 `cleanup`。操作以 `p3-episode` 为准。

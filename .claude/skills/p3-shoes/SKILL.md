@@ -46,11 +46,11 @@ HUD：
 
 ## 追加
 
-把新行写入场次表，更新「当前读数」。同一天只记上场那双鞋。数字保留两位小数，和 HUD 显示一致。
+把新行写入场次表，更新「当前读数」。同一天只记上场那双鞋。数字保留两位小数，和 HUD 显示一致。写完立刻读 `logs/todo.md`。鞋没有单独的清单步骤，不要新加一行。清单不对（例如 `ingest` 还没 done）就停。不要攒到后面再标，也不要拿文件名、账本或 `assets.md` 当进度。
 
 ## 记日志
 
-没有脚本挂钩。账本记完用 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start shoes`，再 `end shoes`。失败用 `fail`。已有这条就不要再写。
+没有脚本挂钩。账本记完用 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start shoes`，再 `end shoes`。失败用 `fail`。已有这条就不要再写。`end` 之后立刻再读 `logs/todo.md`。清单不对就停。不要拿文件名或 `assets.md` 当进度。
 
 ## 完成后
 

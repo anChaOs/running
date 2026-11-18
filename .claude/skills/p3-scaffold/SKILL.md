@@ -37,6 +37,15 @@ mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug/logs
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug end scaffold
 ```
 
+还没有 `logs/todo.md` 时，写一份全 pending 的初始清单（含 `cleanup`，每行带当前时间）。文件已在就不要再 `init`，避免把进度打回 pending：
+
+```bash
+.venv/bin/python tools/todo_list.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug init
+```
+
+`start` / `end` 和 `init` 做完立刻读 `logs/todo.md`。新建的每一行都应是带时间的 pending，最后一行是 `cleanup`。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
+
 ## 完成后
 
 建好目录后立刻推荐下一步。把日期、slug、导出路径换成当前期。
