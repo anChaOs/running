@@ -27,4 +27,4 @@ media: ~/Movies/running-content/2026-11-18-carbon-plate/
 
 - YouTube：https://youtu.be/_UxY1SaK7YA
 - Bilibili：https://www.bilibili.com/video/BV1pas26NEaP
-- 抖音：
+- 抖音：https://v.douyin.com/1jFaCwYIIiw/
