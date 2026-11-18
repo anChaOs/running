@@ -4,7 +4,7 @@ slug: carbon-plate
 title: 碳板鞋为什么更省力？
 status: published
 series: 破三实验室
-media: ~/Movies/running-content/2026-11-17-carbon-plate/
+media: ~/Movies/running-content/2026-11-18-carbon-plate/
 ---
 
 # 2026-11-18 碳板鞋为什么更省力？
@@ -27,4 +27,4 @@ media: ~/Movies/running-content/2026-11-17-carbon-plate/
 
 - YouTube：https://youtu.be/_UxY1SaK7YA
 - Bilibili：https://www.bilibili.com/video/BV1pas26NEaP
-- 抖音：
+- 抖音：https://v.douyin.com/1jFaCwYIIiw/
