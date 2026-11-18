@@ -2,7 +2,7 @@
 date: 2026-11-19
 slug: lt-revenge
 title: 6x2km乳酸阈间歇 | 复仇之战
-status: planned
+status: shot
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-19-lt-revenge/
 ---
