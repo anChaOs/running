@@ -27,4 +27,4 @@ media: ~/Movies/running-content/2026-11-10-double11-shoes/
 
 - YouTube：https://youtu.be/NMVgq7i2Y0g
 - Bilibili：https://www.bilibili.com/video/BV1NtWM68E74
-- 抖音：
+- 抖音：https://v.douyin.com/G_3ClsGmTuI/

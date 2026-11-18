@@ -27,4 +27,4 @@ media: ~/Movies/running-content/2026-11-12-8020/
 
 - YouTube：https://youtu.be/jfz7HgxoSAo
 - Bilibili：https://www.bilibili.com/video/BV1zAW96VEFx
-- 抖音：
+- 抖音：https://v.douyin.com/7dnUdbUGkgk/

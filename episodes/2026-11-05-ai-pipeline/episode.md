@@ -27,4 +27,4 @@ media: ~/Movies/running-content/2026-11-05-ai-pipeline/
 
 - YouTube：https://youtu.be/_HgQNxkcXoM
 - Bilibili：https://www.bilibili.com/video/BV1BaxZ6oEAG
-- 抖音：
+- 抖音：https://v.douyin.com/s-GVFhZGxtk/
