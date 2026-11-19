@@ -28,7 +28,7 @@ description: 按 logs/program.json 写一份 mpv 播放清单来审片（不拼�
 mpv ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl
 ```
 
-mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 1.5.1 能直接打开这份 `.edl`。需要当场播再加 `--play`；本机没有 mpv 时清单仍然写好，并说明启动失败。打不开播放器不算这步失败。打开播放器不是 `logs/todo.md` 上的等待点。
+mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 1.5.1 能直接打开这份 `.edl`。他明确说「打开」或明确同意这次询问之后，才加 `--play` 或打开 IINA。agent 不自行打开播放器。字幕初稿校对不再是例外。本机没有 mpv 时清单仍然写好，并说明启动失败。打不开播放器不算这步失败。打开播放器不是 `logs/todo.md` 上的等待点。
 
 不加 `--dry-run` 的那次写完立刻读 `logs/todo.md`，`preview` 应为 done。没标上就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
@@ -41,7 +41,7 @@ iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-previ
   -- --sub-files=~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.srt
 ```
 
-没有 sidecar 就不要加 `-- --sub-files=`。
+没有 sidecar 就不要加 `-- --sub-files=`。这条命令同样要他先同意才执行。不要用 `--mpv-sub-file`。
 
 ## 前置
 

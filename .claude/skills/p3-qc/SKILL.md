@@ -14,7 +14,7 @@ description: 核对审片预览或最终成片。默认预览画面核对在 p3-
 
 ## 看预览
 
-预览是 `YYYY-MM-DD-review-preview.edl`，不是 mp4。用 IINA 或 mpv 看清单，不要对一条不存在的预览片抽帧。字幕要显式挂上，不要用 `--mpv-sub-file`：
+预览是 `YYYY-MM-DD-review-preview.edl`，不是 mp4。他同意之后才用 IINA 或 mpv 看清单，不要对一条不存在的预览片抽帧。字幕要显式挂上，不要用 `--mpv-sub-file`：
 
 ```bash
 iina --no-stdin --mpv-geometry=320x180-8+8 \
@@ -22,7 +22,7 @@ iina --no-stdin --mpv-geometry=320x180-8+8 \
   -- --sub-files=~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.srt
 ```
 
-没有 sidecar 就不要加 `-- --sub-files=`。用户同意后才打开 IINA，agent 不自行打开播放器。打开播放器不是清单上的等待点。看完立刻读 `logs/todo.md`，`preview` 应为 done。清单不对就停。不要拿文件名或 `assets.md` 当进度。
+没有 sidecar 就不要加 `-- --sub-files=`。用户同意后才打开 IINA，agent 不自行打开播放器。同意是他说「打开」，或明确同意这次询问。字幕初稿校对不再是例外。打开播放器不是清单上的等待点。看完立刻读 `logs/todo.md`，`preview` 应为 done。清单不对就停。不要拿文件名或 `assets.md` 当进度。
 
 ## 抽帧
 
@@ -34,7 +34,7 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
   -frames:v 1 ~/Movies/running-content/YYYY-MM-DD-slug/qc/<label>.jpg
 ```
 
-不要在成片旁边留同名 `.srt`（会和烧进去的字叠两层）；外挂只留 `subtitles.srt`。用户同意后才打开 IINA，agent 不自行打开播放器。打开成片不是清单上的等待点；等待点是抽帧通过、`final-qc` 已 done 之后等「可以发了」。抽帧命令跑完立刻读 `logs/todo.md`。还没标 `final-qc` 就不要往下走。不要拿文件名或 `assets.md` 当进度。打开烧字成片要带 `--no-stdin`，避免 IINA 占着 stdin 挂住：
+不要在成片旁边留同名 `.srt`（会和烧进去的字叠两层）；外挂只留 `subtitles.srt`。用户同意后才打开 IINA，agent 不自行打开播放器。各阶段都一样，字幕校对也不例外：没有这句同意就不要开。打开成片不是清单上的等待点；等待点是抽帧通过、`final-qc` 已 done 之后等「可以发了」。抽帧命令跑完立刻读 `logs/todo.md`。还没标 `final-qc` 就不要往下走。不要拿文件名或 `assets.md` 当进度。打开烧字成片要带 `--no-stdin`，避免 IINA 占着 stdin 挂住：
 
 ```bash
 iina --no-stdin --mpv-geometry=320x180-8+8 \
