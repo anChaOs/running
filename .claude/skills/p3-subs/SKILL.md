@@ -1,6 +1,6 @@
 ---
 name: p3-subs
-description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句；人改字后 force_align → check_subs，确认后 subs: done；再写简介、抖音文案与 B 站/YouTube 标签进 plan.md。用户说字幕、转写、whisper、对口型、改字幕时用。没有审片清单先走 p3-assemble。初稿写完立刻停，先问再打开 txt 和审片预览；没有他明确同意不要开编辑器或播放器。
+description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句；人改字后 force_align → check_subs，确认后 subs: done；再写简介、抖音文案与 B 站/YouTube 标签进 plan.md。用户说字幕、转写、whisper、对口型、改字幕时用。没有审片清单先走 p3-assemble。初稿写完立刻停。不要自动打开编辑器或播放器；先问要不要打开 txt 和审片预览，同意后再开。HUD 透明层和响度要立刻并行开始，别等字幕校验。
 ---
 
 # 字幕（忠于原句）
@@ -15,7 +15,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 2. **校正**：只做下面「可以做」，绝不做「不能做」；交稿前做同音字扫描
 3. **切条**：由 `draft_subs` 产出；agent **不重跑切条算法**。字一个都不改，**不对口型**
 4. **自检切条（必做，交用户前）**：对照「切条易错」逐条扫，只改切分、不改嘴里说的字
-5. 写 `subtitles.txt`，立刻停，等人手改错字和换行。不要自动打开 txt 或审片预览；先问，他同意后再开
+5. 写 `subtitles.txt`，立刻停，等人手改错字和换行。不要自动打开编辑器或播放器。先问要不要打开 `subtitles.txt` 和审片预览，同意后再开；他只点一样就只开那样
 6. 用户说改好了之后：**只改时间、不改字**。`force_align.py` → `check_subs.py` → 硬失败行给人听 → **用户确认**后才写 `subs: done`，再生成媒体目录 SRT
 
 ## 校正：可以做
@@ -61,7 +61,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写，忠于原句�
 - 不要把一段识别的起止按字数均分给几条字幕，也不要手填等步长的时间。对不上的条留给 `force_align.py` 报出来，人听了再定
 - 不要用 tiny / small；只用 large-v3-turbo
 - 不要在这里烧字，也不要在这里修响度。用户确认后只走一次 `final_export.py --confirmed`。
-- 不要在他明确说「打开」、或明确同意这次询问之前，打开 `subtitles.txt`、审片预览、IINA、mpv 或任何视频/播放器。任何编辑器也不要自动开。字幕校对不再是例外。未经同意的播放会吓到人。
+- 不要自动打开编辑器或播放器。先问要不要打开 `subtitles.txt` 和审片预览，同意后再开；他只点一样就只开那样。
 
 ## 转写 + 初稿
 
@@ -109,7 +109,7 @@ txt 一行一条，时间是成片轴：
 
 自检切条做完、写完 `subtitles.txt` 之后 **立刻停**。不要对口型、不要烧字幕、不要写简介。第一稿时间只是识别的词级时间，不是口型。`subs` 仍是 `waiting-review`。用户说改好了之前，不要跑 `force_align.py`。
 
-不要自动打开 `subtitles.txt`（TextEdit 或任何编辑器），也不要自动打开审片预览、IINA、mpv 或任何视频/播放器。字幕校对不再是「可以同步打开预览」的例外。先问要不要打开 `subtitles.txt` 和审片预览。他没同意之前，两样都不要开。他说「打开」，或明确同意这次询问、没有另加限制，就打开这两样。他若只点了其中一样，就只开那样。
+不要自动打开编辑器或播放器。先问要不要打开 `subtitles.txt` 和审片预览，同意后再开；他只点一样就只开那样。
 
 他同意之后才执行：
 
@@ -126,7 +126,7 @@ iina --no-stdin \
 
 - 这一轮用户改错字和换行即可；优先改 `subtitles.txt`，时间不要动。保持单行。
 
-没说改好之前，`assets.md` 写 `subs: waiting-review`。`logs/todo.md` 的 `subs` 必须是 `waiting-review`。这是清单上的等待点：等用户改错字和换行。用户说改好了、并且字幕 `confirmed` 之前，不要跑 `final_export.py --confirmed`。HUD 透明层和响度测量可以并行。写不上就不算这步完成。不要拿 `assets.md` 当进度。
+没说改好之前，`assets.md` 写 `subs: waiting-review`。`logs/todo.md` 的 `subs` 必须是 `waiting-review`。这是清单上的等待点：等用户改错字和换行。用户说改好了、并且字幕 `confirmed` 之前，不要跑 `final_export.py --confirmed`。HUD 透明层和响度要立刻并行开始，别等字幕校验。写不上就不算这步完成。不要拿 `assets.md` 当进度。
 
 ## 改好字之后：对口型
 
@@ -205,7 +205,7 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
 
 **刚写完稿（`waiting-review`）**
 
-立刻停。不要对口型、不要烧字幕、不要写简介。不要打开 TextEdit、审片预览、IINA 或 mpv。先问要不要打开 `subtitles.txt` 和审片预览；他同意后再开，规则见「停下来，等人手改字」。说明切条已自检。时间表若已经冻结，这一轮可以同时画 HUD 和测响度，不必等用户确认字幕。校对只改错字和换行，刀点不动。
+立刻停。不要对口型、不要烧字幕、不要写简介。不要自动打开编辑器或播放器。先问要不要打开 `subtitles.txt` 和审片预览，同意后再开；他只点一样就只开那样。说明切条已自检。HUD 透明层和响度要立刻并行开始，别等字幕校验。校对只改错字和换行，刀点不动。
 
 ```bash
 .venv/bin/python tools/hud/render_running_hud.py \

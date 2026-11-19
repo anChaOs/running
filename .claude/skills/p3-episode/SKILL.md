@@ -18,7 +18,7 @@ description: 一期跑步视频的调度入口。用户丢来未重命名的手�
 - 不要覆盖已有原片、HUD、预览或最终成片，除非用户明确要重做
 - 不要在成片流程里自行搬盘或删原片；归档走 `p3-archive`；发布/清临时走 `p3-publish`
 - 清临时禁止 `rm`。用户确认前不要把文件移进废纸篓，也不要标 `cleanup` done
-- 不要在他明确说「打开」、或明确同意这次询问之前，打开任何视频或播放器（IINA、mpv 或其它）。字幕校对不再是例外。未经同意的播放会吓到人
+- 不要自动打开编辑器或播放器。先问要不要打开 `subtitles.txt` 和审片预览，同意后再开；他只点一样就只开那样
 
 ## 产物图（总序）
 
@@ -37,7 +37,7 @@ p3-cover             → cover-*.jpg（与记录 HUD 并行）
 
 review-preview
   p3-subs     → 转写。对口型前冻结时间表。之后改刀点必须按新表重对齐
-              → 冻结后，用户只改错字和换行；同时可以画 HUD、测响度
+              → 冻结后，用户只改错字和换行。HUD 透明层和响度要立刻并行开始，别等字幕校验
 
 frozen，字幕还在校对
   render_running_hud.py --prep-alpha -j 6
@@ -99,11 +99,11 @@ subs: confirmed，且时间表已冻结、logs/todo.md 允许导出
 
 等人的只有这三处，其它步骤不要停下来等确认：
 
-- 字幕初稿写入后：`subs` 为 `waiting-review`，等用户改错字和换行。不要自动打开 `subtitles.txt` 或审片预览；先问要不要打开，他同意后再开。HUD 透明层和响度可并行。用户说改好了之前，不要跑 `force_align.py`。用户说改好了、且 `subs` 已 `confirmed` 之前，不要跑 `final_export.py --confirmed`。
+- 字幕初稿写入后：`subs` 为 `waiting-review`，等用户改错字和换行。不要自动打开编辑器或播放器。先问要不要打开 `subtitles.txt` 和审片预览，同意后再开；他只点一样就只开那样。HUD 透明层和响度要立刻并行开始，别等字幕校验。用户说改好了之前，不要跑 `force_align.py`。用户说改好了、且 `subs` 已 `confirmed` 之前，不要跑 `final_export.py --confirmed`。
 - 成片导出完成且 `final-qc` 已是 `done`：等用户说「可以发了」再打包或发布。
 - `published` 之后：`cleanup` 等用户确认清临时。确认前不要移进废纸篓，也不要标 `cleanup` done。禁止 `rm`。`YYYY-MM-DD-review-preview.edl` 留下；旁边的预览 `.srt` 仍可删，除非用户另说。
 
-封面确认、打开审片预览、必听硬失败，都不是等待点。打开审片预览仍要他先说「打开」或明确同意；校对字幕不再是例外。
+封面确认、打开审片预览、必听硬失败，都不是等待点。不要自动打开编辑器或播放器。先问要不要打开 `subtitles.txt` 和审片预览，同意后再开；他只点一样就只开那样。
 
 官方脚本会写带时间的格式；手补用：
 
@@ -133,7 +133,7 @@ subs: confirmed，且时间表已冻结、logs/todo.md 允许导出
 
 ## 字幕与最终导出
 
-`p3-subs` 在写完 `subtitles.txt` 后必须停下来等人改字。不要自动打开 txt 或审片预览；先问，他同意后再开。force_align 可以在用户说改好后运行，但硬失败行仍须人听；只有用户明确确认后才改 `subs: done` 和 `episode.md` 的 `edited`。
+`p3-subs` 在写完 `subtitles.txt` 后必须停下来等人改字。不要自动打开编辑器或播放器。先问要不要打开 `subtitles.txt` 和审片预览，同意后再开；他只点一样就只开那样。force_align 可以在用户说改好后运行，但硬失败行仍须人听；只有用户明确确认后才改 `subs: done` 和 `episode.md` 的 `edited`。
 
 最终导出命令：
 

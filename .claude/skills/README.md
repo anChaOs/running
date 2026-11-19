@@ -34,7 +34,7 @@
   p3-shoes        training/logs/shoes.md，算出 -sk
   p3-hud          先只记录 HUD 数据；冻结后 --prep-alpha 直接画留下区间的透明层（8 核 -j 6）
   p3-assemble     按 program.json 写审片播放清单（不拼预览成片，不出最终片）
-  p3-subs         字幕（转写→人改→对齐→人工确认）；校对时可并行准备
+  p3-subs         字幕（转写→人改→对齐→人工确认）；HUD 透明层和响度要立刻并行开始，别等字幕校验
   final_export.py  确认后分段出画面、整片音频混一次；缺的准备自己补
   p3-loudness     已废弃（响度随 final_export 一次编码）
   p3-burn         已废弃（字幕随 final_export 一次编码）
@@ -58,7 +58,7 @@ p3-library / p3-topic / p3-scaffold
   → 冷开场 / 贴图 / 插入入表
   → assemble（按同一张表出低成本预览）
   → 冻结时间表
-  → 用户校对字幕（只改错字和换行）∥ 一次解码画 HUD ∥ 可选测响度
+  → 用户校对字幕（只改错字和换行）。HUD 透明层和响度要立刻并行开始，别等字幕校验
   → 确认字幕
   → final_export --confirmed（约 120 秒一段编码，流拷贝接成一个文件）
   → （可选）p3-bilibili / p3-youtube 自动上传；均不挡、不嵌入 publish
@@ -67,6 +67,6 @@ p3-library / p3-topic / p3-scaffold
   → archive（满 7 天）
 ```
 
-推荐墙钟：`assemble`（整条轻量预览）→ 冻结后 `hud-render` / `loudness-measure` 与字幕校对并行 → 确认字幕 → `final_export` → `publish`。最终导出前不单独烧字，也不要对成片再跑一遍响度；详见 `p3-assemble`。每步墙钟追加到媒体目录 `logs/timeline.txt`（硬规则在 `p3-episode`）。官方脚本会写；没写上的用 `tools/log_timeline.py`。进度清单是 `logs/todo.md`，硬规则也在 `p3-episode`：每步做完立刻对清单。清临时等用户确认后，`cleanup` 才标 done。
+推荐墙钟：`assemble`（整条轻量预览）→ 冻结后 HUD 透明层和响度要立刻并行开始，别等字幕校验 → 确认字幕 → `final_export` → `publish`。最终导出前不单独烧字，也不要对成片再跑一遍响度；详见 `p3-assemble`。每步墙钟追加到媒体目录 `logs/timeline.txt`（硬规则在 `p3-episode`）。官方脚本会写；没写上的用 `tools/log_timeline.py`。进度清单是 `logs/todo.md`，硬规则也在 `p3-episode`：每步做完立刻对清单。清临时等用户确认后，`cleanup` 才标 done。
 
 任意一步都可以停。改字幕只改 `subtitles.txt`，再生成媒体 SRT，不用重拼。改 `-sk` 要重渲 HUD 再拼。

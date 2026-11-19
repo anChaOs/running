@@ -1,6 +1,6 @@
 ---
 name: p3-hud
-description: 先把跑鞋、天气和透明层规格记进 logs/program.json，不渲未剪原片。时间表冻结后可以用 --prep-alpha 按留下的入出点直接画透明层，和字幕校对并行。需要已命名 mp4、FIT、跑鞋 -sn/-sk。用户说 HUD、叠加数据、overlay 时用。封面走 p3-cover，可并行。不要给 open/close 加 HUD，不要剪原片 run-*。天气用上海城市场点，不要发 FIT GPS。确认导出若缺透明层会自己补。确认导出按大约 120 秒分段编码，再流拷贝成一个文件。
+description: 先把跑鞋、天气和透明层规格记进 logs/program.json，不渲未剪原片。时间表冻结后立刻用 --prep-alpha 按留下的入出点直接画透明层。HUD 透明层和响度要立刻并行开始，别等字幕校验。需要已命名 mp4、FIT、跑鞋 -sn/-sk。用户说 HUD、叠加数据、overlay 时用。封面走 p3-cover，可并行。不要给 open/close 加 HUD，不要剪原片 run-*。天气用上海城市场点，不要发 FIT GPS。确认导出若缺透明层会自己补。确认导出按大约 120 秒分段编码，再流拷贝成一个文件。
 ---
 
 # HUD
@@ -59,7 +59,7 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json，�
 
 ## 冻结之后画透明层
 
-`logs/program.json` 已经 `frozen`，并且 `logs/todo.md` 的 `preview` 是 done 之后，可以和字幕校对同时跑。字幕还没确认也不挡这一步。刀点保持冻结；校对只改错字和换行。
+`logs/program.json` 已经 `frozen`，并且 `logs/todo.md` 的 `preview` 是 done 之后，HUD 透明层和响度要立刻并行开始，别等字幕校验。刀点保持冻结；校对只改错字和换行。
 
 ```bash
 .venv/bin/python tools/hud/render_running_hud.py \
@@ -68,7 +68,7 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json，�
   -j 6
 ```
 
-8 核机器用 `-j 6`，留 1–2 核给系统和写 mov 的 ffmpeg。默认仍是 2，核少就拿掉 `-j`。命令行上的数字会进渲染工人数。`--prep-alpha` 跑完立刻读 `logs/todo.md`，`hud-render` 应为 done。字幕还在 `waiting-review` 也不挡这一步。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
+8 核机器用 `-j 6`，留 1–2 核给系统和写 mov 的 ffmpeg。默认仍是 2，核少就拿掉 `-j`。命令行上的数字会进渲染工人数。`--prep-alpha` 跑完立刻读 `logs/todo.md`，`hud-render` 应为 done，别等字幕校验。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
 同一条原片起一个 wrap：FIT 和模板加载一次，再按留下的窗口逐段写成 `hud-renders/<profile>/` 里各自的 alpha mov。一条原片占了大部分窗口时，最多拆成 `-j` 个进程，每个进程仍然一次加载、连续画多段。短窗补起点，透明层时间从 0 起。已经对得上的文件直接复用。不写 `hud-renders/keeps/`，也不解码重编原片画面。
 
