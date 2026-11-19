@@ -27,3 +27,4 @@ media: ~/Movies/running-content/2026-11-19-lt-revenge/
 
 - Bilibili：https://www.bilibili.com/video/BV1Cvst6JEoM
 - YouTube：https://youtu.be/3nuvQlY5MFs
+- 抖音：https://v.douyin.com/rojB6K5HDLI/
