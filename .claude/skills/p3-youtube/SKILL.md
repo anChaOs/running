@@ -21,7 +21,6 @@ description: 把本期 upload/ 成片经 Google Drive「跑步成片」暂存到
 - 不要把 Finder / 本机 `ls`（含 `local-*`）当成「拷完」；API 还空时不要把同一条成片再 `cp` 进「跑步成片」
 - 不要在缺 `token.json` / 缺成片 / 缺 16:9 封面时硬传
 - 不要因外挂字幕失败而回滚已公开的成片（字幕缺 scope 时可后补）
-- 不要在简介里加链接。描述按 `plan.md`「### YouTube」原样传：第一行是 `个人视频制作来自：github.com/anChaOs/running`，后面是两三短句。整段不能含 `https://`、`http://` 或其它可点击 URL。不要改用带 `https://` 的 B 站简介
 
 ## 前置
 
@@ -29,7 +28,7 @@ description: 把本期 upload/ 成片经 Google Drive「跑步成片」暂存到
    - `<标题>.mp4`  
    - `cover-16x9-1920x1080.jpg`（缩略图用这张；**不是** 4×3）  
    - 可选 `subtitles.srt`
-2. `plan.md` 已有标题 +「### YouTube」简介（由 `/p3-subs` 写好；不含链接）
+2. `plan.md` 已有标题 +「### YouTube」简介
 3. box 上已有可用 OAuth：`/workspace/youtube-upload/token.json`（含 **refresh_token**；上传前可强制 refresh）  
    - 常见 scope：`youtube.upload` + `youtube`；挂 captions 还要 **`youtube.force-ssl`**（缺了视频仍可 public，字幕接口会 403）
 4. Google Drive 文件夹「跑步成片」可写（用户账号 / Drive 连接器）

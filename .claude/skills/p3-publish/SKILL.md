@@ -23,7 +23,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 ## 上传清单（用户说可以发了时给）
 
-从 `plan.md` 抄标题、封面句、简介。简介按平台抄：「### B 站」和「### YouTube」各用各的，不要把带 `https://` 的 B 站简介贴到 YouTube。最终导出文件改名与外挂文件名按 `upload/` 现有打包规则处理；不要重新编码成片。文件名里的 ASCII `/` 换成全角 `／`（`pack_upload.py --print-filename`），平台标题仍用 `plan.md` 原文。打包前 `logs/todo.md` 必须是最终导出和最终 QC 都完成，否则 `pack_upload.py` 会停。`pack_upload.py` 跑完立刻读清单，`pack-upload` 应为带时间的 done。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
+从 `plan.md` 抄标题、封面句、简介。简介按平台原样抄：「### B 站」和「### YouTube」各抄各的。最终导出文件改名与外挂文件名按 `upload/` 现有打包规则处理；不要重新编码成片。文件名里的 ASCII `/` 换成全角 `／`（`pack_upload.py --print-filename`），平台标题仍用 `plan.md` 原文。打包前 `logs/todo.md` 必须是最终导出和最终 QC 都完成，否则 `pack_upload.py` 会停。`pack_upload.py` 跑完立刻读清单，`pack-upload` 应为带时间的 done。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
 核对：
 - `upload/` 已有：标题烧字 `.mp4`、三封面（4:3→3:4→16:9）、`subtitles.srt`（`pack_upload.py` 打好）

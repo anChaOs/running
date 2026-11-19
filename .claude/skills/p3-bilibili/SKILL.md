@@ -20,7 +20,7 @@ description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/�
    - 标题名烧字成片 `.mp4`（已 MOVE 进 `upload/`，根目录无第二份）  
    - `cover-4x3-1920x1440.jpg`（另两张可并存，**投稿只用这张**）  
    - 可选 `subtitles.srt`（biliup 本次不挂外挂；创作中心可后补）
-2. `plan.md` 已有标题 +「### B 站」简介。第一行是 `个人视频制作来自：https://github.com/anChaOs/running`，后面两三短句，与 YouTube 摘要正文相同。按原文投稿：保留这条 `https://` 署名，不要改成 YouTube 那种不带协议的写法，也不要把摘要扩回长复盘。投稿前先数简介字数，超过 2000 字就停：
+2. `plan.md` 已有标题 +「### B 站」简介。投稿前先数简介字数，超过 2000 字就停：
 
 ```bash
 .venv/bin/python tools/publish/pack_upload.py --check-desc /tmp/bilibili-desc.txt
