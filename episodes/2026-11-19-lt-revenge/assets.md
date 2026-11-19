@@ -47,11 +47,11 @@
 - hud: done（`--record-only` + `--prep-alpha -j 6`；-sn Plaid 1.5 -sk 550.68；规格 qtrle）
 - cover: done（句「6x2km乳酸阈间歇 | 复仇之战」；字号硬性下限下排版断行 `6x2km|乳酸阈|复仇之战`，省略「间歇」；自拍 rembg + 设计底 `cover-work/bg.jpg`；三比例：`cover-4x3-1920x1440.jpg` / `cover-3x4-1080x1440.jpg` / `cover-16x9-1920x1080.jpg`）
 - preview: done（`2026-11-19-review-preview.edl`；layout 含 close 左右对比数据图三对同步轮播）
-- qc: pending
-- subs: waiting-review（`episodes/2026-11-19-lt-revenge/subtitles.txt`；等用户改错字和换行）
+- qc: done（审片预览 EDL 已校验：frozen、时长 611.643s、open/run-a–d/close 齐全；run-b 开头 0–40.03s、run-c 开头 0–28s 保留；用户已对照预览校对字幕）
+- subs: done（`episodes/2026-11-19-lt-revenge/subtitles.txt` 已确认；媒体目录 `subtitles.srt` 已更新）
 - loudness: done（`--measure-only` 已测）
 - burn: deprecated
-- final: pending
+- final: done（`2026-11-19-run-final.mp4` 611.700s / 18351 帧，2.0G，1080p30 hevc/hvc1 + AAC；已烧字幕；跑步段 HUD 为 Plaid 1.5；close 左右对比三拍为今日概览/分组配速/地图温度 vs 上周；抽帧 `qc/` 12 张已过）
 - upload: pending
 
 ## close 左右对比贴图
