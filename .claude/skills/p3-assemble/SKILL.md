@@ -28,7 +28,7 @@ description: 按 logs/program.json 写一份 mpv 播放清单来审片（不拼�
 mpv ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl
 ```
 
-mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 1.5.1 能直接打开这份 `.edl`。需要当场播再加 `--play`；本机没有 mpv 时清单仍然写好，并说明启动失败。打不开播放器不算这步失败。打开播放器不是 `logs/todo.md` 上的等待点。
+mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 1.5.1 能直接打开这份 `.edl`。不要自动打开播放器。先问，同意后再加 `--play` 或打开 IINA。本机没有 mpv 时清单仍然写好，并说明启动失败。打不开播放器不算这步失败。打开播放器不是 `logs/todo.md` 上的等待点。
 
 不加 `--dry-run` 的那次写完立刻读 `logs/todo.md`，`preview` 应为 done。没标上就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
 
@@ -41,7 +41,7 @@ iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-previ
   -- --sub-files=~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.srt
 ```
 
-没有 sidecar 就不要加 `-- --sub-files=`。
+没有 sidecar 就不要加 `-- --sub-files=`。这条命令同样要他先同意才执行。不要用 `--mpv-sub-file`。
 
 ## 前置
 
@@ -60,4 +60,4 @@ iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-previ
 
 ## 完成后
 
-> 预览核对通过后走 `/p3-subs`，对口型前先冻结时间表。冻上之后，用户校对字幕的同时可以 `--prep-alpha` 和 `final_export.py --measure-only`。8 核机器画透明层加 `-j 6`（默认仍是 2），留 1–2 核给系统和写 mov 的 ffmpeg。同一条原片加载一次 FIT，再按窗口写出各自的 alpha。成片仍只走 `final_export.py --confirmed`，仍然只写出一个文件。画面按大约 120 秒分段，只出画面：段界不切断风刮或 xfade，每一段只打开自己用到的原片，窗口 alpha 收成一条再叠一次，烧字幕，`hevc_videotoolbox`，`-filter_complex_threads` 是 3。整片音频用和测响度同一张图混一次。响度没测好就和第一段画面一起测，测完再开音频编码，不挡画面；音频一直留在内存监控里直到结束。第一段同时对帧头和逐帧数，一致之后后面的段只读帧头。每段记一次内存（macOS 用 footprint 的 phys_footprint，读不到或接近 0 就退回 RSS），超过 8GB 就停。画面段流拷贝接起来，再配上这一条音频。不把 `hud-renders/keeps/` 当画面。
+> 预览核对通过后走 `/p3-subs`，对口型前先冻结时间表。冻上之后，HUD 透明层和响度要立刻并行开始，别等字幕校验：`--prep-alpha` 和 `final_export.py --measure-only`。8 核机器画透明层加 `-j 6`（默认仍是 2），留 1–2 核给系统和写 mov 的 ffmpeg。同一条原片加载一次 FIT，再按窗口写出各自的 alpha。成片仍只走 `final_export.py --confirmed`，仍然只写出一个文件。画面按大约 120 秒分段，只出画面：段界不切断风刮或 xfade，每一段只打开自己用到的原片，窗口 alpha 收成一条再叠一次，烧字幕，`hevc_videotoolbox`，`-filter_complex_threads` 是 3。整片音频用和测响度同一张图混一次。响度没测好就和第一段画面一起测，测完再开音频编码，不挡画面；音频一直留在内存监控里直到结束。第一段同时对帧头和逐帧数，一致之后后面的段只读帧头。每段记一次内存（macOS 用 footprint 的 phys_footprint，读不到或接近 0 就退回 RSS），超过 8GB 就停。画面段流拷贝接起来，再配上这一条音频。不把 `hud-renders/keeps/` 当画面。
