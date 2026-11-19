@@ -28,7 +28,7 @@ description: 把本期 upload/ 成片经 Google Drive「跑步成片」暂存到
    - `<标题>.mp4`  
    - `cover-16x9-1920x1080.jpg`（缩略图用这张；**不是** 4×3）  
    - 可选 `subtitles.srt`
-2. `plan.md` 已有标题 + YouTube / 通用简介文案
+2. `plan.md` 已有标题 +「### YouTube」简介
 3. box 上已有可用 OAuth：`/workspace/youtube-upload/token.json`（含 **refresh_token**；上传前可强制 refresh）  
    - 常见 scope：`youtube.upload` + `youtube`；挂 captions 还要 **`youtube.force-ssl`**（缺了视频仍可 public，字幕接口会 403）
 4. Google Drive 文件夹「跑步成片」可写（用户账号 / Drive 连接器）
@@ -76,7 +76,7 @@ Mac upload/  →  Google Drive「跑步成片」/YYYY-MM-DD-slug/  （暂存 mp4
 | 项 | 默认 |
 | --- | --- |
 | 标题 | `plan.md`「发这个」 |
-| 简介 | `plan.md` YouTube / 通用简介 |
+| 简介 | `plan.md`「### YouTube」正文，原样上传 |
 | 标签 | 从当期 `plan.md`「## 标签」里 **YouTube 标签** 那栏抄（由 `/p3-subs` 按字幕写好）；**不要**在本 skill 写死一套默认标签 |
 | `categoryId` | `22`（People & Blogs）常见可用 |
 | `privacyStatus` | **`public`** |

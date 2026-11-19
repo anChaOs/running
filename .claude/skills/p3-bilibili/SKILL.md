@@ -54,7 +54,7 @@ biliup -u ~/Movies/running-content/.biliup/cookies.json renew
 | 成片 | `~/Movies/running-content/YYYY-MM-DD-slug/upload/<标题>.mp4` |
 | 封面 | 同目录 `cover-4x3-1920x1440.jpg`（**唯一**投稿封面） |
 | 标题 | `plan.md`「发这个」那一行 |
-| 简介 | `plan.md`「### B 站」正文（可先写入临时文件再 `--desc`） |
+| 简介 | `plan.md`「### B 站」正文，原样投稿（可先写入临时文件再 `--desc`） |
 | 分区 `--tid` | `238`（运动） |
 | 标签 `--tag` | 从当期 `plan.md`「## 标签」里 **B 站** 那栏抄（由 `/p3-subs` 按字幕写好）；去掉 `#`、改逗号分隔给 CLI；**不要**在本 skill 写死一套默认标签 |
 | 版权 | `--copyright 1`（自制） |
