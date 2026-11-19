@@ -175,9 +175,9 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
 更新媒体目录的 `subtitles.srt`。有 `YYYY-MM-DD-review-preview.edl`（或旧的预览 mp4）时，脚本另拷同名 `.srt`。IINA 不会自动挂，要用 `-- --sub-files=`。不要在烧字成片旁边留 `YYYY-MM-DD-run-final.srt`。最终导出并移进 `upload/` 后，外挂仍是 `subtitles.srt`。`txt_to_subs.py` 跑完立刻读 `logs/todo.md`。字幕状态应仍是 `confirmed`。清单不对就停。不要拿文件名或 `assets.md` 当进度。
 
 然后才写简介和抖音文案，覆盖该期 `plan.md` 里的占位（`### B 站`、`### YouTube`、抖音栏）。
-- **极致压缩**：两三短句说清本期在干嘛即可；不要分段长摘要。从校准后的 `subtitles.txt` 写，不要按 `talk.md` / 选题卡。已发布旧期不要回改。口播明确引用了出处才写「参考」，否则不留这个标题。
+- **极致压缩**：两三短句说清本期在干嘛即可；不要分段长摘要。从校准后的 `subtitles.txt` 写，不要按 `talk.md` / 选题卡。已发布旧期不要回改。口播明确引用了出处才写「参考」，否则不留这个标题。B 站和 YouTube 摘要正文相同。
 - **B 站**：第一行 `个人视频制作来自：https://github.com/anChaOs/running`
-- **YouTube**：第一行 `个人视频制作来自：github.com/anChaOs/running`（不要 `https://`）。整段（含参考）不能有链接。B 站和 YouTube 摘要正文相同。
+- **YouTube**：第一行 `个人视频制作来自：github.com/anChaOs/running`（不要 `https://`）。整段（含参考）不能有链接。
 - **抖音**：不要 GitHub 行、不要「参考」。
   - **话题（最多 5 个）**：写成「建议话题」清单（不要可粘贴的 `#xxx` 整行）。尽量贴合国内抖音跑步圈热门标签，再按本期换贴题词。禁止把「破三实验室」等频道名当话题。宁缺毋滥，**不超过 5 个**。
 
