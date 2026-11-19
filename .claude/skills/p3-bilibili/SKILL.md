@@ -20,7 +20,7 @@ description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/�
    - 标题名烧字成片 `.mp4`（已 MOVE 进 `upload/`，根目录无第二份）  
    - `cover-4x3-1920x1440.jpg`（另两张可并存，**投稿只用这张**）  
    - 可选 `subtitles.srt`（biliup 本次不挂外挂；创作中心可后补）
-2. `plan.md` 已有标题 +「### B 站」简介。投稿前先数简介字数，超过 2000 字就停：
+2. `plan.md` 已有标题 +「### B 站」简介。第一行是 `个人视频制作来自：https://github.com/anChaOs/running`，后面两三短句，与 YouTube 摘要正文相同。按原文投稿：保留这条 `https://` 署名，不要改成 YouTube 那种不带协议的写法，也不要把摘要扩回长复盘。投稿前先数简介字数，超过 2000 字就停：
 
 ```bash
 .venv/bin/python tools/publish/pack_upload.py --check-desc /tmp/bilibili-desc.txt
@@ -54,7 +54,7 @@ biliup -u ~/Movies/running-content/.biliup/cookies.json renew
 | 成片 | `~/Movies/running-content/YYYY-MM-DD-slug/upload/<标题>.mp4` |
 | 封面 | 同目录 `cover-4x3-1920x1440.jpg`（**唯一**投稿封面） |
 | 标题 | `plan.md`「发这个」那一行 |
-| 简介 | `plan.md`「### B 站」正文（可先写入临时文件再 `--desc`） |
+| 简介 | `plan.md`「### B 站」正文，原样投稿（可先写入临时文件再 `--desc`） |
 | 分区 `--tid` | `238`（运动） |
 | 标签 `--tag` | 从当期 `plan.md`「## 标签」里 **B 站** 那栏抄（由 `/p3-subs` 按字幕写好）；去掉 `#`、改逗号分隔给 CLI；**不要**在本 skill 写死一套默认标签 |
 | 版权 | `--copyright 1`（自制） |

@@ -174,7 +174,18 @@ agent 不得自行写 `subs: done`，也不得自己加 `--confirmed`。`force_a
 
 更新媒体目录的 `subtitles.srt`。有 `YYYY-MM-DD-review-preview.edl`（或旧的预览 mp4）时，脚本另拷同名 `.srt`。IINA 不会自动挂，要用 `-- --sub-files=`。不要在烧字成片旁边留 `YYYY-MM-DD-run-final.srt`。最终导出并移进 `upload/` 后，外挂仍是 `subtitles.srt`。`txt_to_subs.py` 跑完立刻读 `logs/todo.md`。字幕状态应仍是 `confirmed`。清单不对就停。不要拿文件名或 `assets.md` 当进度。
 
-然后才写简介：读校准后的 `subtitles.txt`，短句总结本期实际说了什么，写入该期 `plan.md` 的简介栏。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。简介第一行固定是 `个人视频制作来自：https://github.com/anChaOs/running`，然后才是摘要。大多数期没有「参考」，只写摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI。视频优先用当前平台的地址：B 站简介用 B 站链接，YouTube 简介用 YouTube 链接；YouTube 没有那条，就贴 B 站链接。没念到的不列。摘要两个平台相同，有参考时参考按平台分开。
+然后才写简介：读校准后的 `subtitles.txt`，写入该期 `plan.md` 的简介栏（`### B 站` 与 `### YouTube` 分开）。不要按 `talk.md` / 选题卡写，不要推理，不要「这期不是 xxx」。拍前 plan 里若已有简介占位，用字幕摘要覆盖摘要那一段。已发布的旧期不要回改。
+
+B 站和 YouTube 的摘要都**极致压缩**，和抖音一样：从校准字幕里用两三短句说清本期在干嘛。这一段正文两个平台相同。不要写以前那种分段长复盘。
+
+仓库署名仍是两边简介的第一行，写法不同，原句不要改：
+
+- B 站第一行：`个人视频制作来自：https://github.com/anChaOs/running`
+- YouTube 第一行：`个人视频制作来自：github.com/anChaOs/running`（不要 `https://`）
+
+YouTube 整段简介不能有链接：不要 `https://`、不要 `http://`，也不要其它可点击的 URL。参考栏同样适用。出处如果本来是网址，写成不带协议、不成链接的形式（作品名 / 站点名 / `doi:...` / 裸的 `github.com/...` 一类）。B 站仍可用完整 `https://` URL，参考里也一样；口播引用了视频时，B 站简介仍优先用 B 站链接。不要把 B 站或 YouTube 的 `https://` 链接贴进 YouTube 简介。
+
+大多数期没有「参考」，只写署名和摘要，不要留空标题。口播里明确引用了论文、视频、数据时，才在摘要后另起「参考」：只写出处，不写实验结果。论文写作者、年份和 DOI；YouTube 上的 DOI 用 `doi:...`，不要写成 `https://doi.org/...`。没念到的不列。有参考时按平台分开写。
 
 **抖音作品描述**写入该期 `plan.md`「抖音」栏：
 - **极致压缩**：两三短句说清本期在干嘛即可；不要 GitHub 行、不要分段长摘要、不要「参考」。
