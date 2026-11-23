@@ -1,0 +1,30 @@
+---
+date: 2026-11-23
+slug: taper
+title: 上马前开始减量
+status: published
+series: 破三实验室
+media: ~/Movies/running-content/2026-11-23-taper/
+---
+
+# 2026-11-23 上马前开始减量
+
+一句话：讲全马赛前为什么要减量、一般从什么时候开始、减量和停跑有什么不同；用自己上马前这次安排来说，不写成给所有跑者的处方，也不把冲碳算进减量。
+
+当天训练：上海市室外跑 16.19 km，1:27:08，均配 5:23，均心率 141；课名「天天写 bug」。跑鞋惊碳 Fly，跑后 1475.73 km。
+
+封面句：上马前开始减量
+
+专名：taper、上马、上海马拉松
+
+## 文件
+
+- `talk.md`：边跑边说口播提纲
+- `plan.md`：拍摄/发布计划（标题／封面句／简介占位）
+- `assets.md`：素材索引
+
+## 发布
+
+- YouTube：https://youtu.be/JIT2Z95xzJY
+- Bilibili：https://www.bilibili.com/video/BV19ZyJzgExQ
+- 抖音：https://v.douyin.com/i3NQ8lzd4Ds/
