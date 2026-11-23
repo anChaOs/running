@@ -22,3 +22,7 @@ media: ~/Movies/running-content/2026-11-23-taper/
 - `talk.md`：边跑边说口播提纲
 - `plan.md`：拍摄/发布计划（标题／封面句／简介占位）
 - `assets.md`：素材索引
+
+## 发布
+
+- Bilibili：https://www.bilibili.com/video/BV19ZyJzgExQ
