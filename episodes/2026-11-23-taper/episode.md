@@ -2,7 +2,7 @@
 date: 2026-11-23
 slug: taper
 title: 上马前开始减量
-status: hud
+status: edited
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-23-taper/
 ---

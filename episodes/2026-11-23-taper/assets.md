@@ -40,7 +40,7 @@
 - cover: done（自拍抠图 + 黎明渐变底；句「上马前|开始减量」；人在右；cover-16x9-1920x1080.jpg / cover-4x3-1920x1440.jpg / cover-3x4-1080x1440.jpg）
 - preview: done（审片预览 EDL `2026-11-23-review-preview.edl`；未编码预览片）
 - qc: done（审片预览 EDL 已写，未打开播放器）
-- subs: waiting-review（初稿 episodes/2026-11-23-taper/subtitles.txt；已做切条自检和明显错字，未对口型）
+- subs: done（用户确认「导」；已对口型，check_subs 机器过门；216 条）
 - loudness: done（measure-only，I=-16.87 TP=1.91）
 - burn: deprecated
 - final: pending
