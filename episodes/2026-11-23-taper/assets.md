@@ -36,12 +36,12 @@
 
 - ingest: done
 - shoes: done
-- hud: pending
-- cover: pending
-- preview: pending
-- qc: pending
-- subs: pending
-- loudness: pending
+- hud: done（-sn 惊碳Fly -sk 1475.73；规格 qtrle；video_end_time_mode=file-modified；天气 shanghai；透明层已渲 42 窗）
+- cover: done（自拍抠图 + 黎明渐变底；句「上马前|开始减量」；人在右；cover-16x9-1920x1080.jpg / cover-4x3-1920x1440.jpg / cover-3x4-1080x1440.jpg）
+- preview: done（审片预览 EDL `2026-11-23-review-preview.edl`；未编码预览片）
+- qc: done（审片预览 EDL 已写，未打开播放器）
+- subs: waiting-review（初稿 episodes/2026-11-23-taper/subtitles.txt；已做切条自检和明显错字，未对口型）
+- loudness: done（measure-only，I=-16.87 TP=1.91）
 - burn: deprecated
 - final: pending
 - upload: pending
