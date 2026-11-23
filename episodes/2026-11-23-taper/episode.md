@@ -25,4 +25,6 @@ media: ~/Movies/running-content/2026-11-23-taper/
 
 ## 发布
 
+- YouTube：https://youtu.be/JIT2Z95xzJY
 - Bilibili：https://www.bilibili.com/video/BV19ZyJzgExQ
+- 抖音：https://v.douyin.com/i3NQ8lzd4Ds/
