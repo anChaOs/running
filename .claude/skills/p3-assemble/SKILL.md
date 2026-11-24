@@ -1,17 +1,20 @@
 ---
 name: p3-assemble
-description: 按 logs/program.json 写一份 mpv 播放清单来审片（不拼预览成片、不重编码、不渲 HUD）。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py，不能在这里烧字或修响度。
+description: 按 logs/program.json 写一份 mpv 审片播放清单 review-preview.edl（不拼预览 mp4、不重编码、不渲 HUD）。用户说预览、拼画面、assemble 时用。最终导出走 final_export.py --confirmed。
 ---
 
 # 画面预览
 
-有 `logs/program.json` 时，预览只按这张表写一份播放清单，让播放器按入点和时长直接播原片。看起来像一条时间线，**不写出预览 mp4**。不渲 HUD，不重编码，不烧字幕，不修响度。不要用 ffmpeg 把切开的段 copy 或 concat 成文件，也不要 trim 滤镜从头解码，更不要为了预览走 libx264 / `hevc_videotoolbox`。
+本步遵守 `p3-episode` 全局协议（进度门闩、墙钟日志与不自动开播放器）。有 `logs/program.json` 时，预览**只写 mpv EDL 播放清单**，不拼预览 mp4、不渲 HUD、不烧字幕、不修响度。没有该表时才退回旧路径（拼已有 `*-hud-preview.mp4`），不要为走旧路径去补渲预览。
 
-预览和导出共用表里的入出点。冷开场进跑步、跑步进 close 的 0.2 秒 xfade，预览只把同样的时长从非跑步那一侧扣掉，不做叠化。不同原片的跑步接缝在导出时有 0.08 秒风刮，那不缩短总时长，预览仍是硬切，不要把这 0.08 秒当成 xfade 剪掉。清单里各段时长加起来等于时间表（`frame_program_duration`），不能把关键帧前面的预卷算进去。
+## 前置
 
-没有这张表时，才退回旧路径：拼接已经渲好的 `*-hud-preview.mp4`。不要为了走旧路径去补渲未剪预览。成片仍走 `final_export.py --confirmed`。预览清单不能当作最终导出的输入。
+- `logs/program.json` 已完成 `source_sync`、句间刀、冷开场和贴图入表，且 `logs/todo.md` 的 `layout: done`（否则脚本拒绝）
+- 不要为了预览先做 `*-close-stats.mp4`，也不要触碰 `*-run-final.mp4` 或 `upload/`
 
-产物：`~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl`（mpv EDL v0，每行 `路径,起始秒,时长秒`）。原片在同一目录时路径相对清单，整夹搬走还能播。路径里有逗号、分号、换行或 `!` 时按 mpv 的 `%字节数%原文` 写。
+## 生成审片播放清单
+
+产物：`~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl`（相对路径，整夹搬走可播；虚拟时长等于成片时间表）。
 
 ```bash
 .venv/bin/python tools/assemble/preview_episode.py \
@@ -22,42 +25,12 @@ description: 按 logs/program.json 写一份 mpv 播放清单来审片（不拼�
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
 ```
 
-脚本打印怎么打开：
+- 正式执行后自动写 `review-preview` 墙钟并标 `logs/todo.md` 的 `preview: done`；跑完立刻核对清单。
+- `subtitles.txt` 还没写不要传 `--subtitles`；不要在成片旁边留同名 `.srt`。
+- 打开方式遵循 `p3-episode` 协议（先问再开；IINA 用 `--no-stdin` 与 `-- --sub-files=`，不用 `--mpv-sub-file`；本机无 mpv 不算失败）。
 
-```text
-mpv ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl
-```
+## 核对与下一步
 
-mpv 不要加 `--no-stdin`。那是 IINA 占着 stdin 才用的。IINA 1.5.1 能直接打开这份 `.edl`。不要自动打开播放器。先问，同意后再加 `--play` 或打开 IINA。本机没有 mpv 时清单仍然写好，并说明启动失败。打不开播放器不算这步失败。打开播放器不是 `logs/todo.md` 上的等待点。
+预览用于听旁白和检查是否缺段（接缝、HUD、贴图和烧字在最终片上抽帧）。确认无明显缺段后在 `assets.md` 写 `preview: done`、`qc: done`（仅代表审片核对，不代表字幕确认）。
 
-不加 `--dry-run` 的那次写完立刻读 `logs/todo.md`，`preview` 应为 done。没标上就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
-
-`subtitles.txt` 还没写就不要传 `--subtitles`。传了只在清单旁边写一份外挂 `.srt`，时间用虚拟时间线（和 txt 里的成片时间同一套），不烧进画面。没有字幕文件就不要造。不要在成片旁边留同名 `.srt`。
-
-mpv 挂字幕用 `--sub-file=`。这是命令行别名，等于 `--sub-files-append`，mpv 自己认。IINA 走 libmpv，不认这个别名，`--mpv-sub-file` 会被静默丢掉。IINA 要把文件放在前面，选项放在 `--` 后面：
-
-```bash
-iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl \
-  -- --sub-files=~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.srt
-```
-
-没有 sidecar 就不要加 `-- --sub-files=`。这条命令同样要他先同意才执行。不要用 `--mpv-sub-file`。
-
-## 前置
-
-- `logs/program.json` 里原片对齐、句间刀、冷开场和贴图已经入表。缺了就停，不要改去整段重压。
-- 贴图和数据图记在表的 `overlays` 里，预览可以先不叠。不要为了预览先做 `*-close-stats.mp4`。
-- `logs/todo.md` 的 `layout` 还没 done 时，脚本拒绝写清单。`--dry-run` 不写文件、不记日志。
-- 不要使用或覆盖 `*-run-final.mp4`，不要写 `upload/`。
-
-## 核对
-
-预览用来听旁白、对字幕错别字和换行，不必对着画面逐帧对时间。画面和时间对齐是导出成片的事。确认没有明显缺段之后，在 `assets.md` 写 `preview: done`、`qc: done`。`qc: done` 只代表这次审片核对，不代表字幕已确认。进度以 `logs/todo.md` 为准：脚本成功时 `preview` 应为 done；没标上就不算这步完成。不要拿 `assets.md` 当进度。下一步是 `/p3-subs`。
-
-## 记日志
-
-`preview_episode.py` 写 `logs/timeline.txt` 的 `review-preview`（`--dry-run` 不写）。脚本已写就不要再记。失败由脚本写 `FAIL`。
-
-## 完成后
-
-> 预览核对通过后走 `/p3-subs`，对口型前先冻结时间表。冻上之后，HUD 透明层和响度要立刻并行开始，别等字幕校验：`--prep-alpha` 和 `final_export.py --measure-only`。8 核机器画透明层加 `-j 6`（默认仍是 2），留 1–2 核给系统和写 mov 的 ffmpeg。同一条原片加载一次 FIT，再按窗口写出各自的 alpha。成片仍只走 `final_export.py --confirmed`，仍然只写出一个文件。画面按大约 120 秒分段，只出画面：段界不切断风刮或 xfade，每一段只打开自己用到的原片，窗口 alpha 收成一条再叠一次，烧字幕，`hevc_videotoolbox`，`-filter_complex_threads` 是 3。整片音频用和测响度同一张图混一次。响度没测好就和第一段画面一起测，测完再开音频编码，不挡画面；音频一直留在内存监控里直到结束。第一段同时对帧头和逐帧数，一致之后后面的段只读帧头。每段记一次内存（macOS 用 footprint 的 phys_footprint，读不到或接近 0 就退回 RSS），超过 8GB 就停。画面段流拷贝接起来，再配上这一条音频。不把 `hud-renders/keeps/` 当画面。
+> 下一步走 `/p3-subs` 转写与校对（对口型前冻结时间表，期间立刻并行跑 `--prep-alpha -j 6` 与 `--measure-only`）。

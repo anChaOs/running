@@ -1,59 +1,47 @@
 ---
 name: p3-publish-report
-description: 发布报告。published 之后立刻做，只出一张可打开的单屏 HTML，并同步到 Google Drive running-retrospect/。不要等用户说「给我报告」或「给我task的报告」。用户要报告时也只用本 skill。不写双链、不合 PR、不清临时。
+description: 发布报告。published 之后立刻做，只出一张可打开的单屏 HTML，并统一同步复盘与报告到 Google Drive running-retrospect/。不要等用户要报告。不写双链、不合 PR、不清临时。
 ---
 
 # 发布报告
 
-`p3-publish` 写完 `published`、试过合 episode PR 之后立刻做。不要等用户要报告。只交这一张 HTML。不要另写 Markdown，不要在聊天里再铺一张表。
-
-未 `published`：停，先走 `/p3-publish`。本 skill 不写链接、不合 PR、不删文件。
+`p3-publish` 写完 `published`、试过合 episode PR 之后立刻做，不要等用户要报告。只交这一张 HTML，不另写 Markdown，不在聊天里再铺表。未 `published` 就停，先走 `/p3-publish`。遵守 `p3-episode` 全局协议。
 
 ## 不要做的事
 
-- 不要编秒。没有据就写「约」或「缺日志」
-- 不要把旁路核对片算进官方成片
-- 不要加开场段、使用说明、时区说明
-- 不要让整页滚动
-- 不要把文件大小写到字节，只写到 G
-- 不要把数字平铺成没有重点的一列
+- 不要编秒（无据写「约」或「缺日志」）；不要把旁路核对片算进官方成片
+- 不要加开场段、使用说明、时区说明；不要让整页滚动
+- 不要把文件大小写到字节，只写到 G（如 `1.1G`、`2.5G`）
+- 不要在这里标 `cleanup` 或删文件
 
 ## 证据
 
-时间一律 Asia/Shanghai。优先 `logs/timeline.txt` 和 `logs/failures.md`（媒体目录或 Google Drive `running-retrospect/` 归档）。缺了或不完整，再用文件 birth/mtime、ffmpeg 日志、git commit。日志时间与成片 mtime 不一致时，用文件/编码时间，在该处写「日志后写」。
+时间一律 Asia/Shanghai。优先 `logs/timeline.txt` 和 `logs/failures.md`（媒体目录或 Google Drive `running-retrospect/` 归档）；缺失再用文件 birth/mtime、ffmpeg 日志、git commit。日志与成片 mtime 不一致时用文件/编码时间，标「日志后写」。墙钟 = 起止时刻之差（非表内耗时相加）：制作段到最终导出，发布段从打包到 `published`/PR。
 
-各 stage 当时应已把开始、结束、耗时、成功或失败写入 `logs/timeline.txt`，失败另记 `logs/failures.md`（`p3-episode`）。没写就标缺日志，不要回补编造。
+## 输出与同步
 
-墙钟是起止时刻之差，不是表里耗时相加。制作段到最终导出为止，发布段从打包到 published/PR。
-
-## 写到哪
-
-只写文本 HTML。正式文件写在素材目录：
+正式文件只写文本 HTML 到素材目录：
 
 - `~/Movies/running-content/<YYYY-MM-DD-slug>/publish-report.html`
 
-写完后运行同步脚本，把 `publish-report.html` 一并同步到 Google Drive `running-retrospect/<YYYY-MM-DD-slug>/publish-report.html` 并刷新 `INDEX.md`：
+写完后统一跑一次同步脚本，把 `logs/`、`episode-repo/` 与 `publish-report.html` 一并同步到 Google Drive `running-retrospect/<YYYY-MM-DD-slug>/` 并刷新 `INDEX.md`：
 
 ```bash
 .venv/bin/python tools/publish/sync_retrospect_drive.py \
   --media-dir ~/Movies/running-content/<YYYY-MM-DD-slug>
 ```
 
-聊天里只给素材目录路径。清临时清单仍由 `/p3-publish` 列，等人确认。HTML 写完立刻读 `logs/todo.md`。`published` 应为 done。`cleanup` 还是 pending 就在「还欠」里写清临时确认，不要在这里标 `cleanup`，也不要删文件。清单不对就停。不要拿文件名或 `assets.md` 当进度。
+聊天里只给素材目录路径。核对 `logs/todo.md`（`published: done`；`cleanup` 若仍 `pending` 就在「还欠」里写清临时确认）。清临时清单仍由 `/p3-publish` 列。
 
-## 页面
+## 页面布局
 
-一屏看完。白底黑字，无卡片、阴影、图标。极简，但层次要清楚：标题和结论先看，关键耗时加粗。空单元格写成「缺日志」。文件大小只写到 G，例如 `1.1G`、`2.5G`、`0.9G`，不要写精确字节，也不要在括号里补字节。
+一屏看完，白底黑字，无卡片/阴影/图标。正文 ~15px 行高略松、标题 ~22px 略粗、节标题 ~16px 配细黑下划线；对照表耗时列加粗等宽数字，失败行结果加粗。整页固定视口不滚动，阶段行多时只让阶段表内部滚动。
 
-字号要比旧的 12 号密排明显更大：正文大约 15、行高略松；标题大约 22、略加粗；节标题大约 16，下面划一条细黑线与正文分开。对照表的耗时列加粗，用等宽数字。失败行的结果格加粗。页边距留一点空，不要挤。
+按以下顺序写，不另加栏目：
 
-整页固定在视口里，不整页滚动。阶段行多时，只让阶段表滚动，标题、对照和文末三行始终在同一屏。
-
-按这个顺序写，不要另加栏目或使用说明：
-
-1. 标题单独一行。下一行写 `published` 和 episode PR 链接；已合写 hash 和时间，未合写未合。再一行 YouTube、Bilibili、抖音。抖音空着写「空」，不挡。
-2. 「预览和成片」：先写一句结论，再出对照表。结论要说清耗时谁长谁短、片长是否一致、不是同一次编码。表列是文件、时间、耗时、编码、里面有什么、大小。官方审片对官方成片；旁路审片（例如带叠层的核对片）另起一行。单段 HUD preview 不要放进这张表。新流程的审片是 `*-review-preview.edl`，不是编码过的预览片：表里写清单和虚拟时长，不要为了填编码和大小去找一条预览 mp4。已发布旧期若真有预览 mp4，仍按那个文件写。日志与文件时间不一致时，表下用一句话标明「日志后写」，不要把次要参数堆进结论。
-3. 「阶段」：列名只能是开始、步骤、耗时、结果。覆盖 scaffold、ingest、鞋、封面、HUD（重做或睡眠中断发生过就各一行）、assemble/预览、字幕、最终导出、打包、B 站、YouTube、published/PR。失败的尝试留在表里，结果写「失败」。
-4. 墙钟：制作段对发布段。标签加粗。
-5. 坑。没有写无。标签加粗。
-6. 还欠：抖音短链、清临时确认、未合的工具 PR、字幕等。没有写无。标签加粗。
+1. 标题一行；下一行 `published` + episode PR 链接（已合写 hash 和时间，未合写未合）；再一行 YouTube、Bilibili、抖音（空写「空」）。
+2. 「预览和成片」：先一句结论（耗时谁长谁短、片长是否一致、非同一次编码），再出对照表（列：文件、时间、耗时、编码、里面有什么、大小）。新流程审片为 `*-review-preview.edl`（写清单与虚拟时长，不找预览 mp4）；旁路核对片另起一行；单段 HUD preview 不入表。
+3. 「阶段」：列只能是开始、步骤、耗时、结果，覆盖 scaffold、ingest、鞋、封面、HUD（重做/中断各一行）、assemble/预览、字幕、最终导出、打包、B 站、YouTube、published/PR；失败尝试保留并写「失败」。
+4. **墙钟**：制作段对发布段。
+5. **坑**：没有写无。
+6. **还欠**：抖音短链、清临时确认、未合的工具 PR、字幕等；没有写无。

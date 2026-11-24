@@ -12,15 +12,15 @@
 
 默认 dry-run。确认角色后加 `--apply`。`VID_` 文件若 mtime 和「开始 + 时长」差超过 5 分钟，会把 mtime 改成结束时间，供 HUD `file-modified` 对齐。
 
-`--apply` 后会粗剪 open/close 里明显长于均值的句间停顿。默认 Silero VAD。原片留 `*-open-raw.mp4` / `*-close-raw.mp4`。不要剪原片 run-*。跑中口播在 HUD preview 出完后剪：
+`--apply` 后会锁原片↔FIT（写入 `logs/program.json` 的 `source_sync`），并自动对 `open`/`close`/`run` 做句间停顿检测（默认 Silero VAD），**只把保留区间写入 `logs/program.json`（`--record`），不重编码原片**。不需要句间刀时加 `--skip-pause-trim`。
+
+已收过素材需单独补跑句间刀（默认 dry-run，确认后加 `--record`）：
 
 ```bash
 .venv/bin/python tools/ingest/trim_talk_pauses.py \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
-
-.venv/bin/python tools/ingest/trim_talk_pauses.py \
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
-  --targets preview
+  --record \
+  --targets open,close,run
 ```
 
 流程见 skill `p3-ingest`。

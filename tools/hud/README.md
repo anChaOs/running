@@ -354,26 +354,29 @@ JSON 默认写在素材目录 `weather-hourly.json`。
 
 确认视频时间推断没问题。
 
-### 第二步：先 dry run
+### 第二步：只记录 HUD 规格进时间表（不渲染未剪原片）
 
 ```bash
 .venv/bin/python tools/hud/render_running_hud.py \
-  --media-dir ~/Movies/running-content/2026-04-23-first-video \
-  --overlay-only \
-  --dry-run
-```
-
-确认命令和输出目录没问题。
-
-### 第三步：正式渲染透明图层
-
-```bash
-.venv/bin/python tools/hud/render_running_hud.py \
-  --media-dir ~/Movies/running-content/2026-04-23-first-video \
-  --overlay-only \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  --record-only \
+  --weather-city shanghai \
   -sn Cumulus \
   -sk 642
 ```
+
+确认鞋名、里程、天气与原片对齐已写入 `logs/program.json`（不要加 `--preview`）。
+
+### 第三步：时间表冻结后按留下区间并行画透明层
+
+```bash
+.venv/bin/python tools/hud/render_running_hud.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  --prep-alpha \
+  -j 6
+```
+
+（短视频若需给剪映用的独立透明层，再单独跑 `--overlay-only --overlay-profile prores4444`。）
 
 ---
 
