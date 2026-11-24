@@ -27,4 +27,4 @@ media: ~/Movies/running-content/2026-11-24-lsd-short/
 
 - YouTube：https://youtu.be/SEAJaALcRws
 - Bilibili：https://www.bilibili.com/video/BV1ihyRz1E9q
-- 抖音：
+- 抖音：https://v.douyin.com/WLaUD0lgP1U/
