@@ -47,29 +47,24 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 合 PR：Cursor GitHub 插件若 403，改用本机 `gh pr merge --squash`（用户已登录）。**只自动合 episode 内容 PR**；skill / 工具类 PR 仍等用户合。合完不改清单。合之前 `published` 应已是 done；不是就停。
 
-## 复盘日志上 box（published 之后必做）
+## 复盘日志上 Google Drive（published 之后必做）
 
-双链和 `published` 写上之后马上做。episode PR 能合就先合完再拷；合不了也要拷，不要干等。清临时要等用户点头，这一步不要等。只留文本和小文件，方便以后在 box 上翻这期怎么做的。
+双链和 `published` 写上之后马上做。episode PR 能合就先合完再传；合不了也要传，不要干等。清临时要等用户点头，这一步不要等。只留文本和小文件（绝不传视频、FIT、封面、原片），长期存在用户 Google Drive `running-retrospect/<YYYY-MM-DD-slug>/`，方便跨设备随时复盘。
 
-Mac 上的文件用 **CopyToBox** 送到 box。已经在 box 上的 YouTube 上传记录，在 box 本地拷，不要再从 Mac 传一遍。
+```bash
+.venv/bin/python tools/publish/sync_retrospect_drive.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
+```
 
-两处内容保持一致。先写长期目录，再镜像到浏览路径（本期目录 + 根上的 `INDEX.md`）。浏览路径若已是长期目录的链接，写一处即可。
+目录结构（同名幂等覆盖，并自动刷新根目录 `INDEX.md`）：
 
-- 长期：`/cursor/stores/store-96d3cec6-b662-4113-b5c5-90eebd57a3c8/running-retrospect/<YYYY-MM-DD-slug>/`
-- 浏览：`/workspace/running-retrospect/<YYYY-MM-DD-slug>/`
-
-| 来源 | 放到 | 说明 |
+| 来源 | 放到（Google Drive `running-retrospect/`） | 说明 |
 | --- | --- | --- |
-| 媒体 `logs/timeline.txt`、`logs/todo.md`、`logs/program.json`、`logs/pack-sha256.txt`、`logs/failures.md` | `<slug>/logs/` | 文件在就必拷 |
-| `logs/` 里其它小文件 | `<slug>/logs/` | 有用就带；跳过 `.pid` |
-| 本期 `episode.md`、`plan.md`；`assets.md` 不大也带 | `<slug>/episode-repo/` | 拷的是刚写上 `published` 的那份 |
-| box `/workspace/youtube-upload/` 的 `upload_result.json`，以及同目录 `upload_progress.json`、`upload_run*.log` | `<slug>/youtube-upload/` | 用结果里的 `url` / `title` 对一下本期；没有或不是本期就跳过 |
+| 媒体 `logs/` 下全部文本/JSON（`timeline.txt`、`todo.md`、`program.json`、`pack-sha256.txt`、`failures.md`、`youtube-upload-result.json` 等） | `<slug>/logs/` | 跳过 `.pid` 与二进制/大文件 |
+| 本期 `episode.md`、`plan.md`、`assets.md` | `<slug>/episode-repo/` | 刚写上 `published` 的那份 |
+| 媒体 `publish-report.html` | `<slug>/publish-report.html` | 生成报告后再跑一次即同步 |
 
-没有 `logs/`：在 INDEX 记 missing，继续后面的清临时。`timeline.txt` / `failures.md` 或 `episode.md` / `plan.md` 明明在、却没传上：重试，并写进 `INDEX.md` 末尾 Copy failures；没成功不要当这步做完。
-
-两处 `INDEX.md` 按现有几行补本期：slug、标题、`published`、双链、logs 拷了什么或 missing、youtube-upload 有无、episode-repo 有哪些文件。顺手改顶部同步日期。
-
-清临时不要动 `logs/`。本地日志留着，满 7 天随整夹走 `p3-archive`。拷完立刻读 `logs/todo.md`。`published` 不是 done 就不要当这步做完。这一步不改清单步骤，也不要在这里标 `cleanup`。
+清临时不要动 `logs/`。本地日志留着，满 7 天随整夹走 `p3-archive`。同步完立刻读 `logs/todo.md`。`published` 不是 done 就不要当这步做完。这一步不改清单步骤，也不要在这里标 `cleanup`。
 
 ## 发布后清临时文件
 

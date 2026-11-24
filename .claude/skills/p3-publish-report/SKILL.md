@@ -32,10 +32,12 @@ description: 发布报告。published 且复盘日志拷完后立刻做，只出
 
 - `~/Movies/running-content/<YYYY-MM-DD-slug>/publish-report.html`
 
-同一份再拷进复盘目录。浏览路径若已是长期目录的链接，写一处。两处 `INDEX.md` 各补一行 `publish-report.html`。
+写完后运行同步脚本，把 `publish-report.html` 一并同步到 Google Drive `running-retrospect/<YYYY-MM-DD-slug>/publish-report.html` 并刷新 `INDEX.md`：
 
-- 长期：`/cursor/stores/store-96d3cec6-b662-4113-b5c5-90eebd57a3c8/running-retrospect/<YYYY-MM-DD-slug>/publish-report.html`
-- 浏览：`/workspace/running-retrospect/<YYYY-MM-DD-slug>/publish-report.html`
+```bash
+.venv/bin/python tools/publish/sync_retrospect_drive.py \
+  --media-dir ~/Movies/running-content/<YYYY-MM-DD-slug>
+```
 
 聊天里只给素材目录路径。清临时清单仍由 `/p3-publish` 列，等人确认。HTML 写完立刻读 `logs/todo.md`。`published` 应为 done。`cleanup` 还是 pending 就在「还欠」里写清临时确认，不要在这里标 `cleanup`，也不要删文件。清单不对就停。不要拿文件名或 `assets.md` 当进度。
 

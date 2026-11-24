@@ -14,6 +14,7 @@ sys.path.insert(0, str(PUBLISH_DIR))
 sys.path.insert(0, str(PUBLISH_DIR / "cloud_yt"))
 
 import job_main  # noqa: E402
+import sync_retrospect_drive  # noqa: E402
 import youtube_cloud  # noqa: E402
 
 SAMPLE_PLAN = """# 2026-11-24 发布计划
@@ -142,6 +143,19 @@ class YoutubeCloudTests(unittest.TestCase):
         self.assertEqual(chunks, [("chunk-00", 99000000), ("chunk-01", 80582145)])
         self.assertEqual(total, 179582145)
         self.assertEqual(sha, "0c0f5ce7ec2cbba63eb45c49b4133dbfd86ea9d9bacfccc70cb7e1024cb6e70a")
+
+    def test_retrospect_filters_binary_and_pid_files(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            logs = Path(td)
+            (logs / "timeline.txt").write_text("ok\n", encoding="utf-8")
+            (logs / "todo.md").write_text("ok\n", encoding="utf-8")
+            (logs / "program.json").write_text("{}\n", encoding="utf-8")
+            (logs / "worker.pid").write_text("1234\n", encoding="utf-8")
+            (logs / "preview-qc.zip").write_bytes(b"PK\x03\x04")
+            (logs / "frame.jpg").write_bytes(b"\xff\xd8")
+            (logs / "sub").mkdir()
+            kept = [p.name for p in sync_retrospect_drive.eligible_log_files(logs)]
+            self.assertEqual(kept, ["program.json", "timeline.txt", "todo.md"])
 
 
 if __name__ == "__main__":
