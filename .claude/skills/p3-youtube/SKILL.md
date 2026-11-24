@@ -61,12 +61,12 @@ description: 把本期 upload/ 成片经 GCS（默认）或 Google Drive（手�
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
 ```
 
-脚本会从 `gs://<bucket>/results/YYYY-MM-DD-slug.json` 拉回结果 JSON、写副本到 `logs/youtube-upload-result.json`、补记 `end youtube-upload` 并把 `logs/todo.md` 的 `youtube` 标为 `done`。跑完立刻读 `logs/todo.md` 确认 `youtube` 为带时间的 `done`。清单不对就停。
+脚本会拉回结果 JSON（优先 `gs://<bucket>/results/YYYY-MM-DD-slug.json`，无 bucket 时回读 Drive `upload_result.json`）、写副本到 `logs/youtube-upload-result.json`、补记 `end youtube-upload` 并标 `youtube: done`。跑完核对 `logs/todo.md`（其余协议见 `p3-episode`）。
 
 ## 成功后
 
 1. 把 `https://youtu.be/…` 写入该期 `episode.md`「发布」栏「YouTube：」（B 站仍空则 **不要** 改 `published`）。
-2. 推当期 episode 分支；**只有 B 站 + YouTube 双链都齐** 才轮到 `/p3-publish`（写齐、改 `published`、squash episode PR、出 `publish-report.html`、清临时）。
+2. 推当期 episode 分支；**只有 B 站 + YouTube 双链都齐** 才走 `/p3-publish`。
 3. 告诉用户：
 
 > YouTube 已公开：`https://youtu.be/…`（缩略图/字幕若失败如实说；云端暂存已自动清理）。

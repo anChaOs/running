@@ -9,7 +9,7 @@
 | `p3-hud` | 先把鞋、天气、透明层规格记进时间表；冻结后按入出点直接画透明层 | `logs/program.json` 的 `hud`，`hud-renders/<profile>/*-hud-alpha.mov` |
 | `p3-assemble` | 按时间表写审片播放清单并核对 | `*-review-preview.edl` |
 | `p3-subs` | 转写、人工改字、force_align、质检门；对口型前冻结时间表。校对可与准备并行 | `subtitles.txt`、外挂 SRT |
-| `final_export.py` | 确认后画面按大约 120 秒分段，只出画面。响度没测好就和第一段一起测，测完再编整片音频，音频一直留在内存监控里。画面流拷贝接起来再配上这一条音频。缺准备会先补 | `*-run-final.mp4` |
+| `final_export.py` | 字幕确认后的唯一最终编码入口（缺透明层或响度会自动补齐） | `*-run-final.mp4` |
 | `p3-publish` | 双链、发布状态、复盘同步、清临时 | `published`、Google Drive 复盘 |
 | `p3-publish-report` | `published` 后的发布报告（一并同步 Drive） | 单屏 `publish-report.html` |
 | `p3-bilibili` / `p3-youtube` | 独立上传拿平台链接 | BV / YouTube URL |
@@ -26,9 +26,9 @@ p3-library / p3-topic / p3-scaffold
   → p3-subs（对口型前冻结时间表）
   → 冻结后：用户校对字幕 ∥ `--prep-alpha`（8 核 `-j 6`，默认 2）∥ 可选 `--measure-only`
   → 确认字幕
-  → final_export.py --confirmed（同一张表，大约 120 秒一段，流拷贝成一个文件）
-  → publish
-  → p3-publish-report
+  → final_export.py --confirmed（唯一最终编码）
+  → p3-qc（final-qc done 后等「可以发了」）→ pack_upload.py → （可选）p3-bilibili ∥ p3-youtube
+  → p3-publish → p3-publish-report（一并同步 Google Drive）→ 清临时确认
 ```
 
 最终导出不读取 HUD preview、review preview 或 close-stats 视频。`assemble_episode.py --ass`、`burn_ass.py`、`loudness_only.py` 是历史旁路，不属于新流程。仓库只跟踪 `subtitles.txt`；SRT/ASS 是生成物。

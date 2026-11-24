@@ -42,7 +42,7 @@ description: 做封面、换封面句、重做封面时用。封面用真人抠�
   --out-dir ~/Movies/running-content/YYYY-MM-DD-slug
 ```
 
-脚本产出描边人像、三比例排版与系列名样式。放不下字时按脚本报错处理：减字或用 `|` 手动断行，不要接受「偏小」（退出码 2）。**跑流程只调 `compose_cover.py` 看打印/退出码，不要为执行去 Read 源码**（改布局算法 / 排错除外）。只写文件，不打开图片查看器；要人看就把路径发给用户。要出备选用 `--prefix cover-candidates/b-`。跑完立刻读 `logs/todo.md`。封面不在清单步骤里，不要新加一行，封面确认也不是等待点。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
+脚本产出描边人像、三比例排版与系列名样式。放不下字时按脚本报错处理：减字或用 `|` 手动断行，不要接受「偏小」（退出码 2）。**跑流程只调 `compose_cover.py` 看打印/退出码，不要为执行去 Read 源码**（改布局算法 / 排错除外）。只写文件，不打开图片查看器；要人看就把路径发给用户。要出备选用 `--prefix cover-candidates/b-`。封面不在 `logs/todo.md` 步骤里，不新加行，也不作为等待点（其余规则见 `p3-episode`）。
 
 6. 先按最优判断出**一版**成图（难得才附一版备选）；需要对比时再放进 `cover-candidates/`，不要默认甩多版让人选
 
@@ -72,7 +72,7 @@ cover-candidates/            # 仅在主推/备选需要并排时用
 
 ## 记日志
 
-`compose_cover.py` 会写 `cover`。脚本已写就不要再记一条。整段手做、没跑脚本时，用 `tools/log_timeline.py` 补 `START`/`END`；失败用 `fail`。补记之后立刻读 `logs/todo.md`。清单不对就停。不要拿文件名或 `assets.md` 当进度。
+`compose_cover.py` 会自动写 `cover`；整段手做时用 `tools/log_timeline.py` 补。
 
 ## 完成后
 

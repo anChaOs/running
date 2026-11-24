@@ -1,91 +1,60 @@
 ---
 name: p3-ingest
-description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/running-content/YYYY-MM-DD-slug/，按时间改成 open/run-*/close，写 assets.md。FIT 用高驰 MCP 拉，不要等手表拷贝。用户说收素材、重命名、ingest、手机导出时用。必须保留或校正 mtime，HUD 用它当视频结束时间。
+description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/running-content/YYYY-MM-DD-slug/，按时间改成 open/run-*/close，用高驰 MCP 拉 FIT，锁原片↔FIT 并将句间刀写入 logs/program.json。用户说收素材、重命名、ingest、手机导出时用。
 ---
 
 # 收素材并命名
 
-小米导出常见 `VID_YYYYMMDD_HHMMSS.mp4`。FIT 用高驰 MCP 拉，落到 `YYYY-MM-DD-run-data.fit`。大文件只放仓库外。
+本步遵守 `p3-episode` 全局协议（进度门闩与墙钟日志）。小米导出常见 `VID_YYYYMMDD_HHMMSS.mp4`。FIT 优先用高驰 MCP 拉，落到 `YYYY-MM-DD-run-data.fit`。大文件只放仓库外。
 
 ## 前置
 
-日期、slug、原始文件夹路径。角色分配要给用户看过再 `--apply`。
+日期、slug、原始文件夹路径。角色分配和 mtime 校正结果必须给用户看过再 `--apply`。
 
 ## FIT：高驰 MCP
 
-目录里没有当天 FIT 时，**用高驰 MCP 拉**，不要让用户从手表/App 再拷一份。国内账号节点是 `https://mcpcn.coros.com/mcp`（见 `knowledge/production/COROS-MCP.md`）。未授权就走 OAuth，浏览器回调失败则把地址栏 URL 交给 `mcp__coros__complete_authentication`。
+目录里没有当天 FIT 时，**用高驰 MCP 拉**，不要让用户从手表/App 拷。国内节点 `https://mcpcn.coros.com/mcp`（见 `knowledge/production/COROS-MCP.md`）。
 
-1. `querySportRecords` 按**拍摄日**筛跑步记录。对上视频时间窗的那一场。同一天有多场，按开跑时间和视频重叠来挑，不要拿相邻那天的课。
-2. `downloadActivityFitFiles` 拉该场 FIT。客户端吃不下二进制时改用 `queryActivityFitFileDownloadUrls`，再 `curl` 到媒体目录。
-3. 保存为 `~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-data.fit`。多场只留和跑步重叠的那一个。FIT 落地不标 `ingest`。`--apply` 成功才标，标完立刻读 `logs/todo.md`。
-4. FIT 日限额大约 50 个，一场只下一份。
-
-MCP 只负责把 FIT 拿回来。HUD 对齐仍看视频 `mtime` 和 FIT 时间窗，不要把 FIT GPS 发给天气接口。MCP 不可用时，才退回手机导出的 FIT（文件名可能是 `上海市_跑步*.fit` 或课表名）。
+1. `querySportRecords` 按拍摄日筛跑步记录，挑与视频时间窗重叠的那一场。
+2. `downloadActivityFitFiles` 拉 FIT；客户端不支持二进制时改 `queryActivityFitFileDownloadUrls` + `curl` 保存为 `YYYY-MM-DD-run-data.fit`（日限额约 50 个，一场只下一份）。
+3. FIT 落地本身不标 `ingest`；`--apply` 成功才标。MCP 不可用时才退回手机导出 FIT。
 
 ## 不要做的事
 
-- 不要 `cp` 完再随手 `touch`，会毁掉 HUD 对齐
+- 不要 `cp` 完随手 `touch`（会毁掉 HUD `file-modified` 对齐）
 - 不要覆盖已有 `YYYY-MM-DD-open.mp4` 等，除非 `--force` 且用户同意
-- 不要把成片、HUD preview、封面再收进去（脚本会跳过文件名含 `hud` / `run-final` / `cover-` 的）
-- 不要把大文件 commit 进 git
+- 不要把成片、HUD preview、封面再收进去，也不要把大文件 commit 进 git
+- 不要用 `trim_talk_pauses.py --apply` 重编一套粗剪成片；句间刀只 `--record` 写时间表
 
 ## 步骤
 
-先 dry-run：
+1. **先 dry-run 核对角色与 mtime**：
+   ```bash
+   .venv/bin/python tools/ingest/ingest_run_media.py \
+     --src <原始导出目录> \
+     --date YYYY-MM-DD \
+     --slug <slug> \
+     --episode-dir episodes/YYYY-MM-DD-slug
+   ```
+   - 首段通常 `open`，尾段 `close`，中间 `run-a`/`run-b`…；无头尾加 `--no-open --no-close`；空镜标 `broll-01`（勿混进 `run-*`）。
+   - 多份 FIT 时脚本按时间重叠自动挑；若两场都重叠或都不重叠会停下列候选，用 `--fit <文件名>` 指定。
+   - 多段 `close`（FIT 结束后拍摄）自动命名为 `close-1`/`close-2`… 并无损拼成 `YYYY-MM-DD-close.mp4`（可用 `--close-clips N` 覆盖；保留 `close-N` 分段别删）。
+   - 高驰截图（`Screenshot_*`/`*coros*`/`截图*`）改名为 `YYYY-MM-DD-stats-01.jpg`。
+   - `VID_` 文件名是开始时间；若 `mtime` 与「开始 + 时长」差超 5 分钟，脚本会校正 `mtime` 为结束时间，先把变更给用户看一眼。
+2. **用户确认后加 `--apply`**：重命名/拷入（`copy2` 保留时间）、锁原片↔FIT 写入 `logs/program.json` 的 `source_sync`，并自动执行句间刀 `--record`（不需要句间刀时加 `--skip-pause-trim`）。跑完自动记 `ingest` 墙钟并核对 `logs/todo.md`（`ingest: done`，有句间刀时 `edl: done`）。
+3. **已收过素材需单独补句间刀**（默认 dry-run，确认后加 `--record`；默认保留片头，掐片头加 `--no-keep-lead-silence`）：
+   ```bash
+   .venv/bin/python tools/ingest/trim_talk_pauses.py \
+     --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+     --record \
+     --targets open,close,run
+   ```
+   算法门槛在脚本内，只调脚本看退出码；跑完核对 `logs/todo.md`（`edl: done`）。
 
-```bash
-.venv/bin/python tools/ingest/ingest_run_media.py \
-  --src <原始导出目录> \
-  --date YYYY-MM-DD \
-  --slug <slug> \
-  --episode-dir episodes/YYYY-MM-DD-slug
-```
+## 完成与下一步
 
-核对角色：
-
-- 第一段通常 `open`（跑前），最后一段 `close`（跑后，多段见下），中间 `run-a`、`run-b`…
-- 只有跑中：`--no-open --no-close`
-- 空镜标成 `broll-01`，不要混进 `run-*`（HUD 会扫全部 `*-run-*.mp4`）
-- FIT 已由高驰 MCP 写成 `YYYY-MM-DD-run-data.fit`。源目录里有多个 FIT 时，脚本**按时间重叠自动挑**：读每个 FIT 的 record 起止（`.venv` 有 fitdecode；读不到就用文件名时间、往后估 3 小时），和每段视频的时间窗（`VID_` 名是开始；否则 mtime 当结束往前推时长）算重叠秒数，打印候选表。只有一场明显重叠最多才选它；两场都重叠（次多 ≥ 最多的一半）或都不重叠时**直接停下列候选**，看过后用 `--fit <文件名>` 指定，不要猜
-- **close 有好几段**（跑完说两三条）：FIT 结束后才开拍的尾部片段自动都算 close，命名 `close-1`、`close-2`…，`--apply` 时拼成一条 `YYYY-MM-DD-close.mp4`（参数一致 `-c copy` 无损；不一致才重编码），mtime 取最后一段。没有 FIT 起止时默认只有最后一段是 close，用 `--close-clips N` 指定；自动数错了也用它（`--close-clips 1` 回到单段）。`close-N` 分段留着别删，粗剪和 assemble 只吃拼好的 `close`
-- 高驰截图（`Screenshot_*` / `*coros*` / `截图*`）改名为 `YYYY-MM-DD-stats-01.jpg`。拼成片时叠到 close 左侧
-
-`VID_` 文件名是开始时间。脚本若发现 `mtime` 和「开始 + 时长」相差超过 5 分钟，会把 `mtime` 改成结束时间。这是 HUD `--video-end-time-mode file-modified` 的前提。把将要改写的 mtime 打给用户看一眼。
-
-用户确认后加 `--apply`。源文件已在目标目录里则只改名；从相册拷来则 `copy2` 保留时间。`--apply` 之后立刻读 `logs/todo.md`，`ingest` 应为 done。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
-
-`--apply` 之后会锁原片↔FIT（写 `logs/program.json` 的 `source_sync`），并给 open / run / close 做句间检测。**只把保留区间写进时间表，不重编码。** 不要再 `--apply` 去压一套接近原片码率的粗剪成片。
-
-```bash
-.venv/bin/python tools/ingest/trim_talk_pauses.py \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
-  --record \
-  --targets open,close,run
-```
-
-默认 dry-run，列出要剪短的间隔。确认后加 `--record`。`--record` 写完立刻再读 `logs/todo.md`。有句间刀时 `edl` 应为 done。准备步骤被打回 pending 时，那一行的时间也是新的。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。停顿门槛在 `tools/ingest/trim_talk_pauses.py`；skill 不复述算法。默认保留片头（`keep_lead_silence=True`）。要掐片头加 `--no-keep-lead-silence`。跑流程时只调用脚本看打印和退出码。被剪掉的秒只从成片时间表消失，原片文件和它的 mtime 不动，HUD 仍按原片时间取样。不需要句间刀时，ingest 加 `--skip-pause-trim`。
-
-ingest `--apply` 会直接跑上面的 `--record`。已经收过的素材，单独跑这条。`--apply`（编码那条旧路径）不要作为默认。
-
-## 记日志
-
-`ingest_run_media.py --apply` 会写 `ingest`（不加 `--apply` 不写）。脚本已写就不要再记一条。单独重跑、脚本没写上时，用 `tools/log_timeline.py` 补 `START`/`END`；失败用 `fail`。补记之后立刻读 `logs/todo.md`，该标的马上标。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
-
-## 完成
-
-- 媒体目录有 `open` / `run-*` / `close` / `*-run-data.fit`。句间刀在 `logs/program.json`，原片文件还在
-- `logs/todo.md` 的 `ingest` 已是 done；有句间刀时 `edl` 也是 done
-- `episodes/YYYY-MM-DD-slug/assets.md` 有原名映射和制作状态 `ingest: done`
-- `episode.md` 至少 `shot`
-
-## 完成后
-
-`ingest: done`、`episode.md` 至少 `shot` 之后，立刻推荐下一步。鞋名和里程口径用用户说过的，不要编。
+确认 `logs/todo.md` 中 `ingest`（及有句间刀时 `edl`）为 `done`，`assets.md` 写 `ingest: done`，`episode.md` 至少 `shot`。立刻推荐下一步（鞋名与口径用用户说过的，口径须为开跑前 / 跑完后 / 生涯总里程之一）：
 
 > 下一步用 `/p3-shoes`，可以直接发：
 >
 > `/p3-shoes 鞋是 <HUD 名>，这是开跑前/跑完后 <数字> 公里`
-
-口径必须是三者之一：开跑前、跑完后、现在的生涯总里程。用户没说清楚就先问，不要带着含糊的数去 `p3-hud`。
-
-只要收素材也可以停。记完鞋下一步仍是 `/p3-hud`（成片主轨是 preview）。

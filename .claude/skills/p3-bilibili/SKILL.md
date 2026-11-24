@@ -26,7 +26,7 @@ description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/�
 .venv/bin/python tools/publish/pack_upload.py --check-desc /tmp/bilibili-desc.txt
 ```
 
-字数按 Python 的 Unicode 码位算。`--check-desc` 通过后才能 `biliup upload`。这条检查跑完立刻读 `logs/todo.md`，`pack-upload` 应为 done，否则停。成功拿到 BV 之后，`todo_list.py mark bilibili done`（打包没完成时这条会拒绝）。`mark` 之后立刻再读清单，`bilibili` 应为带时间的 done。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
+字数按 Python Unicode 码位算；`--check-desc` 通过且 `logs/todo.md` 中 `pack-upload: done` 才能 `biliup upload`。拿到 BV 后执行 `todo_list.py mark bilibili done` 并核对 `logs/todo.md`（其余协议见 `p3-episode`）。
 3. Mac 上已装 `biliup`（`~/.local/bin/biliup`，PATH 含该目录）
 4. Cookie：`~/Movies/running-content/.biliup/cookies.json`  
    - 没有或 `renew`/`upload` 报登录失效 → 先登录（见下）
@@ -83,7 +83,7 @@ biliup -u "$COOKIE" upload \
   "$MEDIA/〈标题〉.mp4"
 ```
 
-成片约 2G 时常要十几分钟；放后台并盯日志。成功日志里会有 `bvid`（如 `BV…`）和 `aid`。投稿命令返回后立刻读 `logs/todo.md`。还没标 `bilibili` done 就不要写 `episode.md`。清单不对就停。不要拿文件名或 `assets.md` 当进度。
+成片约 2G 时常要十几分钟，放后台盯日志；成功日志含 `bvid`（如 `BV…`）和 `aid`。未标 `bilibili: done` 前不要写 `episode.md`。
 
 失败：
 
@@ -93,7 +93,7 @@ biliup -u "$COOKIE" upload \
 
 ## 记日志
 
-biliup 没有仓库挂钩。投稿前 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start bilibili-upload`，成功把 `start` 换成 `end`，失败用 `fail`。已有这条就不要再记一条。`end` 或 `fail` 写完立刻读 `logs/todo.md`。成功才标 `bilibili` done；失败不要标 done。清单不对就停。
+biliup 无仓库挂钩：投稿前用 `tools/log_timeline.py` 记 `start bilibili-upload`，成功 `end`（并标 `bilibili: done`），失败 `fail`（不标 done）。
 
 ## 成功后
 

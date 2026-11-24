@@ -44,7 +44,7 @@ mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug/logs
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug init
 ```
 
-`start` / `end` 和 `init` 做完立刻读 `logs/todo.md`。新建的每一行都应是带时间的 pending，最后一行是 `cleanup`。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。
+`start`/`end` 和 `init` 做完立刻核对 `logs/todo.md`（新建行均为带时间的 `pending`，末行 `cleanup`；其余进度协议见 `p3-episode`）。
 
 ## 完成后
 

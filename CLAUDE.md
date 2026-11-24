@@ -39,11 +39,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `training/logs/` | 训练周期、关键课、比赛；跑鞋累计里程在 `shoes.md` |
 | `training/reviews/` | 周 / 月 / 周期 / 账号复盘 |
 | `templates/` | Markdown 写作模板 |
-| `tools/ingest/` | 手机导出收进素材目录 |
-| `tools/hud/` | HUD 时间探测与批量渲染 |
-| `tools/assemble/` | 全长成片拼接 |
+| `tools/ingest/` | 手机导出收进素材目录并锁原片↔FIT / 句间刀入表 |
+| `tools/hud/` | HUD 时间探测、规格记录与透明层批量渲染 |
+| `tools/cover/` | 真人抠图 + 三比例封面排版 |
+| `tools/assemble/` | 审片播放清单（EDL）与唯一最终导出（`final_export.py`） |
 | `tools/subs/` | 字幕初稿、强制对齐、质检门；txt 收成外挂 SRT 与烧字 ASS（都不进 git） |
-| `.claude/skills/` | 按需加载；主题库 `p3-library`，选题 `p3-topic`，成片入口 `p3-episode`，归档 `p3-archive` |
+| `tools/publish/` | 上传打包、Cloud Run YouTube 上传（GCS 默认 / Drive 可切）、Drive 复盘同步 |
+| `.claude/skills/` | 按需加载；主题库 `p3-library`，选题 `p3-topic`，成片总调度 `p3-episode`，归档 `p3-archive` |
 
 新一期用 `templates/episode.md`。口播写在该期 `talk.md`，默认可念稿。知识页用 `templates/wiki-page.md`，规则见 `knowledge/CLAUDE.md`。
 
@@ -79,9 +81,9 @@ inbox 碎片 / 灵光一闪 → skill `p3-library` 进主题库 → 有拍摄日
 
 依赖：Python 3.10+、系统 `ffmpeg`、仓库 `.venv` 里的 `gopro-overlay`。渲染脚本会 `import fitdecode`，必须用 `.venv/bin/python`。macOS 缺图形依赖时：`brew install cairo pkg-config`。
 
-默认模板 `tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml`：带地图，不放右上角。无地图版是 `...-landscape.xml`。默认字体 `/System/Library/Fonts/SFCompactRounded.ttf` 的 Black 字重，字色纯白、无描边。温度写 `°C`，不要写 `℃`（字体没有这个字）。右下是运动时长、日期、当天时间、`气温 °C / 体感 °C`、湿度；不再显示 GPS。运动时长用 FIT timer 起停，不含暂停。天气用 `--weather-city shanghai`（FIT 时间窗 + 上海城市场点，不发 GPS）；不需要时加 `--no-weather`。跑鞋 `-sk` 查 `training/logs/shoes.md`。默认把文件 `mtime` 当视频结束时间再对齐 FIT。HUD 优先加在 `run-*`，一般不加 `open`/`close`。生产默认出透明图层 `*-hud-alpha.mov`（`--overlay-only`）。看效果加 `--preview`，按原片同档（编码/码率/分辨率）叠成 `*-hud-preview.mp4`，不降码。不加这些 flag 仍会把 HUD 烤进 mp4。
+默认模板 `tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml`：带地图，不放右上角（无地图版是 `...-landscape.xml`）。默认字体为仓库捆绑的 `Source Han Sans SC Heavy`（`tools/hud/fonts/SourceHanSansSC-Heavy.otf`，字色纯白、无描边）。温度写 `°C` / `°`，不要写 `℃`（部分字体缺字）。右下是运动时长、日期、当天时间、`AIR 湿度% · 气温°`、`FEEL 体感°`（不显示 GPS）。运动时长用 FIT timer 起停，不含暂停。天气用 `--weather-city shanghai`（FIT 时间窗 + 上海城市场点，不发 GPS）；不需要时加 `--no-weather`。跑鞋 `-sk` 查 `training/logs/shoes.md`。默认把文件 `mtime` 当视频结束时间再对齐 FIT。HUD 优先加在 `run-*`，一般不加 `open`/`close`。
 
-成片先记 `logs/program.json`（原片时钟和成片时间表），预览按这张表轻拼。记录 HUD 时不要加 `--preview`。时间表冻结后，用户校对字幕（只改错字和换行）可以和准备并行：`--prep-alpha` 按留下的入出点直接画透明层。8 核机器加 `-j 6`（默认仍是 2），留 1–2 核给系统和写 mov 的 ffmpeg；同一条原片加载一次 FIT。可选 `--measure-only` 测成片混音。确认字幕后只跑一次 `final_export.py --confirmed`，烧字幕并套用已测响度。默认透明层 `qtrle`。
+成片先记 `logs/program.json`（原片时钟和成片时间表），预览按这张表写 `review-preview.edl`。记录 HUD 用 `--record-only`，不要加 `--preview`。时间表冻结后，用户校对字幕（只改错字和换行）与准备并行：`--prep-alpha -j 6`（8 核建议 6，默认 2，默认编码 `qtrle`）+ `--measure-only` 测成片混音。确认字幕后只跑一次 `final_export.py --confirmed`，烧字幕并套用已测响度。
 
 ```bash
 .venv/bin/python tools/hud/probe_video_times.py \
@@ -95,4 +97,4 @@ inbox 碎片 / 灵光一闪 → skill `p3-library` 进主题库 → 有拍摄日
   -sk 642
 ```
 
-细节见 `tools/hud/README.md`。没有测试套件；改脚本后先 `--dry-run`，再用单片段 `--clips` 检查对齐。成片阶段表见 `knowledge/production/成片skills.md`。
+细节见 `tools/hud/README.md`。工具单测在 `tools/**/test_*.py`；改 HUD 脚本后先 `--dry-run`，再用单片段 `--clips` 检查对齐。成片阶段表见 `knowledge/production/成片skills.md`。
