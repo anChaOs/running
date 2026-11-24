@@ -45,7 +45,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `tools/assemble/` | 审片播放清单（EDL）与唯一最终导出（`final_export.py`） |
 | `tools/subs/` | 字幕初稿、强制对齐、质检门；txt 收成外挂 SRT 与烧字 ASS（都不进 git） |
 | `tools/publish/` | 上传打包、Cloud Run YouTube 上传（GCS 默认 / Drive 可切）、Drive 复盘同步 |
-| `.claude/skills/` | 按需加载；主题库 `p3-library`，选题 `p3-topic`，成片总调度 `p3-episode`，归档 `p3-archive` |
+| `.claude/skills/` | 按需加载（`.agents/skills` 软链指向此处，供 Antigravity / Codex 自动发现）；主题库 `p3-library`，选题 `p3-topic`，成片总调度 `p3-episode`，归档 `p3-archive` |
 
 新一期用 `templates/episode.md`。口播写在该期 `talk.md`，默认可念稿。知识页用 `templates/wiki-page.md`，规则见 `knowledge/CLAUDE.md`。
 
