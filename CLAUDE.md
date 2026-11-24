@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-这是跑步自媒体内容库，不是普通应用仓库。目标是持续产出高质量「边跑边说」口播视频，而不是跑步鸡汤。`AGENT.md` 是本文件的软链；`AGENTS.md` 只作入口指针。`.omx/` 是旧工具工作记忆，不当作内容源。
+这是跑步自媒体内容库，不是普通应用仓库。目标是持续产出高质量「边跑边说」口播视频，而不是跑步鸡汤。`AGENTS.md`、`GEMINI.md`（及历史 `AGENT.md`）均为本文件的软链。`.omx/` 是旧工具工作记忆，不当作内容源。
 
 ## 定位
 
