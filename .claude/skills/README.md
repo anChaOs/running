@@ -21,7 +21,7 @@
   p3-ingest          VID_ / 高驰 FIT → open/run-*/close + 句间刀入表
   p3-shoes           training/logs/shoes.md，算出 -sn / -sk
   p3-hud             记录 HUD 规格；冻结后 --prep-alpha 画透明层
-  p3-cover           真人抠图 + 创意底 + 三比例封面（与 HUD 并行）
+  p3-cover           按题材做多样风格的三比例封面（实景 / 抠图创意底 / 装备 / 数据，与 HUD 并行）
   p3-assemble        按 logs/program.json 写审片播放清单（不编预览片）
   p3-subs            转写→人改→对齐→人工确认→写 plan.md 简介与标签（references/ 按需加载）
   p3-qc              审片或最终片抽帧核对
