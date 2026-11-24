@@ -1,5 +1,6 @@
 # tools
 
+- `media_layout.py`：新期默认分类媒体目录（`raw/`、`data/`、`stills/`、`covers/`、`preview/`、`upload/`、`logs/`）路径解析与旧平铺期兼容层。
 - `ingest/`：手机 `VID_` / FIT 收进素材目录并命名。
 - `hud/`：用 FIT 给跑中素材叠配速、心率、距离、地图、天气。成片先 `--record-only` 记进时间表；冻结后 `--prep-alpha` 按留下的区间直接画透明层，不写 `hud-renders/keeps/`。8 核机器加 `-j 6`（默认 2）。同一条原片加载一次 FIT，再按窗口写出各自的 alpha。
 - `subs/`：字幕初稿（`draft_subs.py`）、改字后强制对齐（`force_align.py`）、质检门（`check_subs.py`）、txt 收成外挂 SRT/ASS 生成物。

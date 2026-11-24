@@ -36,8 +36,8 @@ description: 一期跑步视频的调度入口、产物总序与全局协议真�
 4. **不经同意不开播放器或编辑器（硬规则）**：未经用户明确说「打开」或同意当次询问，禁止启动 IINA / mpv / TextEdit / 预览器（未经同意播放会吓到人）。先问要不要打开 `subtitles.txt` 和审片预览，他只点一样就只开那样。同意后命令：
    ```bash
    open -a TextEdit episodes/YYYY-MM-DD-slug/subtitles.txt   # .md 用 open -a Typora <path.md>
-   iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl
-   # 有同名 sidecar 才加：-- --sub-files=~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.srt
+   iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/preview/YYYY-MM-DD-review-preview.edl
+   # 有同名 sidecar 才加：-- --sub-files=~/Movies/running-content/YYYY-MM-DD-slug/preview/YYYY-MM-DD-review-preview.srt
    # 打开烧字成片：iina --no-stdin ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-final.mp4（严禁旁边留同名 .srt）
    ```
    IINA 走 libmpv，不要用 `--mpv-sub-file`（会静默丢掉）；mpv 命令行则不加 `--no-stdin`、用 `--sub-file=`。

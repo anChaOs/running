@@ -14,7 +14,7 @@ description: 按 logs/program.json 写一份 mpv 审片播放清单 review-previ
 
 ## 生成审片播放清单
 
-产物：`~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-review-preview.edl`（相对路径，整夹搬走可播；虚拟时长等于成片时间表）。
+产物：`~/Movies/running-content/YYYY-MM-DD-slug/preview/YYYY-MM-DD-review-preview.edl`（分类目录下写进 `preview/` 并引用 `../raw/...`，整夹搬走仍可播；旧平铺目录兼容写根）。
 
 ```bash
 .venv/bin/python tools/assemble/preview_episode.py \

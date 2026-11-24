@@ -9,7 +9,7 @@ description: 核对审片播放清单或对最终成片抽帧验收（final-qc�
 
 ## 两个阶段
 
-- **预览核对**：看播放清单 `YYYY-MM-DD-review-preview.edl`（不带 HUD 和烧字），听旁白、查缺段；通过后 `assets.md` 写 `preview: done`、`qc: done`，核对 `logs/todo.md` 中 `preview: done`。
+- **预览核对**：看播放清单 `preview/YYYY-MM-DD-review-preview.edl`（旧期在根目录，不带 HUD 和烧字），听旁白、查缺段；通过后 `assets.md` 写 `preview: done`、`qc: done`，核对 `logs/todo.md` 中 `preview: done`。
 - **最终核对（`final-qc`）**：`final_export.py --confirmed` 跑完后自动做结构检查（可解码、1080p30 HEVC `hvc1` + AAC、时长对齐、响度 ~-16 LUFS）并标 `final-export: done`，但**不会标 `final-qc`**。核对 `logs/todo.md` 确认 `final-export: done` 后，对最终片抽帧检查字幕、HUD、贴图与接缝。
   - 抽帧发现问题：改 `subtitles.txt` 或 `logs/program.json` 重跑 `final_export.py --confirmed`，禁止对成片单独烧字或补跑响度。
   - 抽帧通过后执行：

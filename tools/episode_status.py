@@ -14,6 +14,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import media_layout  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]
 # 与 p3-episode 总序对齐；upload ≈ burn 后的 upload: ready/done
 STAGES = [
@@ -87,13 +90,15 @@ def main() -> int:
     fm = front(ep / "episode.md")
     st = read_kv(ep / "assets.md")
     has = lambda p: p.exists()
-    clips = sorted(media.glob(f"{date}-run-*.mp4")) if media.is_dir() else []
+    clips = sorted(media_layout.glob_media(media, f"{date}-run-*.mp4", subdirs=(media_layout.RAW_DIR,))) if media.is_dir() else []
     clips = [c for c in clips if not any(k in c.name for k in ("run-final", "orient", "transpose", "-raw", "pre-", "-bad", "-hud"))]
-    fit = list(media.glob("*.fit")) if media.is_dir() else []
+    fit = media_layout.find_all_fits(media) if media.is_dir() else []
     previews = list((media / "hud-renders").glob("*-hud-preview.mp4")) if media.is_dir() else []
-    covers = {n: has(media / n) for n in ("cover-1920x1080.jpg", "cover-4x3-1920x1440.jpg", "cover-1080x1440.jpg")}
+    covers = {n: media_layout.find_cover(media, n) is not None for n in ("cover-16x9-1920x1080.jpg", "cover-4x3-1920x1440.jpg", "cover-3x4-1080x1440.jpg")}
     final = media / f"{date}-run-final.mp4"
-    titled = [p for p in media.glob("*.mp4") if not p.name.startswith(date)] if media.is_dir() else []
+    titled = [p for p in media_layout.glob_media(media, "*.mp4", subdirs=(media_layout.UPLOAD_DIR,)) if not p.name.startswith(date)] if media.is_dir() else []
+    open_clips = media_layout.glob_media(media, f"{date}-open.mp4", subdirs=(media_layout.RAW_DIR,)) if media.is_dir() else []
+    close_clips = media_layout.glob_media(media, f"{date}-close.mp4", subdirs=(media_layout.RAW_DIR,)) if media.is_dir() else []
     subs_txt = ep / "subtitles.txt"
     print(f"# {name}  status={fm.get('status', '?')}")
     print(f"- 仓库：{'有' if ep.is_dir() else '无'} episode.md={'有' if has(ep / 'episode.md') else '无'} "
@@ -104,8 +109,8 @@ def main() -> int:
     print(f"- 封面句：{fm.get('封面句') or '（未写）'}")
     print(f"- 媒体目录：{media} {'存在' if media.is_dir() else '不存在'}")
     if media.is_dir():
-        print(f"  open={'有' if has(media / f'{date}-open.mp4') else '无'} run-*={len(clips)} "
-              f"close={'有' if has(media / f'{date}-close.mp4') else '无'} FIT={len(fit)} "
+        print(f"  open={'有' if open_clips else '无'} run-*={len(clips)} "
+              f"close={'有' if close_clips else '无'} FIT={len(fit)} "
               f"hud-preview={len(previews)}/{len(clips) or '?'} "
               f"cover={sum(covers.values())}/3 成片={'run-final' if has(final) else ('标题名' if titled else '无')} "
               f"字幕txt={'有' if has(subs_txt) else '无'}")

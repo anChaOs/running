@@ -16,7 +16,7 @@ description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/ru
 目录里没有当天 FIT 时，**用高驰 MCP 拉**，不要让用户从手表/App 拷。国内节点 `https://mcpcn.coros.com/mcp`（见 `knowledge/production/COROS-MCP.md`）。
 
 1. `querySportRecords` 按拍摄日筛跑步记录，挑与视频时间窗重叠的那一场。
-2. `downloadActivityFitFiles` 拉 FIT；客户端不支持二进制时改 `queryActivityFitFileDownloadUrls` + `curl` 保存为 `YYYY-MM-DD-run-data.fit`（日限额约 50 个，一场只下一份）。
+2. `downloadActivityFitFiles` 拉 FIT；客户端不支持二进制时改 `queryActivityFitFileDownloadUrls` + `curl` 保存为 `data/YYYY-MM-DD-run-data.fit`（旧平铺期放根目录；日限额约 50 个，一场只下一份）。
 3. FIT 落地本身不标 `ingest`；`--apply` 成功才标。MCP 不可用时才退回手机导出 FIT。
 
 ## 不要做的事
@@ -37,9 +37,10 @@ description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/ru
      --episode-dir episodes/YYYY-MM-DD-slug
    ```
    - 首段通常 `open`，尾段 `close`，中间 `run-a`/`run-b`…；无头尾加 `--no-open --no-close`；空镜标 `broll-01`（勿混进 `run-*`）。
+   - 默认写入分类目录：原片进 `raw/`，FIT 与 `stats-NN` 截图进 `data/`（如已有平铺旧文件或需旧布局可加 `--flat`）。`logs/program.json` 会记相对路径（如 `raw/...`）。
    - 多份 FIT 时脚本按时间重叠自动挑；若两场都重叠或都不重叠会停下列候选，用 `--fit <文件名>` 指定。
-   - 多段 `close`（FIT 结束后拍摄）自动命名为 `close-1`/`close-2`… 并无损拼成 `YYYY-MM-DD-close.mp4`（可用 `--close-clips N` 覆盖；保留 `close-N` 分段别删）。
-   - 高驰截图（`Screenshot_*`/`*coros*`/`截图*`）改名为 `YYYY-MM-DD-stats-01.jpg`。
+   - 多段 `close`（FIT 结束后拍摄）自动命名为 `close-1`/`close-2`… 并无损拼成 `raw/YYYY-MM-DD-close.mp4`（可用 `--close-clips N` 覆盖；保留 `close-N` 分段别删）。
+   - 高驰截图（`Screenshot_*`/`*coros*`/`截图*`）改名为 `data/YYYY-MM-DD-stats-01.jpg`。
    - `VID_` 文件名是开始时间；若 `mtime` 与「开始 + 时长」差超 5 分钟，脚本会校正 `mtime` 为结束时间，先把变更给用户看一眼。
 2. **用户确认后加 `--apply`**：重命名/拷入（`copy2` 保留时间）、锁原片↔FIT 写入 `logs/program.json` 的 `source_sync`，并自动执行句间刀 `--record`（不需要句间刀时加 `--skip-pause-trim`）。跑完自动记 `ingest` 墙钟并核对 `logs/todo.md`（`ingest: done`，有句间刀时 `edl: done`）。
 3. **已收过素材需单独补句间刀**（默认 dry-run，确认后加 `--record`；默认保留片头，掐片头加 `--no-keep-lead-silence`）：
@@ -53,7 +54,7 @@ description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/ru
 
 ## 完成与下一步
 
-确认 `logs/todo.md` 中 `ingest`（及有句间刀时 `edl`）为 `done`，`assets.md` 写 `ingest: done`，`episode.md` 至少 `shot`。立刻推荐下一步（鞋名与口径用用户说过的，口径须为开跑前 / 跑完后 / 生涯总里程之一）：
+确认 `logs/todo.md` 中 `ingest`（及有句间刀时 `edl`）为 `done`，`assets.md` 写 `ingest: done`（`raw/` / `data/` 相对路径），`episode.md` 至少 `shot`。立刻推荐下一步（鞋名与口径用用户说过的，口径须为开跑前 / 跑完后 / 生涯总里程之一）：
 
 > 下一步用 `/p3-shoes`，可以直接发：
 >

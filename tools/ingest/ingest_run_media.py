@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import log_timeline  # noqa: E402
+import media_layout  # noqa: E402
 import program_edl as edl  # noqa: E402
 import todo_list  # noqa: E402
 
@@ -446,6 +447,11 @@ def main() -> int:
         action="store_true",
         help="Do not trim long pauses in open/close",
     )
+    parser.add_argument(
+        "--flat",
+        action="store_true",
+        help="Write into legacy flat root instead of classified raw/data/covers/preview subdirs",
+    )
     args = parser.parse_args()
     media_dir = Path(args.media_root).expanduser() / f"{args.date}-{args.slug}"
     with log_timeline.span(media_dir, "ingest", enabled=args.apply) as wall:
@@ -461,13 +467,16 @@ def _ingest(args) -> int:
     slug = args.slug
     media_dir = Path(args.media_root).expanduser().resolve() / f"{date}-{slug}"
     dry_run = not args.apply
+    classified = media_layout.should_use_classified_on_ingest(media_dir, force_flat=args.flat)
+    if classified and not dry_run:
+        media_layout.ensure_classified_dirs(media_dir)
 
     videos = discover_videos(src)
     fits = discover_fits(src)
     if not videos:
         raise SystemExit(f"No videos in {src}")
 
-    print(f"Media dir: {media_dir}")
+    print(f"Media dir: {media_dir} (layout={'classified' if classified else 'flat'})")
     print(f"Mode: {'APPLY' if args.apply else 'DRY-RUN'}")
     durations = {p: run_ffprobe_duration(p) for p in videos}
     windows = [video_window(p, durations[p]) for p in videos]
@@ -489,9 +498,10 @@ def _ingest(args) -> int:
     for path, role in mapping:
         start = parse_vid_start(path.name) or file_mtime(path)
         duration = durations.get(path)
-        dest = media_dir / dest_name(date, role, path.suffix.lower())
+        dest = media_layout.raw_dest_path(media_dir, dest_name(date, role, path.suffix.lower()), classified=classified)
+        dest_rel = f"{media_layout.RAW_DIR}/{dest.name}" if classified else dest.name
         exists = dest.exists() and dest.resolve() != path.resolve()
-        print(f"  {path.name}  {start.strftime('%H:%M:%S')}  {duration or '?'}s  -> {dest.name}  [{role}]")
+        print(f"  {path.name}  {start.strftime('%H:%M:%S')}  {duration or '?'}s  -> {dest_rel}  [{role}]")
         if exists and not args.force:
             raise SystemExit(f"Refusing to overwrite {dest} (pass --force)")
         copy_or_move(path, dest, move=args.move, dry_run=dry_run)
@@ -507,7 +517,7 @@ def _ingest(args) -> int:
         rows.append(
             {
                 "src": path.name,
-                "dest": dest.name,
+                "dest": dest_rel,
                 "role": role,
                 "start": start.strftime("%H:%M:%S"),
                 "mtime": mtime_note,
@@ -517,23 +527,26 @@ def _ingest(args) -> int:
     if len(close_parts) > 1:
         close_parts.sort()
         parts = [t for _, t, _ in close_parts]
-        joined = media_dir / f"{date}-close.mp4"
+        joined = media_layout.raw_dest_path(media_dir, f"{date}-close.mp4", classified=classified)
+        joined_rel = f"{media_layout.RAW_DIR}/{joined.name}" if classified else joined.name
         if joined.exists() and not args.force:
             raise SystemExit(f"Refusing to overwrite {joined} (pass --force)")
         mode = join_clips(parts, joined, dry_run)
-        rows.append({"src": " + ".join(rows[i]["dest"] for _, _, i in close_parts), "dest": joined.name,
+        rows.append({"src": " + ".join(rows[i]["dest"] for _, _, i in close_parts), "dest": joined_rel,
                      "role": "close", "start": rows[close_parts[0][2]]["start"],
                      "mtime": f"拼接（{mode}），mtime=最后一段"})
 
     fit_pairs: list[tuple[str, str]] = []
     if primary_fit is not None:
-        dest_fit = media_dir / f"{date}-run-data.fit"
+        dest_fit = media_layout.data_dest_path(media_dir, f"{date}-run-data.fit", classified=classified)
+        fit_rel = f"{media_layout.DATA_DIR}/{dest_fit.name}" if classified else dest_fit.name
         copy_or_move(primary_fit, dest_fit, move=args.move, dry_run=dry_run)
-        fit_pairs.append((primary_fit.name, dest_fit.name))
+        fit_pairs.append((primary_fit.name, fit_rel))
 
     for i, path in enumerate(discover_raw_stats(src), start=1):
-        dest_stat = media_dir / f"{date}-stats-{i:02d}{path.suffix.lower()}"
-        print(f"  STAT {path.name} -> {dest_stat.name}")
+        dest_stat = media_layout.data_dest_path(media_dir, f"{date}-stats-{i:02d}{path.suffix.lower()}", classified=classified)
+        stat_rel = f"{media_layout.DATA_DIR}/{dest_stat.name}" if classified else dest_stat.name
+        print(f"  STAT {path.name} -> {stat_rel}")
         copy_or_move(path, dest_stat, move=args.move, dry_run=dry_run)
 
     payload = {
@@ -584,7 +597,8 @@ def _ingest(args) -> int:
 
 def _lock_source_sync(media_dir: Path, date: str, slug: str, rows: list[dict]) -> None:
     """原片第 0 秒相对 FIT 开始的偏移。成片怎么剪都不改这张表。"""
-    fit_path = media_dir / f"{date}-run-data.fit"
+    fit_name = f"{date}-run-data.fit"
+    fit_path = media_layout.resolve_media_path(media_dir, fit_name, subdirs=(media_layout.DATA_DIR,))
     fit_start = None
     if fit_path.is_file():
         try:
@@ -594,17 +608,18 @@ def _lock_source_sync(media_dir: Path, date: str, slug: str, rows: list[dict]) -
     if fit_start is None:
         print("source sync not locked: FIT start time is missing")
         return
+    fit_rel = media_layout.rel_media_path(fit_path, media_dir)
     sync = []
     for row in rows:
         if not str(row.get("role", "")).startswith("run"):
             continue
-        dest = media_dir / row["dest"]
+        dest = media_layout.resolve_media_path(media_dir, row["dest"], subdirs=(media_layout.RAW_DIR,))
         if not dest.is_file():
             continue
         duration = run_ffprobe_duration(dest)
         video_start = video_window(dest, duration)[0]
         offset = (video_start - fit_start).total_seconds()
-        sync.append({"clip": dest.name, "fit": fit_path.name, "offset_s": offset})
+        sync.append({"clip": media_layout.rel_media_path(dest, media_dir), "fit": fit_rel, "offset_s": offset})
     if not sync:
         print("source sync not locked: no run clip")
         return

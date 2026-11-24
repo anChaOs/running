@@ -98,16 +98,29 @@ def test_end_to_end() -> None:
         sys.argv = ["ingest", "--src", str(src), "--media-root", str(media.parent), "--date", "2026-01-02", "--slug", "test",
                     "--episode-dir", str(ep), "--apply", "--skip-pause-trim"]
         ing.main()
-        names = sorted(p.name for p in media.iterdir())
+        raw_names = sorted(p.name for p in (media / "raw").iterdir())
         for n in ("open", "run-a", "run-b", "close-1", "close-2", "close"):
-            assert f"2026-01-02-{n}.mp4" in names, names
-        assert "2026-01-02-run-data.fit" in names
-        close = media / "2026-01-02-close.mp4"
+            assert f"2026-01-02-{n}.mp4" in raw_names, raw_names
+        assert (media / "data" / "2026-01-02-run-data.fit").is_file()
+        for sub in ("raw", "data", "stills", "covers", "preview", "upload", "logs"):
+            assert (media / sub).is_dir(), sub
+        close = media / "raw" / "2026-01-02-close.mp4"
         assert abs(duration(close) - 4.0) < 0.3, duration(close)
-        assert abs(close.stat().st_mtime - (media / "2026-01-02-close-2.mp4").stat().st_mtime) < 1
+        assert abs(close.stat().st_mtime - (media / "raw" / "2026-01-02-close-2.mp4").stat().st_mtime) < 1
         assets = (ep / "assets.md").read_text(encoding="utf-8")
-        assert "close-1.mp4 + 2026-01-02-close-2.mp4" in assets, assets
+        assert "raw/2026-01-02-close-1.mp4 + raw/2026-01-02-close-2.mp4" in assets, assets
         assert "morning.fit" in assets, assets
+        assert "data/2026-01-02-run-data.fit" in assets, assets
+
+        # Verify legacy --flat mode still works if explicitly requested.
+        media_flat = Path(d, "media_flat", "2026-01-02-flat")
+        ep_flat = Path(d, "ep_flat")
+        sys.argv = ["ingest", "--src", str(src), "--media-root", str(media_flat.parent), "--date", "2026-01-02", "--slug", "flat",
+                    "--episode-dir", str(ep_flat), "--apply", "--skip-pause-trim", "--flat"]
+        ing.main()
+        assert (media_flat / "2026-01-02-open.mp4").is_file()
+        assert (media_flat / "2026-01-02-run-data.fit").is_file()
+        assert not (media_flat / "raw").exists()
 
 
 if __name__ == "__main__":

@@ -22,10 +22,11 @@ description: 新建一期 episodes/YYYY-MM-DD-slug 和 episode.md。用户说建
 3. `talk.md` 放这期可念口播。还没有口播时，文件里只留简介占位：`等字幕完成并校准后再写。不要按本口播卡写。` 不要写简介正文。素材索引用 `templates/assets.md`。
 4. `episode.md` 的 `专名：` 行：talk.md 里已经出现的产品名、人名、英文缩写先填上（顿号分隔），没有就留模板占位。p3-subs 会自动读这行。
 5. `status` 先 `planned`；素材进目录后再改 `shot`。
-6. 建空的媒体目录，并同时建 `logs/`。选题落盘、建期都要建，不要标成可选，也不要等到导出：
+6. 初始化媒体目录与初始清单（`todo_list.py init` 会同时建好分类子目录 `raw/`、`data/`、`stills/`、`covers/`、`preview/`、`upload/`、`logs/` 与全 `pending` 清单）。文件已在就不要再 `init`：
 
 ```bash
-mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug/logs
+.venv/bin/python tools/todo_list.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug init
 ```
 
 还没有 `logs/timeline.txt` 时，先写一行 `# YYYY-MM-DD-slug timeline (Asia/Shanghai)`。再用 helper 记 `scaffold`（已有这条 `END` 就不要再记）：
@@ -35,13 +36,6 @@ mkdir -p ~/Movies/running-content/YYYY-MM-DD-slug/logs
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start scaffold
 .venv/bin/python tools/log_timeline.py \
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug end scaffold
-```
-
-还没有 `logs/todo.md` 时，写一份全 pending 的初始清单（含 `cleanup`，每行带当前时间）。文件已在就不要再 `init`，避免把进度打回 pending：
-
-```bash
-.venv/bin/python tools/todo_list.py \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug init
 ```
 
 `start`/`end` 和 `init` 做完立刻核对 `logs/todo.md`（新建行均为带时间的 `pending`，末行 `cleanup`；其余进度协议见 `p3-episode`）。

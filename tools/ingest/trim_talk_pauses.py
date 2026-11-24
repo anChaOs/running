@@ -18,6 +18,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import media_layout  # noqa: E402
 import program_edl as edl  # noqa: E402
 import todo_list  # noqa: E402
 
@@ -454,7 +455,7 @@ def find_talk_clips(media_dir: Path, targets: set[str]) -> list[Path]:
                 continue
             matches = sorted(
                 p
-                for p in media_dir.glob(f"*-{role}.mp4")
+                for p in media_layout.glob_media(media_dir, f"*-{role}.mp4", subdirs=(media_layout.RAW_DIR,))
                 if "hud" not in p.name.lower() and "raw" not in p.stem
             )
             if matches:
@@ -463,7 +464,7 @@ def find_talk_clips(media_dir: Path, targets: set[str]) -> list[Path]:
         found.extend(
             sorted(
                 p
-                for p in media_dir.glob("*-run-*.mp4")
+                for p in media_layout.glob_media(media_dir, "*-run-*.mp4", subdirs=(media_layout.RAW_DIR,))
                 if "hud" not in p.name.lower()
                 and "preview" not in p.name.lower()
                 and "final" not in p.name.lower()
@@ -493,8 +494,9 @@ def record_keeps(media_dir: Path, plans: list[dict]) -> None:
     rows = []
     for plan in plans:
         clip: Path = plan["source"]
+        clip_rel = media_layout.rel_media_path(clip, media_dir)
         for start, end in plan["windows"]:
-            rows.append({"clip": clip.name, "src_start_s": float(start), "src_end_s": float(end)})
+            rows.append({"clip": clip_rel, "src_start_s": float(start), "src_end_s": float(end)})
     if not rows:
         print("no keep windows to record")
         return

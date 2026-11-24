@@ -9,7 +9,7 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json（-
 
 ## 前置
 
-- 素材目录已有 `*-run-*.mp4` 和 `*-run-data.fit`，`mtime` 已校正且 `source_sync` 已写入 `logs/program.json`
+- 素材目录已按分类或平铺放好 `*-run-*.mp4`（`raw/`）和 `*-run-data.fit`（`data/`），`mtime` 已校正且 `source_sync` 已写入 `logs/program.json`
 - `-sn` / `-sk` 已由 `/p3-shoes` 确认（`-sk` = 本场跑完后累计 km，HUD 会反推开跑前再随 FIT 滚动）
 
 ## 不要做的事
@@ -25,7 +25,7 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json（-
 
 ```bash
 .venv/bin/python tools/hud/probe_video_times.py \
-  ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-a.mp4
+  ~/Movies/running-content/YYYY-MM-DD-slug/raw/YYYY-MM-DD-run-a.mp4
 ```
 
 再只记录、不渲染（明确不要天气改 `--no-weather`；已有缓存用 `--weather-json`）：

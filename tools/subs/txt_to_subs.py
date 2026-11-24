@@ -12,7 +12,11 @@ from __future__ import annotations
 import argparse
 import re
 import shutil
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import media_layout  # noqa: E402
 
 
 CUE_RE = re.compile(r"^(\d+:\d{2}:\d{2}\.\d{2})[–-](\d+:\d{2}:\d{2}\.\d{2})\s+(.*)$")
@@ -54,11 +58,11 @@ def write_srt(path: Path, cues: list[tuple[str, str, str]]) -> None:
 
 def media_sidecar_targets(media: Path, episode_name: str) -> list[Path]:
     """上传用 subtitles.srt。审片清单可以有同名 .srt。烧字成片旁边不留同名 .srt。"""
-    date = episode_name[:10]
-    targets = [media / "subtitles.srt"]
-    preview_names = (f"{date}-review-preview.edl", f"{date}-review-preview.mp4")
-    if any((media / name).is_file() for name in preview_names):
-        targets.append(media / f"{date}-review-preview.srt")
+    targets = [media_layout.subtitles_srt_dest(media)]
+    for preview_file in media_layout.existing_preview_files(media, episode_name):
+        sidecar = preview_file.with_suffix(".srt")
+        if sidecar not in targets:
+            targets.append(sidecar)
     return targets
 
 
@@ -66,8 +70,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Convert subtitles.txt into SRT for Bilibili and YouTube.")
     parser.add_argument("--txt", required=True, help="episodes/.../subtitles.txt")
     parser.add_argument("--srt", help="输出 SRT。默认写在 txt 旁边（本地导出，不进 git）")
-    parser.add_argument("--media-dir", help="同时拷到媒体目录：subtitles.srt（上传用）。"
-                        "若有 YYYY-MM-DD-review-preview.edl（或旧的预览 mp4），另拷同名 .srt。"
+    parser.add_argument("--media-dir", help="同时拷到媒体目录：subtitles.srt（分类目录放 upload/，旧目录放根）。"
+                        "若有 review-preview.edl（preview/ 或根），另拷同名 .srt。"
                         "不在烧字成片旁边留同名 .srt。传 auto = ~/Movies/running-content/<期名>")
     args = parser.parse_args()
 
@@ -85,12 +89,14 @@ def main() -> int:
         if not media.is_dir():
             raise SystemExit(f"media dir not found: {media}")
         targets = media_sidecar_targets(media, txt.parent.name)
-        stale = media / f"{txt.parent.name[:10]}-run-final.srt"
-        if stale.is_file() and stale.resolve() != srt_path.resolve():
-            stale.unlink()
-            print(f"Removed {stale} (burned final must not keep a same-name sidecar)")
+        for stale_dir in (media, media / media_layout.UPLOAD_DIR):
+            stale = stale_dir / f"{txt.parent.name[:10]}-run-final.srt"
+            if stale.is_file() and stale.resolve() != srt_path.resolve():
+                stale.unlink()
+                print(f"Removed {stale} (burned final must not keep a same-name sidecar)")
         for t in targets:
             if t.resolve() != srt_path:
+                t.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(srt_path, t)
                 print(f"Copied {t}")
     return 0
