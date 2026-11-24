@@ -1,11 +1,11 @@
 ---
 name: p3-publish
-description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode 发布栏、status=published、该期 episode PR squash 合 main；接着把制作复盘日志 CopyToBox 到 bot 长期留存；再列清临时 KEEP/DELETE（体积）→ 人确认 → 进废纸篓。抖音短链不挡 published，随后写入。用户说发布完毕、发完了、已发布、写链接、合 episode PR、清临时时用。满 7 天整夹归档见 p3-archive。
+description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode 发布栏、status=published、该期 episode PR squash 合 main；接着将制作复盘日志同步到 Google Drive 长期留存并出发布报告；再列清临时 KEEP/DELETE（体积）→ 人确认 → 进废纸篓。抖音短链不挡 published，随后写入。用户说发布完毕、发完了、已发布、写链接、合 episode PR、清临时时用。满 7 天整夹归档见 p3-archive。
 ---
 
 # 发布
 
-烧字 / upload-ready 之后：**写双链 → `published` → squash 合本期 episode PR → 复盘日志上 box → 清临时**。
+烧字 / upload-ready 之后：**写双链 → `published` → squash 合本期 episode PR → 复盘日志同步 Google Drive（随 `/p3-publish-report` 一并同步）→ 清临时**。
 
 ## 不要做的事
 
@@ -14,7 +14,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 - 不要在用户确认前删任何临时文件
 - 清临时禁止 `rm` / `rm -rf`；只进废纸篓
 - 不要整夹删媒体目录；满 7 天搬盘走 `p3-archive`
-- `published` 之后必须把复盘日志拷上 box
+- `published` 之后必须把复盘日志同步到 Google Drive `running-retrospect/`
 - 复盘目录不要放视频、FIT、封面、原片
 
 ## 前置
@@ -40,12 +40,12 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 1. 写两边链接进 `episode.md`「发布」栏，`status=published`，并 `todo_list.py mark published done`。立刻读 `logs/todo.md`：`published` 应为 done，`cleanup` 仍是 pending。B 站或 YouTube 还没 done 就不要改 `episode.md`。清单不对就停。不要拿文件名或 `assets.md` 当进度。
 2. **立刻合并该期 episode PR 进 `main`**（squash；可删远程分支）；不要等用户再点合
-3. **复盘日志上 box**（下一节，必做；不要等清临时确认）。拷完立刻 `/p3-publish-report`
+3. **出报告并同步复盘日志到 Google Drive**（下一节，必做；不要等清临时确认）：立刻走 `/p3-publish-report` 写 `publish-report.html`，写完后统一跑一次 `sync_retrospect_drive.py` 把 `logs/`、`episode-repo/` 和 `publish-report.html` 一并传到 Google Drive（若暂不出报告则直接同步 `logs/` + `episode-repo/`）
 4. 再按下文列清临时清单（体积）→ 用户确认 → 进废纸篓（禁止 `rm`）
 
 抖音短链不挡本步；有了再补写「抖音：」。
 
-合 PR：Cursor GitHub 插件若 403，改用本机 `gh pr merge --squash`（用户已登录）。**只自动合 episode 内容 PR**；skill / 工具类 PR 仍等用户合。合完不改清单。合之前 `published` 应已是 done；不是就停。
+合 PR：用本机 `gh pr merge --squash`（用户已登录）。**只自动合 episode 内容 PR**；skill / 工具类 PR 仍等用户合。合完不改清单。合之前 `published` 应已是 done；不是就停。
 
 ## 复盘日志上 Google Drive（published 之后必做）
 
@@ -81,7 +81,7 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 | 审片播放清单 | `YYYY-MM-DD-review-preview.edl` 留下 |
 | 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
 | 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
-| `logs/` | 制作日志。复盘已拷到 box；本地留到满 7 天归档，清临时不删 |
+| `logs/` | 制作日志。已同步到 Google Drive `running-retrospect/`；本地留到满 7 天归档，清临时不删 |
 | `publish-report.html` | 发布报告，在素材目录。清临时不删 |
 
 仓库只保留 `subtitles.txt`，清理媒体临时文件时不要改它。跑鞋账本一律不动。
@@ -115,10 +115,10 @@ description: 发布收尾：用户给齐 B 站 + YouTube 链接后写 episode �
 
 ## 记日志
 
-`pack_upload.py` 会写 `pack-upload`，并在 `logs/pack-sha256.txt` 记下成片的 SHA-256。写上 `published` 之前，`logs/todo.md` 里 B 站和 YouTube 都必须是 done，否则不要改 `episode.md`。写的时候用 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start published`，再 `end`，并 `todo_list.py mark published done`。`mark published` 之后立刻读清单，`published` 应为 done，`cleanup` 仍是 pending。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。脚本或 helper 已写的行不要重复；失败用 `fail`。复盘拷上 box 之后也读一遍清单，这一步不改步骤；`published` 不是 done 就不要当复盘做完。
+`pack_upload.py` 会写 `pack-upload`，并在 `logs/pack-sha256.txt` 记下成片的 SHA-256。写上 `published` 之前，`logs/todo.md` 里 B 站和 YouTube 都必须是 done，否则不要改 `episode.md`。写的时候用 `.venv/bin/python tools/log_timeline.py --media-dir ~/Movies/running-content/YYYY-MM-DD-slug start published`，再 `end`，并 `todo_list.py mark published done`。`mark published` 之后立刻读清单，`published` 应为 done，`cleanup` 仍是 pending。清单不对就停。不要攒到后面再标，也不要拿文件名或 `assets.md` 当进度。脚本或 helper 已写的行不要重复；失败用 `fail`。复盘同步到 Google Drive 之后也读一遍清单，这一步不改步骤；`published` 不是 done 就不要当复盘做完。
 
 ## 完成后
 
-> 双链已写、`published`、episode PR 已 squash 进 main。复盘已在 box：`running-retrospect/<YYYY-MM-DD-slug>/`（logs / episode-repo / youtube-upload 有或无，如实说；传失败不要说成已同步）。清临时清单如下，确认后进废纸篓。
+> 双链已写、`published`、episode PR 已 squash 进 main。复盘与发布报告已同步到 Google Drive `running-retrospect/<YYYY-MM-DD-slug>/`（logs / episode-repo / publish-report.html 有或无，如实说；同步失败不要说成已同步）。清临时清单如下，确认后进废纸篓。
 >
 > （列出 KEEP / DELETE + 体积）

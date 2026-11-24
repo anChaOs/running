@@ -10,60 +10,54 @@ Uploads only small text/JSON/HTML files (never video, FIT, images, or .pid) into
       publish-report.html
 
 Idempotent: existing files with the same name are updated in place (no duplicates).
+Merges existing remote INDEX.md / Drive episode folders when rebuilding INDEX.md so
+historical episodes archived off the local Mac are never erased.
 """
 
 from __future__ import annotations
 
 import argparse
 import io
-import json
 import mimetypes
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
 
-DEFAULT_TOKEN = Path("~/Movies/running-content/.yt-cloud/token.json").expanduser()
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _google_common import (  # noqa: E402
+    DEFAULT_LOCAL_TOKEN,
+    FOLDER_MIME,
+    drive_download_bytes,
+    drive_find_child,
+    drive_list_children_map,
+    load_drive_service,
+)
+
+DEFAULT_TOKEN = DEFAULT_LOCAL_TOKEN
 DEFAULT_MEDIA_ROOT = Path("~/Movies/running-content").expanduser()
 DEFAULT_DRIVE_ROOT = "running-retrospect"
 SHANGHAI = ZoneInfo("Asia/Shanghai")
-FOLDER_MIME = "application/vnd.google-apps.folder"
 MAX_FILE_BYTES = 2 * 1024 * 1024  # 2 MiB guard: text/json/html logs only
 ALLOWED_SUFFIXES = {".txt", ".md", ".json", ".log", ".html", ".csv", ".yaml", ".yml"}
 REPO_FILES = ("episode.md", "plan.md", "assets.md")
-
-
-def load_drive_service(token_path: Path):
-    if not token_path.is_file():
-        raise FileNotFoundError(
-            f"OAuth token not found: {token_path}. Run tools/publish/cloud_yt/auth_oauth.py first."
-        )
-    info = json.loads(token_path.read_text(encoding="utf-8"))
-    creds = Credentials.from_authorized_user_info(info)
-    creds.refresh(Request())
-    return build("drive", "v3", credentials=creds, cache_discovery=False)
-
-
-def _escape_q(val: str) -> str:
-    return val.replace("\\", "\\\\").replace("'", "\\'")
+SLUG_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-")
 
 
 def ensure_folder(drive, parent_id: str | None, name: str) -> str:
-    clauses = [f"name = '{_escape_q(name)}'", f"mimeType = '{FOLDER_MIME}'", "trashed = false"]
-    if parent_id:
-        clauses.append(f"'{parent_id}' in parents")
-    else:
-        clauses.append("'root' in parents")
-    resp = drive.files().list(q=" and ".join(clauses), fields="files(id, name)", pageSize=5).execute()
-    files = resp.get("files", [])
-    if files:
-        return files[0]["id"]
+    found = drive_find_child(
+        drive,
+        parent_id,
+        name,
+        mime_type=FOLDER_MIME,
+        root_only=(parent_id is None),
+    )
+    if found:
+        return found["id"]
     body: dict[str, Any] = {"name": name, "mimeType": FOLDER_MIME}
     if parent_id:
         body["parents"] = [parent_id]
@@ -71,25 +65,13 @@ def ensure_folder(drive, parent_id: str | None, name: str) -> str:
     return created["id"]
 
 
-def list_children_map(drive, folder_id: str) -> dict[str, dict[str, Any]]:
-    out: dict[str, dict[str, Any]] = {}
-    pt = None
-    while True:
-        resp = drive.files().list(
-            q=f"'{folder_id}' in parents and trashed = false",
-            fields="nextPageToken, files(id, name, mimeType, size)",
-            pageSize=200,
-            pageToken=pt,
-        ).execute()
-        for item in resp.get("files", []):
-            out[item["name"]] = item
-        pt = resp.get("nextPageToken")
-        if not pt:
-            break
-    return out
-
-
-def upsert_file(drive, parent_id: str, existing: dict[str, dict[str, Any]], local_path: Path, name: str | None = None) -> str:
+def upsert_file(
+    drive,
+    parent_id: str,
+    existing: dict[str, dict[str, Any]],
+    local_path: Path,
+    name: str | None = None,
+) -> str:
     target_name = name or local_path.name
     mime = mimetypes.guess_type(target_name)[0] or "text/plain"
     if target_name.endswith(".md"):
@@ -112,7 +94,14 @@ def upsert_file(drive, parent_id: str, existing: dict[str, dict[str, Any]], loca
     return created["id"]
 
 
-def upsert_text(drive, parent_id: str, existing: dict[str, dict[str, Any]], name: str, text: str, mime: str = "text/markdown") -> str:
+def upsert_text(
+    drive,
+    parent_id: str,
+    existing: dict[str, dict[str, Any]],
+    name: str,
+    text: str,
+    mime: str = "text/markdown",
+) -> str:
     media = MediaIoBaseUpload(io.BytesIO(text.encode("utf-8")), mimetype=mime, resumable=False)
     if name in existing:
         fid = existing[name]["id"]
@@ -161,6 +150,101 @@ def parse_episode_summary(episode_dir: Path, slug: str) -> dict[str, str]:
     return info
 
 
+def _split_md_row(line: str) -> list[str]:
+    """Split a Markdown table row while preserving escaped pipes (`\\|`)."""
+    inner = line.strip()
+    if inner.startswith("|"):
+        inner = inner[1:]
+    if inner.endswith("|"):
+        inner = inner[:-1]
+    return [cell.replace("\\|", "|").strip() for cell in re.split(r"(?<!\\)\|", inner)]
+
+
+def parse_index_md(text: str) -> dict[str, dict[str, Any]]:
+    """Parse existing INDEX.md rows into slug -> record dicts so archived episodes stay preserved."""
+    out: dict[str, dict[str, Any]] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line.startswith("|"):
+            continue
+        cells = _split_md_row(line)
+        if len(cells) < 8:
+            continue
+        slug = cells[0].strip("` ")
+        if not SLUG_RE.match(slug):
+            continue
+        logs_col = cells[5]
+        repo_col = cells[6]
+        out[slug] = {
+            "slug": slug,
+            "title": cells[1],
+            "status": cells[2].strip("` "),
+            "bilibili": "" if cells[3] == "-" else cells[3],
+            "youtube": "" if cells[4] == "-" else cells[4],
+            "logs_display": logs_col,
+            "repo_files": [] if repo_col in ("", "missing") else [x.strip() for x in repo_col.split(",") if x.strip()],
+            "has_report": cells[7].lower() == "yes",
+        }
+    return out
+
+
+def merge_index_records(
+    *,
+    synced: list[dict[str, Any]],
+    local_only: list[dict[str, Any]],
+    remote_index: dict[str, dict[str, Any]],
+    remote_folders: dict[str, dict[str, Any]] | None = None,
+    episodes_root: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Merge freshly synced, local-present, and archived-remote episodes without dropping history.
+
+    Priority (highest wins): synced > local_only > remote_index > remote_folders.
+    For remote-only (archived) episodes, title/status/links are refreshed from git repo
+    `episodes/<slug>/episode.md` if present, while preserving remote logs/report columns.
+    """
+    by_slug: dict[str, dict[str, Any]] = {}
+
+    if remote_folders:
+        for slug, rec in remote_folders.items():
+            by_slug[slug] = dict(rec)
+
+    for slug, rec in remote_index.items():
+        merged = dict(rec)
+        if episodes_root is not None:
+            ep_dir = episodes_root / slug
+            if (ep_dir / "episode.md").is_file():
+                fresh = parse_episode_summary(ep_dir, slug)
+                for k in ("title", "status", "bilibili", "youtube"):
+                    if fresh.get(k):
+                        merged[k] = fresh[k]
+        by_slug[slug] = merged
+
+    for rec in local_only:
+        by_slug[rec["slug"]] = rec
+
+    for rec in synced:
+        by_slug[rec["slug"]] = rec
+
+    return list(by_slug.values())
+
+
+def inspect_remote_episode(drive, folder_id: str, slug: str, episodes_root: Path) -> dict[str, Any]:
+    """Inspect a remote Drive episode folder when it was missing from INDEX.md."""
+    children = drive_list_children_map(drive, folder_id)
+    logs_files: list[str] = []
+    if "logs" in children and children["logs"].get("mimeType") == FOLDER_MIME:
+        logs_files = sorted(drive_list_children_map(drive, children["logs"]["id"]).keys())
+    repo_files: list[str] = []
+    if "episode-repo" in children and children["episode-repo"].get("mimeType") == FOLDER_MIME:
+        repo_files = sorted(drive_list_children_map(drive, children["episode-repo"]["id"]).keys())
+    return {
+        **parse_episode_summary(episodes_root / slug, slug),
+        "logs_files": logs_files,
+        "repo_files": repo_files,
+        "has_report": "publish-report.html" in children,
+    }
+
+
 def sync_episode(
     drive,
     root_id: str,
@@ -178,17 +262,17 @@ def sync_episode(
 
     if not dry_run:
         ep_folder_id = ensure_folder(drive, root_id, slug)
-        ep_existing = list_children_map(drive, ep_folder_id)
+        ep_existing = drive_list_children_map(drive, ep_folder_id)
 
         if log_files:
             logs_folder_id = ensure_folder(drive, ep_folder_id, "logs")
-            logs_existing = list_children_map(drive, logs_folder_id)
+            logs_existing = drive_list_children_map(drive, logs_folder_id)
             for lf in log_files:
                 upsert_file(drive, logs_folder_id, logs_existing, lf)
 
         if repo_files:
             repo_folder_id = ensure_folder(drive, ep_folder_id, "episode-repo")
-            repo_existing = list_children_map(drive, repo_folder_id)
+            repo_existing = drive_list_children_map(drive, repo_folder_id)
             for rf in repo_files:
                 upsert_file(drive, repo_folder_id, repo_existing, rf)
 
@@ -219,14 +303,17 @@ def render_index(records: list[dict[str, Any]]) -> str:
         "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for r in sorted(records, key=lambda x: x["slug"], reverse=True):
-        bili = r["bilibili"] or "-"
-        yt = r["youtube"] or "-"
-        logs_col = f"{len(r['logs_files'])} files" if r["logs_files"] else "missing"
-        repo_col = ", ".join(r["repo_files"]) if r["repo_files"] else "missing"
-        rep_col = "yes" if r["has_report"] else "no"
-        title = r["title"].replace("|", "\\|")
+        bili = r.get("bilibili") or "-"
+        yt = r.get("youtube") or "-"
+        if "logs_files" in r:
+            logs_col = f"{len(r['logs_files'])} files" if r["logs_files"] else "missing"
+        else:
+            logs_col = r.get("logs_display") or "missing"
+        repo_col = ", ".join(r.get("repo_files") or []) or "missing"
+        rep_col = "yes" if r.get("has_report") else "no"
+        title = str(r.get("title") or r["slug"]).replace("|", "\\|")
         lines.append(
-            f"| `{r['slug']}` | {title} | `{r['status']}` | {bili} | {yt} | {logs_col} | {repo_col} | {rep_col} |"
+            f"| `{r['slug']}` | {title} | `{r.get('status', 'unknown')}` | {bili} | {yt} | {logs_col} | {repo_col} | {rep_col} |"
         )
     return "\n".join(lines) + "\n"
 
@@ -248,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
         media_root = Path(args.media_root).expanduser().resolve()
         targets = sorted(
             p for p in media_root.iterdir()
-            if p.is_dir() and re.match(r"^\d{4}-\d{2}-\d{2}-", p.name)
+            if p.is_dir() and SLUG_RE.match(p.name)
         )
     else:
         targets = [Path(args.media_dir).expanduser().resolve()]
@@ -259,39 +346,62 @@ def main(argv: list[str] | None = None) -> int:
     drive = None if args.dry_run else load_drive_service(Path(args.token_file).expanduser())
     root_id = "" if args.dry_run else ensure_folder(drive, None, args.drive_root)
 
-    records: list[dict[str, Any]] = []
+    synced_records: list[dict[str, Any]] = []
     for media_dir in targets:
         ep_dir = episodes_root / media_dir.name
-        records.append(sync_episode(drive, root_id, media_dir, ep_dir, dry_run=args.dry_run))
+        synced_records.append(sync_episode(drive, root_id, media_dir, ep_dir, dry_run=args.dry_run))
 
-    # When syncing a single episode, rebuild INDEX.md across all local media folders for completeness.
-    index_records = records
+    # Collect other local media folders (for --media-dir runs) so they stay represented in INDEX.md.
+    local_only: list[dict[str, Any]] = []
+    synced_slugs = {r["slug"] for r in synced_records}
     if not args.all:
         media_root = targets[0].parent
-        all_local = sorted(
-            p for p in media_root.iterdir()
-            if p.is_dir() and re.match(r"^\d{4}-\d{2}-\d{2}-", p.name)
-        )
-        by_slug = {r["slug"]: r for r in records}
-        for p in all_local:
-            if p.name not in by_slug:
-                ep_dir = episodes_root / p.name
-                by_slug[p.name] = {
-                    **parse_episode_summary(ep_dir, p.name),
-                    "logs_files": [f.name for f in eligible_log_files(p / "logs")],
-                    "repo_files": [n for n in REPO_FILES if (ep_dir / n).is_file()],
-                    "has_report": (p / "publish-report.html").is_file(),
-                }
-        index_records = list(by_slug.values())
+        if media_root.is_dir():
+            for p in sorted(media_root.iterdir()):
+                if p.is_dir() and SLUG_RE.match(p.name) and p.name not in synced_slugs:
+                    ep_dir = episodes_root / p.name
+                    local_only.append({
+                        **parse_episode_summary(ep_dir, p.name),
+                        "logs_files": [f.name for f in eligible_log_files(p / "logs")],
+                        "repo_files": [n for n in REPO_FILES if (ep_dir / n).is_file()],
+                        "has_report": (p / "publish-report.html").is_file(),
+                    })
+
+    # Merge existing remote INDEX.md and any remote-only episode folders (e.g. archived off local Mac).
+    remote_index: dict[str, dict[str, Any]] = {}
+    remote_folders: dict[str, dict[str, Any]] = {}
+    root_existing: dict[str, dict[str, Any]] = {}
+    if not args.dry_run:
+        root_existing = drive_list_children_map(drive, root_id)
+        if "INDEX.md" in root_existing:
+            try:
+                old_text = drive_download_bytes(drive, root_existing["INDEX.md"]["id"]).decode("utf-8")
+                remote_index = parse_index_md(old_text)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[WARN] Could not read existing remote INDEX.md: {exc}", flush=True)
+        known_slugs = synced_slugs | {r["slug"] for r in local_only} | set(remote_index.keys())
+        for name, item in root_existing.items():
+            if item.get("mimeType") == FOLDER_MIME and SLUG_RE.match(name) and name not in known_slugs:
+                remote_folders[name] = inspect_remote_episode(drive, item["id"], name, episodes_root)
+
+    index_records = merge_index_records(
+        synced=synced_records,
+        local_only=local_only,
+        remote_index=remote_index,
+        remote_folders=remote_folders,
+        episodes_root=episodes_root,
+    )
 
     index_md = render_index(index_records)
     if args.dry_run:
         print("\n--- INDEX.md preview ---")
         print(index_md)
     else:
-        root_existing = list_children_map(drive, root_id)
         upsert_text(drive, root_id, root_existing, "INDEX.md", index_md)
-        print(f"Synced {len(records)} episode(s) and updated {args.drive_root}/INDEX.md (folder id: {root_id})")
+        print(
+            f"Synced {len(synced_records)} episode(s) and updated {args.drive_root}/INDEX.md "
+            f"({len(index_records)} total indexed; folder id: {root_id})"
+        )
     return 0
 
 

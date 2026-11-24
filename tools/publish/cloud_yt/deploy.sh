@@ -55,6 +55,7 @@ if ! "$GCLOUD" storage buckets describe "gs://${BUCKET_NAME}" --project "$PROJEC
 fi
 
 LIFECYCLE_FILE="$(mktemp)"
+trap 'rm -f "${LIFECYCLE_FILE:-}"' EXIT
 cat >"$LIFECYCLE_FILE" <<'JSON'
 {
   "rule": [
@@ -70,6 +71,7 @@ cat >"$LIFECYCLE_FILE" <<'JSON'
 JSON
 "$GCLOUD" storage buckets update "gs://${BUCKET_NAME}" --lifecycle-file="$LIFECYCLE_FILE"
 rm -f "$LIFECYCLE_FILE"
+LIFECYCLE_FILE=""
 
 echo "==> 3/6 Ensuring dedicated least-privilege Service Account..."
 if ! "$GCLOUD" iam service-accounts describe "$SA_EMAIL" --project "$PROJECT_ID" >/dev/null 2>&1; then

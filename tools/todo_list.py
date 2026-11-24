@@ -32,7 +32,7 @@ STEPS: tuple[tuple[str, str], ...] = (
     ("final-qc", "最终片 QC；done 后等用户说可以发了"),
     ("pack-upload", "打包进 upload/"),
     ("bilibili", "B 站字数预检与投稿"),
-    ("drive", "Drive 暂存"),
+    ("drive", "云端暂存（GCS / Drive）"),
     ("youtube", "YouTube 公开上传"),
     ("published", "双链已写，status=published"),
     ("cleanup", "发布后清临时；等人确认再进废纸篓，禁止 rm"),

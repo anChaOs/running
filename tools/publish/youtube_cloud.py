@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -26,23 +25,21 @@ from pathlib import Path
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import log_timeline  # noqa: E402
 import todo_list  # noqa: E402
+from _google_common import (  # noqa: E402
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_LOCAL_TOKEN,
+    FOLDER_MIME,
+    drive_download_bytes,
+    drive_find_child,
+    drive_list_children_map,
+    find_gcloud,
+    load_drive_service,
+)
 
-DEFAULT_CONFIG_PATH = Path("~/Movies/running-content/.yt-cloud/config.json").expanduser()
-DEFAULT_LOCAL_TOKEN = Path("~/Movies/running-content/.yt-cloud/token.json").expanduser()
 DRIVE_LEAVES = ("我的云端硬盘", "My Drive")
-
-
-def find_gcloud() -> str:
-    for candidate in (
-        os.environ.get("GCLOUD_BIN"),
-        str(Path("~/google-cloud-sdk/bin/gcloud").expanduser()),
-        shutil.which("gcloud"),
-    ):
-        if candidate and Path(candidate).is_file():
-            return candidate
-    return "gcloud"
 
 
 def load_cloud_config(path: Path = DEFAULT_CONFIG_PATH) -> dict[str, Any]:
@@ -257,7 +254,7 @@ def stage_to_drive(
     srt_path: Path | None,
     *,
     dry_run: bool,
-) -> Path:
+) -> tuple[Path, bool]:
     drive_root = find_local_drive_root(drive_root_name)
     ep_drive = drive_root / slug
     chunks_dir = ep_drive / "chunks"
@@ -293,7 +290,7 @@ def stage_to_drive(
             encoding="utf-8",
         )
         print(f"[drive] Staged cover, subtitles, and metadata.json into {ep_drive}", flush=True)
-    return ep_drive
+    return ep_drive, reuse_chunks
 
 
 def verify_drive_cloud_ready(token_path: Path, drive_root_name: str, slug: str, timeout_s: int = 600) -> bool:
@@ -302,65 +299,22 @@ def verify_drive_cloud_ready(token_path: Path, drive_root_name: str, slug: str, 
         print(f"[drive] Local token not found at {token_path}; skipping local Drive API verification (Cloud Run Job will wait/verify).", flush=True)
         return False
 
-    from google.auth.transport.requests import Request
-    from google.oauth2.credentials import Credentials
-    from googleapiclient.discovery import build
-    from googleapiclient.http import MediaIoBaseDownload
-    import io
-
-    # Import manifest parser from cloud_yt/job_main.py
     sys.path.insert(0, str(Path(__file__).resolve().parent / "cloud_yt"))
     from job_main import parse_manifest  # noqa: E402
 
-    info = json.loads(token_path.read_text(encoding="utf-8"))
-    creds = Credentials.from_authorized_user_info(info)
-    creds.refresh(Request())
-    drive = build("drive", "v3", credentials=creds, cache_discovery=False)
-    folder_mime = "application/vnd.google-apps.folder"
-
-    def find_child(parent_id: str | None, name: str, mime: str | None = None) -> dict | None:
-        safe = name.replace("\\", "\\\\").replace("'", "\\'")
-        q = [f"name = '{safe}'", "trashed = false"]
-        if parent_id:
-            q.append(f"'{parent_id}' in parents")
-        if mime:
-            q.append(f"mimeType = '{mime}'")
-        files = drive.files().list(q=" and ".join(q), fields="files(id,name,size,mimeType)", pageSize=20).execute().get("files", [])
-        return files[0] if files else None
-
-    def list_children(folder_id: str) -> dict[str, dict]:
-        out: dict[str, dict] = {}
-        pt = None
-        while True:
-            resp = drive.files().list(
-                q=f"'{folder_id}' in parents and trashed = false",
-                fields="nextPageToken,files(id,name,size,mimeType)",
-                pageSize=200,
-                pageToken=pt,
-            ).execute()
-            for item in resp.get("files", []):
-                out[item["name"]] = item
-            pt = resp.get("nextPageToken")
-            if not pt:
-                break
-        return out
-
+    drive = load_drive_service(token_path)
     deadline = time.monotonic() + timeout_s
     while True:
-        root = find_child(None, drive_root_name, folder_mime)
-        ep = find_child(root["id"], slug, folder_mime) if root else None
+        root = drive_find_child(drive, None, drive_root_name, mime_type=FOLDER_MIME)
+        ep = drive_find_child(drive, root["id"], slug, mime_type=FOLDER_MIME) if root else None
         if ep:
-            children = list_children(ep["id"])
+            children = drive_list_children_map(drive, ep["id"])
             chunks_folder = children.get("chunks")
             if chunks_folder and "metadata.json" in children:
-                cfiles = list_children(chunks_folder["id"])
+                cfiles = drive_list_children_map(drive, chunks_folder["id"])
                 if "manifest.txt" in cfiles:
-                    buf = io.BytesIO()
-                    dl = MediaIoBaseDownload(buf, drive.files().get_media(fileId=cfiles["manifest.txt"]["id"]))
-                    done = False
-                    while not done:
-                        _, done = dl.next_chunk()
-                    chunks, _, _ = parse_manifest(buf.getvalue().decode("utf-8"))
+                    manifest_text = drive_download_bytes(drive, cfiles["manifest.txt"]["id"]).decode("utf-8")
+                    chunks, _, _ = parse_manifest(manifest_text)
                     missing = [
                         f"{n}({cfiles.get(n, {}).get('size', -1)}/{sz})"
                         for n, sz in chunks
@@ -381,6 +335,41 @@ def verify_drive_cloud_ready(token_path: Path, drive_root_name: str, slug: str, 
             raise TimeoutError(f"Drive API sync check timed out after {timeout_s}s: {status}")
         print(f"[drive] {status}; rechecking in 10s...", flush=True)
         time.sleep(10)
+
+
+def fetch_drive_result(token_path: Path, drive_root_name: str, slug: str) -> dict[str, Any] | None:
+    """Fallback result fetch from Google Drive `<drive_root>/<slug>/upload_result.json`."""
+    if not token_path.is_file():
+        return None
+    drive = load_drive_service(token_path)
+    root = drive_find_child(drive, None, drive_root_name, mime_type=FOLDER_MIME)
+    if not root:
+        return None
+    ep = drive_find_child(drive, root["id"], slug, mime_type=FOLDER_MIME)
+    if not ep:
+        return None
+    res_file = drive_find_child(drive, ep["id"], "upload_result.json")
+    if not res_file:
+        return None
+    return json.loads(drive_download_bytes(drive, res_file["id"]).decode("utf-8"))
+
+
+def record_upload_result(media_dir: Path, result: dict[str, Any]) -> Path:
+    """Write result JSON to logs/youtube-upload-result.json and mark timeline + todo idempotently."""
+    out_log = media_dir / "logs" / "youtube-upload-result.json"
+    out_log.parent.mkdir(parents=True, exist_ok=True)
+    out_log.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+    url = result.get("url", "")
+    if url:
+        status = todo_list.load(media_dir)
+        if status.get("youtube") != "done":
+            timeline_path = media_dir / "logs" / "timeline.txt"
+            existing_tl = timeline_path.read_text(encoding="utf-8") if timeline_path.is_file() else ""
+            if log_timeline.unmatched_start(existing_tl, "youtube-upload"):
+                log_timeline.end(media_dir, "youtube-upload", note=f"{url} ({result.get('source', 'cloud')})")
+            todo_list.mark(media_dir, "youtube", "done")
+    return out_log
 
 
 def cmd_upload(args: argparse.Namespace) -> int:
@@ -430,10 +419,15 @@ def cmd_upload(args: argparse.Namespace) -> int:
             log_timeline.end(media_dir, "drive-stage", note=f"gcs gs://{bucket}/staging/{slug}/")
             todo_list.mark(media_dir, "drive", "done")
     else:
-        stage_to_drive(media_dir, slug, drive_root, meta, video_path, cover_path, srt_path, dry_run=args.dry_run)
-        if not args.dry_run and not args.no_verify_drive:
-            verify_drive_cloud_ready(Path(args.token_file).expanduser(), drive_root, slug, timeout_s=args.drive_wait_s)
+        _ep_drive, reused = stage_to_drive(
+            media_dir, slug, drive_root, meta, video_path, cover_path, srt_path, dry_run=args.dry_run
+        )
         if not args.dry_run:
+            if reused:
+                log_timeline.start(media_dir, "drive-stage")
+                log_timeline.end(media_dir, "drive-stage", note=f"reused existing drive chunks ({drive_root}/{slug})")
+            if not args.no_verify_drive:
+                verify_drive_cloud_ready(Path(args.token_file).expanduser(), drive_root, slug, timeout_s=args.drive_wait_s)
             todo_list.mark(media_dir, "drive", "done")
 
     exec_cmd = build_execute_cmd(
@@ -478,19 +472,27 @@ def cmd_result(args: argparse.Namespace) -> int:
     region = args.region or cfg.get("region") or "us-west1"
     bucket = args.bucket or cfg.get("bucket") or ""
     job = args.job or cfg.get("job") or "running-yt-upload"
+    drive_root = getattr(args, "drive_root", "") or cfg.get("drive_root") or "跑步成片"
+    token_file = Path(getattr(args, "token_file", str(DEFAULT_LOCAL_TOKEN))).expanduser()
     gcloud = find_gcloud()
 
-    if not bucket:
-        raise SystemExit("Missing GCS bucket to read results/<slug>.json. Pass --bucket.")
+    result: dict[str, Any] | None = None
+    if bucket:
+        result_uri = f"gs://{bucket}/results/{slug}.json"
+        proc = subprocess.run(
+            [gcloud, "storage", "cat", result_uri],
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode == 0:
+            result = json.loads(proc.stdout)
 
-    result_uri = f"gs://{bucket}/results/{slug}.json"
-    proc = subprocess.run(
-        [gcloud, "storage", "cat", result_uri],
-        capture_output=True,
-        text=True,
-    )
-    if proc.returncode != 0:
-        print(f"Result not ready yet at {result_uri}. Checking recent Cloud Run Job executions...", flush=True)
+    if result is None:
+        result = fetch_drive_result(token_file, drive_root, slug)
+
+    if result is None:
+        where = f"gs://{bucket}/results/{slug}.json" if bucket else f"Drive {drive_root}/{slug}/upload_result.json"
+        print(f"Result not ready yet at {where}. Checking recent Cloud Run Job executions...", flush=True)
         if project:
             subprocess.run(
                 [gcloud, "run", "jobs", "executions", "list", "--job", job, "--project", project, "--region", region, "--limit", "5"],
@@ -498,20 +500,11 @@ def cmd_result(args: argparse.Namespace) -> int:
             )
         return 1
 
-    result = json.loads(proc.stdout)
-    out_log = media_dir / "logs" / "youtube-upload-result.json"
-    out_log.parent.mkdir(parents=True, exist_ok=True)
-    out_log.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-
-    url = result.get("url", "")
+    record_upload_result(media_dir, result)
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    url = result.get("url", "")
     if url:
-        status = todo_list.load(media_dir)
-        if status.get("youtube") != "done":
-            if log_timeline.unmatched_start((media_dir / "logs" / "timeline.txt").read_text(encoding="utf-8"), "youtube-upload"):
-                log_timeline.end(media_dir, "youtube-upload", note=f"{url} ({result.get('source', 'cloud')})")
-            todo_list.mark(media_dir, "youtube", "done")
-            print(f"\nMarked youtube: done in {media_dir / 'logs' / 'todo.md'} ({url})")
+        print(f"\nVerified youtube: done in {media_dir / 'logs' / 'todo.md'} ({url})")
     return 0
 
 
@@ -526,18 +519,18 @@ def main(argv: list[str] | None = None) -> int:
         sp.add_argument("--region", default="")
         sp.add_argument("--bucket", default="")
         sp.add_argument("--job", default="")
+        sp.add_argument("--drive-root", default="", help="Drive root folder name (default: 跑步成片)")
+        sp.add_argument("--token-file", default=str(DEFAULT_LOCAL_TOKEN))
 
     sp_up = sub.add_parser("upload", help="Stage episode to GCS (default) or Drive and trigger Cloud Run Job")
     add_common(sp_up)
     sp_up.add_argument("--episode-dir", default="", help="Default: episodes/<slug>")
     sp_up.add_argument("--source", choices=("gcs", "drive"), default=None, help="Staging backend: gcs (default) or drive")
-    sp_up.add_argument("--drive-root", default="", help="Drive root folder name (default: 跑步成片)")
     sp_up.add_argument("--privacy", choices=("public", "unlisted", "private"), default="public")
     sp_up.add_argument("--wait", action="store_true", help="Wait for Cloud Run Job to finish instead of async return")
     sp_up.add_argument("--keep-staging", action="store_true", help="Do not delete GCS/Drive staging files after upload")
     sp_up.add_argument("--no-verify-drive", action="store_true", help="Skip local Drive API sync wait in --source drive mode")
     sp_up.add_argument("--drive-wait-s", type=int, default=600)
-    sp_up.add_argument("--token-file", default=str(DEFAULT_LOCAL_TOKEN))
     sp_up.add_argument("--dry-run", action="store_true")
     sp_up.set_defaults(func=cmd_upload)
 

@@ -56,9 +56,9 @@ subs: confirmed，且时间表已冻结、logs/todo.md 允许导出
               → YYYY-MM-DD-run-final.mp4
 
 双链齐
-  p3-publish  → 写链接 / published / 合 episode PR / 复盘日志上 box
+  p3-publish  → 写链接 / published / 合 episode PR / 复盘日志同步 Google Drive
               → 清临时：先列 KEEP/DELETE，用户确认后才进废纸篓，然后 cleanup done；YYYY-MM-DD-review-preview.edl 留下
-  p3-publish-report → 复盘拷完后立刻出单屏 HTML（清临时仍在 p3-publish）
+  p3-publish-report → published 后立刻出单屏 HTML 并随复盘同步到 Google Drive（清临时仍在 p3-publish）
 ```
 
 时间表在媒体目录 `logs/program.json`。两套时钟：`source_sync` 是原片对 FIT 的偏移，HUD 永远按原片时间取样；`program` 是成片时间，句间刀、冷开场、插入、转场只改这张。预览和 `final_export.py` 读同一份。schema 见 `tools/program_edl.py` 模块说明。
@@ -123,7 +123,7 @@ subs: confirmed，且时间表已冻结、logs/todo.md 允许导出
 | 冻结后的准备 | 时间表已冻结、预览已完成；字幕可以还在校对 | `render_running_hud.py --prep-alpha`（8 核加 `-j 6`，默认 2），可选 `final_export.py --measure-only` |
 | 最终导出 | 用户说改好了，清单 `subs: confirmed`，时间表已冻结，`logs/todo.md` 的导出检查通过 | `final_export.py --confirmed` |
 | 发布 / 清临时 | 用户说「可以发了」之后才打包；双链齐再写 published。清临时再等一次确认 | `p3-publish` |
-| 发布报告 | 已 published，复盘已拷 | `p3-publish-report` |
+| 发布报告 | 已 `published`（写完一并同步复盘到 Google Drive） | `p3-publish-report` |
 | 只换封面 | 自拍 + 封面句 | `p3-cover` |
 | 再核对 | 审片清单或最终成片 | `p3-qc` |
 | 剪映短片 | HUD alpha | `p3-jianying` |

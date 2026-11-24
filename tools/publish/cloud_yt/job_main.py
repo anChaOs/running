@@ -21,7 +21,7 @@ import os
 import shutil
 import sys
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -33,12 +33,6 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, MediaIoBaseUpload
 
-SCOPES = [
-    "https://www.googleapis.com/auth/youtube.upload",
-    "https://www.googleapis.com/auth/youtube",
-    "https://www.googleapis.com/auth/youtube.force-ssl",
-    "https://www.googleapis.com/auth/drive",
-]
 UPLOAD_CHUNK_BYTES = 16 * 1024 * 1024
 RETRIABLE_HTTP_STATUS = {500, 502, 503, 504}
 
@@ -89,7 +83,7 @@ def load_credentials(token_file: Path) -> Credentials:
     if not token_file.is_file():
         raise FileNotFoundError(f"OAuth token file not found: {token_file}")
     info = json.loads(token_file.read_text(encoding="utf-8"))
-    creds = Credentials.from_authorized_user_info(info, scopes=SCOPES)
+    creds = Credentials.from_authorized_user_info(info)
     if not creds.refresh_token:
         raise ValueError("OAuth token.json is missing refresh_token")
     log("Refreshing Google OAuth access token...")
@@ -237,6 +231,55 @@ def _drive_download_file(creds: Credentials, file_id: str, dest: Path) -> None:
             _, done = dl.next_chunk()
 
 
+def assemble_drive_chunks_streaming(
+    manifest_chunks: list[tuple[str, int]],
+    download_fn,
+    video_path: Path,
+    chunk_dir: Path,
+    *,
+    prefetch: int = 2,
+) -> str:
+    """Download Drive chunks with a bounded prefetch window, append in order, and unlink immediately.
+
+    Keeps peak Cloud Run tmpfs usage near `1x video + prefetch * chunk_size` instead of `2x video`.
+    Returns the SHA-256 hex digest of the assembled video.
+    """
+    chunk_dir.mkdir(parents=True, exist_ok=True)
+    window = max(1, prefetch)
+    hasher = hashlib.sha256()
+
+    with ThreadPoolExecutor(max_workers=window) as pool, video_path.open("wb") as out_fh:
+        in_flight: dict[int, Any] = {}
+
+        def submit(idx: int) -> None:
+            cname, _csize = manifest_chunks[idx]
+            in_flight[idx] = pool.submit(download_fn, cname, chunk_dir / cname)
+
+        for idx in range(min(window, len(manifest_chunks))):
+            submit(idx)
+
+        for idx, (cname, expected_size) in enumerate(manifest_chunks):
+            fut = in_flight.pop(idx)
+            fut.result()
+            cpath = chunk_dir / cname
+            got = cpath.stat().st_size
+            if got != expected_size:
+                cpath.unlink(missing_ok=True)
+                raise RuntimeError(f"Chunk {cname} size mismatch: expected {expected_size}, got {got}")
+
+            next_idx = idx + window
+            if next_idx < len(manifest_chunks):
+                submit(next_idx)
+
+            with cpath.open("rb") as in_fh:
+                for block in iter(lambda: in_fh.read(4 * 1024 * 1024), b""):
+                    out_fh.write(block)
+                    hasher.update(block)
+            cpath.unlink(missing_ok=True)
+
+    return hasher.hexdigest()
+
+
 def stage_from_drive(
     creds: Credentials,
     drive_root_name: str,
@@ -298,38 +341,25 @@ def stage_from_drive(
     meta = json.loads(_drive_download_bytes(drive, ep_children["metadata.json"]["id"]).decode("utf-8"))
     expected_sha = (meta.get("sha256") or manifest_sha or "").strip().lower()
 
-    # Download chunks in parallel, then assemble in order and verify SHA-256.
+    # Stream chunks with a 2-chunk prefetch window and delete each chunk right after appending
+    # so tmpfs peak stays ~1x video + ~200 MiB (safe inside 8Gi Cloud Run memory even for 4GB+ videos).
     chunk_dir = work_dir / "chunks"
-    chunk_dir.mkdir(parents=True, exist_ok=True)
-    log(f"Downloading {len(manifest_chunks)} chunks from Drive in parallel (4 workers)...")
-    t0 = time.monotonic()
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        futs = {
-            pool.submit(_drive_download_file, creds, chunk_id_map[cname], chunk_dir / cname): (cname, csize)
-            for cname, csize in manifest_chunks
-        }
-        for fut in as_completed(futs):
-            cname, csize = futs[fut]
-            fut.result()
-            got = (chunk_dir / cname).stat().st_size
-            if got != csize:
-                raise RuntimeError(f"Chunk {cname} size mismatch: expected {csize}, got {got}")
-    log(f"All {len(manifest_chunks)} chunks downloaded in {time.monotonic() - t0:.1f}s")
-
     video_path = work_dir / "video.mp4"
-    hasher = hashlib.sha256()
-    with video_path.open("wb") as out_fh:
-        for cname, _ in manifest_chunks:
-            cpath = chunk_dir / cname
-            with cpath.open("rb") as in_fh:
-                for block in iter(lambda: in_fh.read(4 * 1024 * 1024), b""):
-                    out_fh.write(block)
-                    hasher.update(block)
-            cpath.unlink()  # Free tmpfs space immediately after appending each chunk.
-    actual_sha = hasher.hexdigest()
+    log(f"Downloading & assembling {len(manifest_chunks)} chunks from Drive (bounded prefetch=2)...")
+    t0 = time.monotonic()
+    actual_sha = assemble_drive_chunks_streaming(
+        manifest_chunks,
+        lambda cname, dest: _drive_download_file(creds, chunk_id_map[cname], dest),
+        video_path,
+        chunk_dir,
+        prefetch=2,
+    )
     if expected_sha and actual_sha != expected_sha:
         raise RuntimeError(f"Assembled Drive video SHA-256 mismatch: expected {expected_sha}, got {actual_sha}")
-    log(f"Assembled {video_path.stat().st_size / (1024 * 1024):.1f} MiB, SHA-256 verified: {actual_sha[:16]}...")
+    log(
+        f"Assembled {video_path.stat().st_size / (1024 * 1024):.1f} MiB in {time.monotonic() - t0:.1f}s, "
+        f"SHA-256 verified: {actual_sha[:16]}..."
+    )
 
     cover_path: Path | None = None
     for cname in ("cover-16x9-1920x1080.jpg", "cover-16x9.jpg"):

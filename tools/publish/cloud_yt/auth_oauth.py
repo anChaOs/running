@@ -15,10 +15,14 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
 from google_auth_oauthlib.flow import InstalledAppFlow
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from _google_common import DEFAULT_LOCAL_TOKEN, find_gcloud  # noqa: E402
 
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
@@ -26,18 +30,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube.force-ssl",
     "https://www.googleapis.com/auth/drive",
 ]
-DEFAULT_LOCAL_TOKEN = Path("~/Movies/running-content/.yt-cloud/token.json").expanduser()
-
-
-def find_gcloud() -> str:
-    for candidate in (
-        os.environ.get("GCLOUD_BIN"),
-        str(Path("~/google-cloud-sdk/bin/gcloud").expanduser()),
-        "gcloud",
-    ):
-        if candidate and (Path(candidate).is_file() or candidate == "gcloud"):
-            return candidate
-    return "gcloud"
 
 
 def push_secret(project: str, secret_name: str, token_json: str) -> None:

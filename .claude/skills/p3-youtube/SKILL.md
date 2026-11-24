@@ -1,6 +1,6 @@
 ---
 name: p3-youtube
-description: 把本期 upload/ 成片经 GCS（默认）或 Google Drive（手动切换）触发 GCP Cloud Run Job 在云端公开上传 YouTube（16:9 封面 + 外挂字幕）。用户说 YouTube 上传、自动发 YouTube、传 YT 时用。独立于 p3-publish：本 skill 只上传拿链接；写双链 / published / 合 PR / 清临时仍走 p3-publish。触发后用户 Mac 可立刻合盖断网。
+description: 把本期 upload/ 成片经 GCS（默认）或 Google Drive（手动切换）触发 GCP Cloud Run Job 在云端公开上传 YouTube（16:9 封面 + 外挂字幕）。用户说 YouTube 上传、自动发 YouTube、传 YT 时用。独立于 p3-publish：本 skill 只上传拿链接；双链齐后走 p3-publish。触发后用户 Mac 可立刻合盖断网。
 ---
 
 # YouTube 自动上传（GCS / Drive → Cloud Run Job → Data API）

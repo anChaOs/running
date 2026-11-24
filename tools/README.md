@@ -7,6 +7,6 @@
 - `assemble/final_export.py`：字幕人工确认后的唯一最终导出入口。`--measure-only` 可在校对时先测成片混音。`--confirmed` 从原片、HUD alpha 和 stats 图片一次完成裁切、叠加、拼接、烧字幕、套用已测响度与 HEVC 输出；缺准备会先补上。
 - `assemble/assemble_episode.py`、`burn_ass.py`、`loudness_only.py`：历史旁路，仅供旧期维护，不属于新流程。
 - `cover/`：三比例封面排版（4:3 / 3:4 / 16:9）。
-- `publish/`：上传打包（`pack_upload.py` → 媒体目录 `upload/`）；把成片切成亚 100MB 块并拷进 Google Drive 桌面版目录。
+- `publish/`：上传打包（`pack_upload.py` → 媒体目录 `upload/`）；云端 YouTube 自动上传（`youtube_cloud.py` + `cloud_yt/` Cloud Run Job，默认 GCS 暂存、支持 `--source drive` 配合 `stage_drive_chunks.py` 分块切换）；复盘日志与发布报告同步到 Google Drive（`sync_retrospect_drive.py`）。
 
 规格统一配置：`tools/export-spec.json`。默认最终规格为 1080p30 HEVC；切换 4K 时先改配置并重新渲 HUD/预览，当前不做完整 4K 验收。

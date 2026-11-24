@@ -4,24 +4,32 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-PUBLISH_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(PUBLISH_DIR))
-sys.path.insert(0, str(PUBLISH_DIR / "cloud_yt"))
+TOOLS_DIR = Path(__file__).resolve().parents[1]
+PUB_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(TOOLS_DIR))
+sys.path.insert(0, str(PUB_DIR))
+sys.path.insert(0, str(PUB_DIR / "cloud_yt"))
 
 import job_main  # noqa: E402
+import log_timeline  # noqa: E402
 import sync_retrospect_drive  # noqa: E402
+import todo_list  # noqa: E402
 import youtube_cloud  # noqa: E402
 
-SAMPLE_PLAN = """# 2026-11-24 发布计划
+
+SAMPLE_PLAN = """\
+# 测试计划
 
 ## 标题
 
-上马前，LSD没跑够能行吗？
+> 发这个：上马前，LSD没跑够能行吗？
 
 ## 简介
 
@@ -29,32 +37,49 @@ SAMPLE_PLAN = """# 2026-11-24 发布计划
 
 个人视频制作来自：https://github.com/anChaOs/running
 
-B 站简介正文。
+B 站简介。
 
 ### YouTube
 
 个人视频制作来自：github.com/anChaOs/running
 
-YouTube 简介正文，不含链接。
+YouTube 简介第一行。
+第二行。
 
 ## 标签
 
 B 站（5–8 个，不要堆）：
 
 ```text
-#跑步 #马拉松 #上海马拉松
+#跑步 #马拉松 #上海马拉松 #长距离跑 #破三
 ```
 
 YouTube 标签：
 
 ```text
-跑步, 马拉松, 上海马拉松, 长距离慢跑
+跑步, 马拉松, 上海马拉松, 长距离跑, 破三, 赛前减量
 ```
 """
 
 
+def _mark_through_drive(media: Path) -> None:
+    for step in (
+        "ingest",
+        "edl",
+        "hud-record",
+        "layout",
+        "preview",
+    ):
+        todo_list.mark(media, step, "done")
+    todo_list.mark(media, "subs", "waiting-review")
+    todo_list.mark(media, "subs", "aligned")
+    todo_list.mark(media, "subs", "confirmed", confirmed=True)
+    for step in ("final-export", "final-qc", "pack-upload", "drive"):
+        todo_list.mark(media, step, "done")
+
+
 class YoutubeCloudTests(unittest.TestCase):
-    def test_parse_plan_youtube_extracts_fields(self) -> None:
+    def test_parse_plan_youtube(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             plan = Path(td) / "plan.md"
             plan.write_text(SAMPLE_PLAN, encoding="utf-8")
@@ -62,9 +87,9 @@ class YoutubeCloudTests(unittest.TestCase):
             self.assertEqual(parsed["title"], "上马前，LSD没跑够能行吗？")
             self.assertIn("github.com/anChaOs/running", parsed["description"])
             self.assertNotIn("https://", parsed["description"])
-            self.assertEqual(parsed["tags"], ["跑步", "马拉松", "上海马拉松", "长距离慢跑"])
+            self.assertEqual(parsed["tags"], ["跑步", "马拉松", "上海马拉松", "长距离跑", "破三", "赛前减量"])
 
-    def test_parse_plan_rejects_https_in_youtube_desc(self) -> None:
+    def test_parse_plan_rejects_url_in_youtube_desc(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             plan = Path(td) / "plan.md"
             plan.write_text(
@@ -144,6 +169,77 @@ class YoutubeCloudTests(unittest.TestCase):
         self.assertEqual(total, 179582145)
         self.assertEqual(sha, "0c0f5ce7ec2cbba63eb45c49b4133dbfd86ea9d9bacfccc70cb7e1024cb6e70a")
 
+    def test_streaming_drive_chunk_assembly_and_cleanup(self) -> None:
+        parts = {
+            "chunk-00": b"AAAA" * 1024,
+            "chunk-01": b"BBBB" * 1024,
+            "chunk-02": b"CCCC" * 512,
+            "chunk-03": b"DDDD" * 256,
+        }
+        manifest_chunks = [(name, len(data)) for name, data in parts.items()]
+        expected_bytes = b"".join(parts.values())
+        expected_sha = hashlib.sha256(expected_bytes).hexdigest()
+
+        with tempfile.TemporaryDirectory() as td:
+            work = Path(td)
+            chunk_dir = work / "chunks"
+            video_path = work / "video.mp4"
+
+            def fake_download(cname: str, dest: Path) -> None:
+                dest.write_bytes(parts[cname])
+
+            got_sha = job_main.assemble_drive_chunks_streaming(
+                manifest_chunks,
+                fake_download,
+                video_path,
+                chunk_dir,
+                prefetch=2,
+            )
+            self.assertEqual(got_sha, expected_sha)
+            self.assertEqual(video_path.read_bytes(), expected_bytes)
+            # Every chunk must have been unlinked immediately after writing.
+            self.assertEqual(list(chunk_dir.iterdir()), [])
+
+    def test_record_upload_result_without_timeline_and_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            media = Path(td) / "2026-11-24-lsd-short"
+            media.mkdir()
+            _mark_through_drive(media)
+            # Deliberately no logs/timeline.txt yet.
+            payload = {"slug": media.name, "source": "gcs", "url": "https://youtu.be/abc123"}
+            out = youtube_cloud.record_upload_result(media, payload)
+            self.assertTrue(out.is_file())
+            self.assertEqual(todo_list.load(media)["youtube"], "done")
+
+            # Add an unmatched start, verify second call is idempotent when youtube is already done.
+            log_timeline.start(media, "youtube-upload")
+            youtube_cloud.record_upload_result(media, payload)
+            tl = (media / "logs" / "timeline.txt").read_text(encoding="utf-8")
+            self.assertEqual(tl.count("END"), 0)
+
+    def test_cmd_result_falls_back_to_drive_when_bucket_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            media = Path(td) / "2026-11-24-lsd-short"
+            media.mkdir()
+            _mark_through_drive(media)
+            log_timeline.start(media, "youtube-upload")
+            missing_cfg = Path(td) / "no-config.json"
+            drive_res = {"slug": media.name, "source": "drive", "url": "https://youtu.be/xyz789"}
+
+            with mock.patch.object(youtube_cloud, "fetch_drive_result", return_value=drive_res):
+                rc = youtube_cloud.main([
+                    "result",
+                    "--media-dir", str(media),
+                    "--config", str(missing_cfg),
+                ])
+            self.assertEqual(rc, 0)
+            self.assertEqual(todo_list.load(media)["youtube"], "done")
+            saved = json.loads((media / "logs" / "youtube-upload-result.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["url"], "https://youtu.be/xyz789")
+            tl = (media / "logs" / "timeline.txt").read_text(encoding="utf-8")
+            self.assertIn("END", tl)
+            self.assertIn("https://youtu.be/xyz789", tl)
+
     def test_retrospect_filters_binary_and_pid_files(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             logs = Path(td)
@@ -156,6 +252,53 @@ class YoutubeCloudTests(unittest.TestCase):
             (logs / "sub").mkdir()
             kept = [p.name for p in sync_retrospect_drive.eligible_log_files(logs)]
             self.assertEqual(kept, ["program.json", "timeline.txt", "todo.md"])
+
+    def test_retrospect_merge_preserves_archived_episodes_in_index(self) -> None:
+        old_index = """\
+# Running Retrospect Index
+
+最后同步：2026-11-20 12:00:00 +08:00
+
+| Slug | 标题 | 状态 | Bilibili | YouTube | logs | episode-repo | publish-report.html |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `2026-11-01-archived` | 旧期\\|带竖线 | `published` | https://www.bilibili.com/video/BVold | https://youtu.be/old1 | 5 files | episode.md, plan.md | yes |
+"""
+        parsed_remote = sync_retrospect_drive.parse_index_md(old_index)
+        self.assertIn("2026-11-01-archived", parsed_remote)
+        self.assertEqual(parsed_remote["2026-11-01-archived"]["title"], "旧期|带竖线")
+        self.assertTrue(parsed_remote["2026-11-01-archived"]["has_report"])
+
+        with tempfile.TemporaryDirectory() as td:
+            ep_root = Path(td) / "episodes"
+            archived_ep = ep_root / "2026-11-01-archived"
+            archived_ep.mkdir(parents=True)
+            (archived_ep / "episode.md").write_text(
+                "---\ntitle: 旧期|新标题\nstatus: published\n---\n- Bilibili：https://www.bilibili.com/video/BVold\n- YouTube：https://youtu.be/old1\n",
+                encoding="utf-8",
+            )
+            synced = [
+                {
+                    "slug": "2026-11-24-lsd-short",
+                    "title": "上马前，LSD没跑够能行吗？",
+                    "status": "published",
+                    "bilibili": "https://www.bilibili.com/video/BVnew",
+                    "youtube": "https://youtu.be/new1",
+                    "logs_files": ["timeline.txt", "todo.md"],
+                    "repo_files": ["episode.md", "plan.md"],
+                    "has_report": True,
+                }
+            ]
+            merged = sync_retrospect_drive.merge_index_records(
+                synced=synced,
+                local_only=[],
+                remote_index=parsed_remote,
+                episodes_root=ep_root,
+            )
+            rendered = sync_retrospect_drive.render_index(merged)
+            self.assertIn("`2026-11-24-lsd-short`", rendered)
+            self.assertIn("`2026-11-01-archived`", rendered)
+            self.assertIn("旧期\\|新标题", rendered)
+            self.assertIn("| 5 files |", rendered)
 
 
 if __name__ == "__main__":

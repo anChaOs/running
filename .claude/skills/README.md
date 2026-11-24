@@ -38,10 +38,10 @@
   final_export.py  确认后分段出画面、整片音频混一次；缺的准备自己补
   p3-loudness     已废弃（响度随 final_export 一次编码）
   p3-burn         已废弃（字幕随 final_export 一次编码）
-  p3-publish      发布：写双链 / published / 合 PR / 复盘日志上 box / 清临时
-  p3-publish-report  复盘拷完后的单屏 HTML 发布报告
+  p3-publish      发布：写双链 / published / 合 PR / 复盘同步 Google Drive / 清临时
+  p3-publish-report  published 后的单屏 HTML 发布报告（一并同步 Google Drive）
   p3-bilibili     可选：biliup 自动投 B 站（独立，不进主链）
-  p3-youtube      可选：Drive→box→YouTube Data API（独立，默认不用用户电脑）
+  p3-youtube      可选：GCS（默认）/ Drive → Cloud Run Job → YouTube Data API（独立，触发后可合盖）
   p3-cover        只换封面 / 重抽
   p3-qc           只再核对；默认已在 assemble 里做过
   p3-jianying     60–90 秒剪映，不走全长脚本
@@ -62,8 +62,8 @@ p3-library / p3-topic / p3-scaffold
   → 确认字幕
   → final_export --confirmed（约 120 秒一段编码，流拷贝接成一个文件）
   → （可选）p3-bilibili / p3-youtube 自动上传；均不挡、不嵌入 publish
-  → publish（published 门闩 / 复盘日志上 box / 清临时真源）
-  → p3-publish-report（复盘拷完后的单屏 HTML）
+  → publish（published 门闩 / 复盘同步 Google Drive / 清临时真源）
+  → p3-publish-report（单屏 HTML，写完一并同步 Google Drive）
   → archive（满 7 天）
 ```
 

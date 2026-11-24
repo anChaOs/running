@@ -1,13 +1,13 @@
 ---
 name: p3-publish-report
-description: 发布报告。published 且复盘日志拷完后立刻做，只出一张可打开的单屏 HTML。不要等用户说「给我报告」或「给我task的报告」。用户要报告时也只用本 skill。不写双链、不合 PR、不清临时。
+description: 发布报告。published 之后立刻做，只出一张可打开的单屏 HTML，并同步到 Google Drive running-retrospect/。不要等用户说「给我报告」或「给我task的报告」。用户要报告时也只用本 skill。不写双链、不合 PR、不清临时。
 ---
 
 # 发布报告
 
-`p3-publish` 写完 `published`、试过合 episode PR、复盘拷完之后立刻做。不要等用户要报告。只交这一张 HTML。不要另写 Markdown，不要在聊天里再铺一张表。
+`p3-publish` 写完 `published`、试过合 episode PR 之后立刻做。不要等用户要报告。只交这一张 HTML。不要另写 Markdown，不要在聊天里再铺一张表。
 
-未 `published` 或复盘还没拷：停，先走 `/p3-publish`。本 skill 不写链接、不合 PR、不删文件。
+未 `published`：停，先走 `/p3-publish`。本 skill 不写链接、不合 PR、不删文件。
 
 ## 不要做的事
 
@@ -20,7 +20,7 @@ description: 发布报告。published 且复盘日志拷完后立刻做，只出
 
 ## 证据
 
-时间一律 Asia/Shanghai。优先 `logs/timeline.txt` 和 `logs/failures.md`（媒体目录或已拷上的复盘）。缺了或不完整，再用文件 birth/mtime、ffmpeg 日志、git commit。日志时间与成片 mtime 不一致时，用文件/编码时间，在该处写「日志后写」。
+时间一律 Asia/Shanghai。优先 `logs/timeline.txt` 和 `logs/failures.md`（媒体目录或 Google Drive `running-retrospect/` 归档）。缺了或不完整，再用文件 birth/mtime、ffmpeg 日志、git commit。日志时间与成片 mtime 不一致时，用文件/编码时间，在该处写「日志后写」。
 
 各 stage 当时应已把开始、结束、耗时、成功或失败写入 `logs/timeline.txt`，失败另记 `logs/failures.md`（`p3-episode`）。没写就标缺日志，不要回补编造。
 
