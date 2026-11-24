@@ -2,7 +2,7 @@
 date: 2026-11-24
 slug: lsd-short
 title: 上马前，LSD没跑够能行吗？
-status: edited
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-24-lsd-short/
 ---
@@ -25,6 +25,6 @@ media: ~/Movies/running-content/2026-11-24-lsd-short/
 
 ## 发布
 
-- YouTube：
+- YouTube：https://youtu.be/SEAJaALcRws
 - Bilibili：https://www.bilibili.com/video/BV1ihyRz1E9q
 - 抖音：
