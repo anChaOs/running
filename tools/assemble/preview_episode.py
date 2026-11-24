@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import shutil
@@ -28,6 +29,7 @@ sys.path.insert(0, str(TOOLS_DIR / "assemble"))
 sys.path.insert(0, str(TOOLS_DIR / "subs"))
 
 import log_timeline
+import media_layout
 import program_edl as edl
 import todo_list
 from export_spec import PREVIEW_SPEC, ExportSpec, video_codec_args
@@ -429,13 +431,14 @@ def _clip_date(path: Path) -> str:
 
 def _original_runs(media_dir: Path) -> tuple[Path, ...]:
     return tuple(
-        path for path in sorted(media_dir.glob("*-run-*.mp4"))
-        if path.is_file() and not any(part in path.stem for part in RAW_CLIP_PARTS)
+        path for path in media_layout.glob_media(media_dir, "*-run-*.mp4", subdirs=(media_layout.RAW_DIR,))
+        if not any(part in path.stem for part in RAW_CLIP_PARTS)
     )
 
 
-def _preview_for(run: Path) -> Path:
-    return run.parent / "hud-renders" / f"{run.stem}-hud-preview.mp4"
+def _preview_for(run: Path, media_dir: Path | None = None) -> Path:
+    base = media_dir if media_dir is not None else run.parent
+    return base / "hud-renders" / f"{run.stem}-hud-preview.mp4"
 
 
 def _find_close(media_dir: Path, stats: tuple[Path, ...]) -> Path | None:
@@ -445,8 +448,8 @@ def _find_close(media_dir: Path, stats: tuple[Path, ...]) -> Path | None:
     )
     close_raw = _one(
         [
-            path for path in sorted(media_dir.glob("*-close.mp4"))
-            if path.is_file() and "stats" not in path.name and "hud" not in path.name
+            path for path in media_layout.glob_media(media_dir, "*-close.mp4", subdirs=(media_layout.RAW_DIR,))
+            if "stats" not in path.name and "hud" not in path.name
         ],
         "close",
     )
@@ -483,17 +486,17 @@ def discover_preview_cut(media_dir: Path) -> PreviewCut:
             f"No original run clips in {media_dir}. "
             "Review preview concatenates HUD previews and does not restack originals."
         )
-    missing = [run for run in runs if not _preview_for(run).is_file()]
+    missing = [run for run in runs if not _preview_for(run, media_dir).is_file()]
     if missing:
-        names = ", ".join(_preview_for(run).name for run in missing)
+        names = ", ".join(_preview_for(run, media_dir).name for run in missing)
         raise SystemExit(
             f"Missing HUD preview(s): {names}. "
             "Render those segments with tools/hud/render_running_hud.py --overlay-only --preview first. "
             "Review preview does not restack originals and HUD alpha."
         )
-    previews = tuple(_preview_for(run) for run in runs)
+    previews = tuple(_preview_for(run, media_dir) for run in runs)
     open_clip = _one(
-        [path for path in sorted(media_dir.glob("*-open.mp4")) if path.is_file()],
+        media_layout.glob_media(media_dir, "*-open.mp4", subdirs=(media_layout.RAW_DIR,)),
         "open",
     )
     close_clip = _find_close(media_dir, _stats_files(media_dir))
@@ -778,10 +781,18 @@ def mpv_edl_text(rows: list[tuple[str, float, float]]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def playlist_source(path: Path, playlist: Path) -> str:
-    """和清单同目录时写相对路径，mpv 按清单所在目录解析。不在里面再用绝对路径。"""
+def playlist_source(path: Path, playlist: Path, *, media_dir: Path | None = None) -> str:
+    """和清单同在媒体目录时写相对路径（支持 preview/ -> ../raw/），否则写绝对路径。"""
     resolved = path.resolve()
     base = playlist.parent.resolve()
+    if media_dir is not None:
+        root = media_dir.expanduser().resolve()
+        try:
+            resolved.relative_to(root)
+            base.relative_to(root)
+            return Path(os.path.relpath(resolved, base)).as_posix()
+        except ValueError:
+            pass
     try:
         return resolved.relative_to(base).as_posix()
     except ValueError:
@@ -818,7 +829,7 @@ def assert_playlist_matches_timeline(virtual: float, timeline: float) -> None:
 
 def review_playlist_path(media_dir: Path, episode: str, out: str | None) -> Path:
     if not out:
-        return media_dir / f"{episode[:10]}-review-preview.edl"
+        return media_layout.preview_edl_path(media_dir, episode)
     path = Path(out).expanduser().resolve()
     if path.suffix.lower() == ".mp4":
         raise SystemExit("review preview writes an mpv EDL, not an mp4")
@@ -876,10 +887,12 @@ def _preview_from_program(args, media_dir: Path) -> int:
         clip = seg["clip"]
         if clip in sources:
             continue
-        path = (media_dir / clip).resolve()
+        path = media_layout.resolve_media_path(
+            media_dir, clip, subdirs=(media_layout.RAW_DIR, media_layout.STILLS_DIR)
+        ).resolve()
         if not path.is_file():
             raise SystemExit(f"program clip not found: {path}")
-        sources[clip] = Path(playlist_source(path, output))
+        sources[clip] = Path(playlist_source(path, output, media_dir=media_dir))
     actions = edl.preview_actions(table)
     rows = playlist_rows(actions, sources)
     timeline = edl.frame_program_duration(table)
@@ -907,6 +920,7 @@ def _preview_from_program(args, media_dir: Path) -> int:
         return 0
     if todo_list.load(media_dir).get("layout") != "done":
         raise SystemExit("todo layout is not done; refusing to write the preview")
+    output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(document, encoding="utf-8")
     if subtitles is not None:
         write_subtitle_sidecar(subtitles, output)

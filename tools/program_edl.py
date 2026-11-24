@@ -32,6 +32,7 @@ import json
 import math
 from pathlib import Path
 
+import media_layout
 import todo_list
 
 VERSION = 1
@@ -525,14 +526,15 @@ def sync_runs_from_disk(table: dict, media_dir: Path) -> dict:
 
     if table.get("program"):
         raise ValueError("source sync is locked once the program timeline exists")
-    fits = sorted(Path(media_dir).glob("*-run-data.fit"))
+    fits = media_layout.find_fits(media_dir)
     if len(fits) != 1:
         raise ValueError("need exactly one *-run-data.fit to lock source sync")
     fit_start = ingest.fit_window(fits[0])[0]
     if fit_start is None:
         raise ValueError(f"FIT has no start time: {fits[0].name}")
+    fit_rel = media_layout.rel_media_path(fits[0], media_dir)
     rows = []
-    for path in sorted(Path(media_dir).glob("*-run-*.mp4")):
+    for path in media_layout.glob_media(media_dir, "*-run-*.mp4", subdirs=(media_layout.RAW_DIR,)):
         if any(part in path.stem for part in ("hud", "raw", "preview", "final", "stats")):
             continue
         duration = ingest.run_ffprobe_duration(path)
@@ -541,8 +543,8 @@ def sync_runs_from_disk(table: dict, media_dir: Path) -> dict:
         video_start = ingest.video_window(path, duration)[0]
         rows.append(
             {
-                "clip": path.name,
-                "fit": fits[0].name,
+                "clip": media_layout.rel_media_path(path, media_dir),
+                "fit": fit_rel,
                 "offset_s": (video_start - fit_start).total_seconds(),
             }
         )
@@ -1007,7 +1009,14 @@ def main(argv: list[str] | None = None) -> int:
             todo_list.mark(media, "edl", "done")
         elif args.cmd == "close-stats":
             table = load_media(media)
-            assets = [part.strip() for part in args.assets.split(",") if part.strip()]
+            assets = [
+                media_layout.rel_media_path(
+                    media_layout.resolve_media_path(media, part.strip(), subdirs=(media_layout.DATA_DIR, media_layout.STILLS_DIR)),
+                    media,
+                )
+                for part in args.assets.split(",")
+                if part.strip()
+            ]
             save(media, add_close_stats(table, assets))
         elif args.cmd == "layout":
             table = load_media(media)
@@ -1041,22 +1050,34 @@ def main(argv: list[str] | None = None) -> int:
             todo_list.clear_prep(media, ("hud-render",))
         elif args.cmd == "lead":
             table = load_media(media)
+            lead_clip = media_layout.rel_media_path(
+                media_layout.resolve_media_path(media, args.clip, subdirs=(media_layout.RAW_DIR, media_layout.STILLS_DIR)),
+                media,
+            )
             save(media, set_lead(table, {
-                "clip": args.clip, "src_start_s": args.start, "src_end_s": args.end, "hud": args.hud,
+                "clip": lead_clip, "src_start_s": args.start, "src_end_s": args.end, "hud": args.hud,
             }))
             todo_list.clear_prep(media)
         elif args.cmd == "insert":
             table = load_media(media)
+            ins_clip = media_layout.rel_media_path(
+                media_layout.resolve_media_path(media, args.clip, subdirs=(media_layout.RAW_DIR, media_layout.STILLS_DIR)),
+                media,
+            )
             save(media, add_insert(table, {
-                "id": args.id, "clip": args.clip, "src_start_s": args.start,
+                "id": args.id, "clip": ins_clip, "src_start_s": args.start,
                 "src_end_s": args.end, "after_id": args.after_id,
                 "transition": args.transition,
             }))
             todo_list.clear_prep(media)
         elif args.cmd == "overlay":
             table = load_media(media)
+            ov_asset = media_layout.rel_media_path(
+                media_layout.resolve_media_path(media, args.asset, subdirs=(media_layout.DATA_DIR, media_layout.STILLS_DIR)),
+                media,
+            )
             save(media, add_overlay(table, {
-                "asset": args.asset, "program_start_s": args.start, "program_end_s": args.end,
+                "asset": ov_asset, "program_start_s": args.start, "program_end_s": args.end,
                 "x": args.x, "y": args.y, "width": args.width, "opacity": args.opacity, "role": args.role,
             }, expect_duration_s=args.expect_duration))
         elif args.cmd == "freeze":
@@ -1087,14 +1108,14 @@ def adopt_clips_on_disk(table: dict, media_dir: Path) -> dict:
 
     clips = []
     for pattern in ("*-open.mp4", "*-run-*.mp4", "*-close.mp4"):
-        for path in sorted(media_dir.glob(pattern)):
+        for path in media_layout.glob_media(media_dir, pattern, subdirs=(media_layout.RAW_DIR,)):
             if any(part in path.stem for part in ("hud", "raw", "stats", "preview", "final")):
                 continue
             raw = subprocess.check_output(
                 ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", str(path)],
                 text=True,
             ).strip()
-            clips.append({"clip": path.name, "duration_s": float(raw)})
+            clips.append({"clip": media_layout.rel_media_path(path, media_dir), "duration_s": float(raw)})
     if not clips:
         raise ValueError(f"no open/run/close clips to adopt in {media_dir}")
     return adopt_full_clips(table, clips)

@@ -20,8 +20,11 @@ description: 查或追加跑鞋累计里程并算出 HUD -sn/-sk（本场跑完�
 ```bash
 .venv/bin/python - <<'PY'
 from pathlib import Path
+import sys
+sys.path.insert(0, "tools")
 import fitdecode
-fit = Path("~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-data.fit").expanduser()
+import media_layout as ml
+fit = ml.find_fits(Path("~/Movies/running-content/YYYY-MM-DD-slug").expanduser())[0]
 total = None
 with fitdecode.FitReader(fit) as fr:
     for frame in fr:

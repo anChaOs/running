@@ -34,6 +34,7 @@ sys.path.insert(0, str(SUBS_DIR))
 sys.path.insert(0, str(ASSEMBLE_DIR))
 
 import log_timeline
+import media_layout
 import program_edl as edl
 import todo_list
 from export_spec import (
@@ -104,12 +105,13 @@ def _one(paths: list[Path], label: str) -> Path | None:
 
 
 def _stats_files(media_dir: Path) -> tuple[Path, ...]:
-    named = sorted(p for p in media_dir.iterdir() if p.is_file() and DATE_STATS_RE.match(p.stem) and p.suffix.lower() in IMAGE_EXT)
+    candidates = media_layout.iter_files(media_dir, subdirs=(media_layout.DATA_DIR,))
+    named = [p for p in candidates if DATE_STATS_RE.match(p.stem) and p.suffix.lower() in IMAGE_EXT]
     if named:
         return tuple(named)
     return tuple(
-        p for p in sorted(media_dir.iterdir())
-        if p.is_file() and p.suffix.lower() in IMAGE_EXT
+        p for p in candidates
+        if p.suffix.lower() in IMAGE_EXT
         and not p.name.lower().startswith("cover-")
         and "hud" not in p.name.lower()
         and any(hint in p.name.lower() for hint in RAW_STATS_HINTS)
@@ -121,9 +123,12 @@ def _allowed_source(path: Path) -> bool:
 
 
 def discover_sources(media_dir: Path, *, allow_legacy_close_stats: bool = False) -> SourceSet:
-    open_clip = _one([p for p in sorted(media_dir.glob("*-open.mp4")) if _allowed_source(p)], "open")
+    open_clip = _one(
+        [p for p in media_layout.glob_media(media_dir, "*-open.mp4", subdirs=(media_layout.RAW_DIR,)) if _allowed_source(p)],
+        "open",
+    )
     close_candidates = [
-        p for p in sorted(media_dir.glob("*-close.mp4"))
+        p for p in media_layout.glob_media(media_dir, "*-close.mp4", subdirs=(media_layout.RAW_DIR,))
         if _allowed_source(p) and "stats" not in p.name and "hud" not in p.name
     ]
     close_clip = _one(close_candidates, "close")
@@ -131,7 +136,9 @@ def discover_sources(media_dir: Path, *, allow_legacy_close_stats: bool = False)
         close_clip = _one(sorted(media_dir.glob("*-close-stats.mp4")), "legacy close-stats")
     elif close_clip is None and list(media_dir.glob("*-close-stats.mp4")):
         raise SystemExit("Final export requires original close; close-stats.mp4 is a legacy preview only")
-    runs = tuple(p for p in sorted(media_dir.glob("*-run-*.mp4")) if _allowed_source(p))
+    runs = tuple(
+        p for p in media_layout.glob_media(media_dir, "*-run-*.mp4", subdirs=(media_layout.RAW_DIR,)) if _allowed_source(p)
+    )
     if not runs:
         raise SystemExit(f"No original run clips in {media_dir}; final export never consumes HUD previews")
     alpha = tuple(
@@ -794,9 +801,12 @@ def _still_duration_s(opening: ClipOpening, slices: list[dict]) -> float:
 
 def _still_video_args(media_dir: Path, opening: ClipOpening, slices: list[dict], fps: int) -> list[str]:
     """静图没有时间轴。按这一段的时长循环一帧，不 seek。"""
+    still_path = media_layout.resolve_media_path(
+        media_dir, opening.clip, subdirs=(media_layout.STILLS_DIR, media_layout.DATA_DIR, media_layout.RAW_DIR)
+    )
     return [
         "-loop", "1", "-framerate", str(fps), "-t", f"{_still_duration_s(opening, slices):.6f}",
-        "-i", str(media_dir / opening.clip),
+        "-i", str(still_path),
     ]
 
 
@@ -817,7 +827,10 @@ def _clip_input_args(media_dir: Path, slices: list[dict], *, sample_rate: int = 
         # 只跳过这段最早入点之前的画面。刀和刀之间的空隙仍会解码再丢掉。
         # 和滤镜里「seek 之后从 0 量」是一对，不能只改一边。
         args.extend(_opening_limit_args(opening, slices))
-        args.extend(["-i", str(media_dir / opening.clip)])
+        clip_path = media_layout.resolve_media_path(
+            media_dir, opening.clip, subdirs=(media_layout.RAW_DIR,)
+        )
+        args.extend(["-i", str(clip_path)])
     return args
 
 
@@ -1371,10 +1384,13 @@ def _measure_only(args, media_dir: Path) -> int:
         raise SystemExit("loudness measure needs preview done; it does not need confirmed subtitles")
     for sl in edl.export_slices(table):
         _reject_program_source(sl["clip"])
-        if _is_keep_intermediate(media_dir / sl["clip"]):
+        clip_path = media_layout.resolve_media_path(
+            media_dir, sl["clip"], subdirs=(media_layout.RAW_DIR, media_layout.STILLS_DIR, media_layout.DATA_DIR)
+        )
+        if _is_keep_intermediate(clip_path):
             raise SystemExit(f"loudness measure reads original clips, not keeps: {sl['clip']}")
-        if not (media_dir / sl["clip"]).is_file() and not args.dry_run:
-            raise SystemExit(f"program clip not found: {media_dir / sl['clip']}")
+        if not clip_path.is_file() and not args.dry_run:
+            raise SystemExit(f"program clip not found: {clip_path}")
     saved = read_loudness(media_dir)
     if loudness_reusable(saved, table):
         print(f"Loudnorm pass 1 reused I={saved['measured']['input_i']}", flush=True)
@@ -1416,7 +1432,8 @@ def program_input_args(
             args.extend(_still_video_args(media_dir, opening, timeline, fps))
             continue
         args.extend(_opening_limit_args(opening, timeline))
-        args.extend(["-i", str(media_dir / opening.clip)])
+        clip_path = media_layout.resolve_media_path(media_dir, opening.clip, subdirs=(media_layout.RAW_DIR,))
+        args.extend(["-i", str(clip_path)])
     for index, group in enumerate(confirmed_alpha_groups(table, alpha_paths, fps)):
         if len(group) == 1:
             args.extend(["-i", str(group[0])])
@@ -1433,7 +1450,9 @@ def program_input_args(
         args.extend(["-i", str(WHOOSH_PATH)])
     for ov in table.get("overlays") or []:
         span = float(ov["program_end_s"]) - float(ov["program_start_s"])
-        asset = media_dir / ov["asset"]
+        asset = media_layout.resolve_media_path(
+            media_dir, ov["asset"], subdirs=(media_layout.DATA_DIR, media_layout.STILLS_DIR)
+        )
         args.extend(["-loop", "1", "-framerate", str(fps), "-t", f"{span:.6f}", "-i", str(asset)])
     return args
 
@@ -1997,15 +2016,20 @@ def _export_from_program(args, media_dir: Path) -> int:
         raise SystemExit(str(exc)) from None
     for sl in edl.export_slices(table):
         _reject_program_source(sl["clip"])
-        if not (media_dir / sl["clip"]).is_file() and not args.dry_run:
-            raise SystemExit(f"program clip not found: {media_dir / sl['clip']}")
+        clip_path = media_layout.resolve_media_path(
+            media_dir, sl["clip"], subdirs=(media_layout.RAW_DIR, media_layout.STILLS_DIR, media_layout.DATA_DIR)
+        )
+        if not clip_path.is_file() and not args.dry_run:
+            raise SystemExit(f"program clip not found: {clip_path}")
     output = Path(args.out).expanduser().resolve()
     if output.exists() and not args.dry_run:
         raise SystemExit(f"Refusing to overwrite existing final output: {output}")
     durations = {}
     fps = FINAL_SPEC.timeline.fps
     for sl in edl.export_slices(table, fps):
-        path = media_dir / sl["clip"]
+        path = media_layout.resolve_media_path(
+            media_dir, sl["clip"], subdirs=(media_layout.RAW_DIR, media_layout.STILLS_DIR, media_layout.DATA_DIR)
+        )
         if path.is_file() and sl["clip"] not in durations:
             durations[sl["clip"]] = probe_duration(path)
     jobs = edl.hud_jobs(table, fps)

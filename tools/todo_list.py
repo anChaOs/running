@@ -17,6 +17,9 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import media_layout
+
+
 SH = ZoneInfo("Asia/Shanghai")
 
 STEPS: tuple[tuple[str, str], ...] = (
@@ -244,7 +247,8 @@ def clear_prep(
 
 
 def init(media_dir: Path | str, *, now: datetime | None = None) -> TodoStatus:
-    """建期时写一份全 pending 的清单。文件已在就不改，避免把进度打回去。"""
+    """建期时建好分类目录并写一份全 pending 的清单。文件已在就不改，避免把进度打回去。"""
+    media_layout.ensure_classified_dirs(media_dir)
     path = todo_path(media_dir)
     if path.is_file():
         return load(media_dir)

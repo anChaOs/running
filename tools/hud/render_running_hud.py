@@ -23,6 +23,7 @@ except ImportError:  # 运行时由仓库 .venv 提供；静态检查环境可�
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from export_spec import PREVIEW_SPEC, video_codec_args
 import log_timeline
+import media_layout
 import program_edl as edl
 import todo_list
 
@@ -113,12 +114,17 @@ CLIP_SKIP = ("run-final", "orient", "transpose", "-raw", "pre-", "-bad", "-hud")
 
 def discover_clips(media_dir: Path) -> list[Path]:
     # 只要 run-a / run-b 这类原段；成片 run-final、朝向备份、raw 不能再叠一层 HUD
-    clips = sorted(p for p in media_dir.glob("*-run-*.mp4") if not any(k in p.name for k in CLIP_SKIP))
+    clips = [
+        p for p in media_layout.glob_media(media_dir, "*-run-*.mp4", subdirs=(media_layout.RAW_DIR,))
+        if not any(k in p.name for k in CLIP_SKIP)
+    ]
     if clips:
         return clips
-    return sorted(path for path in media_dir.glob("*.mp4")
-                  if not path.name.endswith("-open.mp4") and "-close" not in path.name  # close / close-N / close-stats
-                  and not any(k in path.name for k in CLIP_SKIP))
+    return [
+        path for path in media_layout.glob_media(media_dir, "*.mp4", subdirs=(media_layout.RAW_DIR,))
+        if not path.name.endswith("-open.mp4") and "-close" not in path.name  # close / close-N / close-stats
+        and not any(k in path.name for k in CLIP_SKIP)
+    ]
 
 
 def resolve_total_distance_meters(fit_path: Path) -> int | None:
@@ -530,7 +536,7 @@ def plan_alpha_jobs(media_dir: Path, table: dict, durations: dict[str, float] | 
         plans.append(
             {
                 "clip": job["clip"],
-                "source": media_dir / job["clip"],
+                "source": media_layout.resolve_media_path(media_dir, job["clip"], subdirs=(media_layout.RAW_DIR,)),
                 "dest": alpha_dest(media_dir, job, fps=fps),
                 "src_start_s": float(job["src_start_s"]),
                 "src_end_s": float(job["src_end_s"]),
@@ -855,11 +861,11 @@ def export_alphas(
     for plan in plans:
         if "keeps" in plan["dest"].parts:
             raise SystemExit(f"HUD alpha must not be written under keeps: {plan['dest']}")
-    fits = sorted(media_dir.glob("*-run-data.fit"))
+    fits = media_layout.find_fits(media_dir)
     if not fits and not dry_run:
         raise SystemExit(f"No FIT file found in {media_dir}")
-    fit = fits[0] if fits else media_dir / "run-data.fit"
-    weather = media_dir / "weather-hourly.json"
+    fit = fits[0] if fits else media_layout.weather_json_write_path(media_dir).with_name("run-data.fit")
+    weather = media_layout.weather_json_read_path(media_dir)
     pending = []
     for plan in plans:
         dest = plan["dest"]
@@ -1095,7 +1101,7 @@ def _prep_alpha(args) -> int:
         raise SystemExit("HUD prep needs preview done; it does not need confirmed subtitles")
     durations: dict[str, float] = {}
     for job in edl.hud_jobs(table):
-        path = media_dir / job["clip"]
+        path = media_layout.resolve_media_path(media_dir, job["clip"], subdirs=(media_layout.RAW_DIR,))
         if job["clip"] in durations:
             continue
         if not path.is_file():
@@ -1255,13 +1261,16 @@ def _render_main(args) -> int:
     if args.fit:
         fit = Path(args.fit).expanduser().resolve()
     else:
-        fits = sorted(media_dir.glob("*-run-data.fit"))
+        fits = media_layout.find_fits(media_dir)
         if not fits:
             raise SystemExit(f"No FIT file found in {media_dir}")
         fit = fits[0]
 
     if args.clips:
-        clips = [media_dir / clip for clip in args.clips]
+        clips = [
+            media_layout.resolve_media_path(media_dir, clip, subdirs=(media_layout.RAW_DIR,))
+            for clip in args.clips
+        ]
     else:
         clips = discover_clips(media_dir)
 
@@ -1282,7 +1291,11 @@ def _render_main(args) -> int:
         f"run={fit_total_km:.3f} km  before={max(0.0, default_shoe_total_km_after_run - fit_total_km):.2f} km"
     )
 
-    weather_path = media_dir / "weather-hourly.json"
+    weather_path = (
+        media_layout.weather_json_read_path(media_dir)
+        if (args.no_weather or args.weather_json)
+        else media_layout.weather_json_write_path(media_dir)
+    )
     weather_ok = False
     if args.no_weather:
         pass

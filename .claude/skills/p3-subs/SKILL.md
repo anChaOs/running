@@ -67,7 +67,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写（忠于原句�
    .venv/bin/python tools/todo_list.py \
      --media-dir ~/Movies/running-content/YYYY-MM-DD-slug mark subs confirmed --confirmed
    ```
-4. **生成外挂 SRT**（同步更新审片 sidecar；勿在烧字成片旁留同名 `.srt`）：
+4. **生成外挂 SRT**（分类目录写进 `upload/subtitles.srt`，并按 `preview/*.edl` 同名同步 sidecar `.srt`；旧平铺期写根；勿在烧字成片旁留同名 `.srt`）：
    ```bash
    .venv/bin/python tools/subs/txt_to_subs.py \
      --txt episodes/YYYY-MM-DD-slug/subtitles.txt --media-dir auto

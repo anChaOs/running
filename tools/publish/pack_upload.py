@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import log_timeline  # noqa: E402
+import media_layout  # noqa: E402
 import todo_list  # noqa: E402
 
 BILIBILI_DESC_MAX = 2000
@@ -127,6 +128,8 @@ def find_title_mp4(media_dir: Path, explicit: Path | None = None) -> Path:
 
 
 def resolve_small(media_dir: Path, name: str) -> Path | None:
+    if name.startswith("cover-"):
+        return media_layout.find_cover(media_dir, name)
     root = media_dir / name
     if root.is_file():
         return root

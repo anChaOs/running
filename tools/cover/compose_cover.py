@@ -28,6 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import log_timeline  # noqa: E402
+import media_layout  # noqa: E402
 
 from PIL import Image, ImageFilter, ImageDraw, ImageFont
 
@@ -276,10 +277,11 @@ def _compose(args) -> int:
     color = tuple(int(c) for c in args.title_color.split(",")) + (255,)
     ok = True
     written = []
+    dest_dir = media_layout.cover_dest_dir(out, args.prefix)
     for name, W, H, layout in FORMATS:
         lines = split_title(args.title)
         img, size, s_size, thumb = compose(bg, ol, lines, args.series, args.font, W, H, layout, args.side, color)
-        dst = out / f"{args.prefix}{name}"
+        dst = dest_dir / f"{args.prefix}{name}"
         dst.parent.mkdir(parents=True, exist_ok=True)
         img.save(dst, quality=92)
         written.append(dst)

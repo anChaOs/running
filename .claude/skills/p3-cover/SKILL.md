@@ -48,13 +48,14 @@ description: 做封面、换封面句、重做封面时用。按题材挑选多�
 
 可用 Pillow / ImageMagick / 轻量合成脚本或设计图 + 清晰大字排版，按三比例分别导出即可；记住仍要保证小图字号醒目且不重画人脸。
 
-**3. 标准产出（比例在前，只产这三张正式图）：**
+**3. 标准产出（分类目录输出到 `covers/`，旧平铺期写根，只产这三张正式图）：**
 
 ```text
-cover-4x3-1920x1440.jpg      # 4:3  横版  B 站首页推荐（biliup 唯一投稿封面）
-cover-3x4-1080x1440.jpg      # 3:4  竖版  小红书等
-cover-16x9-1920x1080.jpg     # 16:9 横版  B 站 / YouTube / 视频号
-cover-candidates/            # 可选：多风格对比候选
+covers/cover-4x3-1920x1440.jpg    # 4:3  横版  B 站首页推荐（biliup 唯一投稿封面）
+covers/cover-3x4-1080x1440.jpg    # 3:4  竖版  小红书等
+covers/cover-16x9-1920x1080.jpg   # 16:9 横版  B 站 / YouTube / 视频号
+stills/                           # 存放自拍原图 / 参考图
+cover-candidates/                 # 可选：多风格对比候选
 ```
 
 写 `assets.md` 的 `cover: done` 并记所选版本与路径。`compose_cover.py` 会自动写 `cover` 墙钟；手做其它路线时用 `tools/log_timeline.py` 补记 `start cover` / `end cover`。

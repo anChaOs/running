@@ -6,15 +6,14 @@
 
 | 保留 | 说明 |
 | --- | --- |
-| 原片 | `open-raw` / `run-*` / `close-raw`；若没有 `*-raw` 变体，则保留剪过的 `open` / `close` 当作原片 |
+| 原片 | `raw/` 下的 `open-raw` / `run-*` / `close-raw`（旧期在根目录；无 `*-raw` 则留 `open`/`close`） |
 | 成片 | **仅一份**：`upload/<标题>.mp4`；根目录不要再留同名成片；勿留 `*-no-burn` / 额外 `run-final` |
-| 封面 / 外挂 | `upload/` 内三封面（4:3→3:4→16:9）+ `subtitles.srt`；根目录若仍有同名，须为硬链（同 inode），勿再 copy 一份 |
-| 媒体字幕产物 | 上传用 `subtitles.srt`。不要在烧字成片旁边留 `*-run-final.srt` |
-| 审片播放清单 | `YYYY-MM-DD-review-preview.edl` 留下 |
-| 封面自拍原图 | 媒体目录里的自拍源照片（非 `cover-*.jpg`） |
-| 数据 | FIT、`weather-hourly.json`、`stats-*.jpg` |
+| 封面 / 外挂 | `upload/` 内三封面 + `subtitles.srt`；正式封面在 `covers/`（与 `upload/` 须为硬链同 inode，旧期可能在根） |
+| 审片播放清单 | `preview/YYYY-MM-DD-review-preview.edl`（旧期在根） |
+| 封面自拍原图 | `stills/`（或旧期根目录）里的自拍源照片 |
+| 数据 | `data/`（或旧期根目录）里的 FIT、`weather-hourly.json`、`stats-*.jpg` |
 | `logs/` | 制作日志。已同步到 Google Drive `running-retrospect/`；本地留到满 7 天归档，清临时不删 |
-| `publish-report.html` | 发布报告，在素材目录。清临时不删 |
+| `publish-report.html` | 发布报告，在素材根目录。清临时不删 |
 
 仓库只保留 `subtitles.txt`，清理媒体临时文件时不要改它。跑鞋账本一律不动。
 
@@ -35,7 +34,7 @@
 | `cover-candidates/` / `cover-work/` | 封面候选帧与抠图工作目录 |
 | `cold-open/` | 冷开场中间件 |
 | `yt-drive-chunks/` | Drive 分块本地暂存工作目录 |
-| `YYYY-MM-DD-review-preview.srt` | 审片清单旁的外挂。用户说留下才留 |
+| `preview/*.srt`（或根 `YYYY-MM-DD-review-preview.srt`） | 审片清单旁的外挂。用户说留下才留 |
 | 其它预览旁路 | 旧的 `*-review-preview.mp4` 等可再生成的预览片。`YYYY-MM-DD-review-preview.edl` 不在此列 |
 | `*.bak`、`.DS_Store` | 备份后缀与系统垃圾 |
 
