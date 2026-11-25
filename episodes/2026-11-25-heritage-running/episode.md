@@ -30,5 +30,6 @@ bilibili_bvid: BV1WWyizBEKC
 
 - YouTube：https://youtu.be/By9uyr3cdJw
 - Bilibili：BV1WWyizBEKC（https://www.bilibili.com/video/BV1WWyizBEKC）
+- 抖音：https://v.douyin.com/6baeHPhTRBU/
 - 成片：`~/Movies/running-content/2026-11-25-heritage-running/upload/从古法编程到古法跑步.mp4`
 - 外挂：`~/Movies/running-content/2026-11-25-heritage-running/upload/subtitles.srt`
