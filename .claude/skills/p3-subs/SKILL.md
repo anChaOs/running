@@ -25,7 +25,7 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写（忠于原句�
 
 ## 阶段一：转写、校正与初稿停门
 
-1. **转写初稿**（`--audio` 传当前时间表的 16k 单声道 wav，如 `asr/YYYY-MM-DD-run-final.wav`；不要覆盖 `asr/*.words.json` 与 `asr/*.draft.srt`）：
+1. **转写初稿**（`--audio` 传当前时间表的 16k 单声道 wav，如 `asr/YYYY-MM-DD-run-final.wav`；不要覆盖 `asr/*.words.json` 与 `asr/draft-*.srt`）：
    ```bash
    .venv/bin/python tools/subs/draft_subs.py \
      --audio ~/Movies/running-content/YYYY-MM-DD-slug/asr/YYYY-MM-DD-run-final.wav \

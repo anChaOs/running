@@ -874,7 +874,7 @@ def launch_mpv(cmd: list[str]) -> str | None:
 def _preview_from_program(args, media_dir: Path) -> int:
     """按时间表写 mpv EDL。不拼预览成片，不渲 HUD，不重编码，不烧字幕，不修响度。"""
     table = edl.load_media(media_dir)
-    problems = edl.validate(table)
+    problems = edl.validate(table, check_subs_stale=False)
     if problems:
         raise SystemExit("program timeline: " + "; ".join(problems))
     if not table["program"]:

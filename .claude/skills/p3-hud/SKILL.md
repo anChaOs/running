@@ -41,9 +41,9 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json（-
 
 跑完核对 `logs/todo.md`（`hud-record: done`；重记规格时 `hud-render` 会被打回 `pending`）。`--record-only` 不记 `hud-render` 墙钟。
 
-## 阶段二：时间表冻结后画透明层（`hud-render`）
+## 阶段二：交出字幕初稿后画透明层（`hud-render`）
 
-`logs/program.json` 已 `frozen` 且 `preview: done` 后，**立刻并行启动**（别等字幕校验；8 核用 `-j 6`，核少拿掉 `-j` 默认 2）：
+`logs/program.json` 已 `frozen`、`preview: done` 且**优先独享 CPU 跑完 `draft_subs.py` 交出 `subtitles.txt`（`subs: waiting-review`）时**，**立刻并行启动**（与用户校对字幕并行，不要抢在转写初稿前占满 CPU；8 核用 `-j 6`，核少拿掉 `-j` 默认 2）：
 
 ```bash
 .venv/bin/python tools/hud/render_running_hud.py \

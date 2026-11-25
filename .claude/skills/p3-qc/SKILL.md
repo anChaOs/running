@@ -31,5 +31,5 @@ ffmpeg -y -ss <秒> -i ~/Movies/running-content/YYYY-MM-DD-slug/YYYY-MM-DD-run-f
 
 ## 完成后
 
-- 还没字幕：`/p3-subs`（冻结后立刻并行 `--prep-alpha -j 6` 与 `--measure-only`）。
+- 还没字幕：`/p3-subs`（先跑完 `draft_subs.py` 交出初稿 `subs: waiting-review`，再立刻并行 `--prep-alpha -j 6` 与 `--measure-only`）。
 - 最终片抽帧通过、`final-qc: done`：等用户说「可以发了」，再走 `/p3-publish`。
