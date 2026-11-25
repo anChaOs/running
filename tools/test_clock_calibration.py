@@ -31,6 +31,14 @@ class ClockCalibrationTest(unittest.TestCase):
         self.assertEqual(edl.classify_clip("2026-11-25-open-raw.mp4"), "cold_open")
         with self.assertRaises(ValueError):
             edl.classify_clip("2026-11-25-pre-coldopen.mp4")
+        for derived in (
+            "2026-11-25-open-hud.mp4",
+            "2026-11-25-open-preview.mp4",
+            "2026-11-25-open-final.mp4",
+            "2026-11-25-open-trimtmp.mp4",
+        ):
+            with self.assertRaises(ValueError):
+                edl.classify_clip(derived)
 
     def test_calibrate_from_open_splits_hud_at_fit_start_without_transition(self) -> None:
         table = edl.empty_program("2026-11-25-demo")
@@ -205,7 +213,7 @@ class ClockCalibrationTest(unittest.TestCase):
         self.assertAlmostEqual(beep.parse_timecode("1:44"), 104.0)
         self.assertAlmostEqual(beep.parse_timecode("1:44.5"), 104.5)
         self.assertAlmostEqual(beep.parse_timecode("0:01:44.5"), 104.5)
-        for bad in ("", "-5", "1:60", "1:2:3:4"):
+        for bad in ("", "-5", "-0:30", "nan", "inf", "1:nan", "1:60", "1:2:3:4"):
             with self.assertRaises(ValueError):
                 beep.parse_timecode(bad)
 
@@ -242,11 +250,94 @@ class ClockCalibrationTest(unittest.TestCase):
             hud.write_alpha_manifest(media, table, plans)
             self.assertTrue(hud.alphas_ready(media, table))
 
-            # 改 clock_offset 后：manifest 不再匹配，alphas_ready 为 False
+            # 改 clock_offset 后：alpha_dest 带偏移后缀且 manifest 不再匹配，绝不复用未校准旧文件
             edl.calibrate_clock(table, clock_offset_s=16.29)
             self.assertFalse(hud.alphas_ready(media, table))
+            plans_cal = hud.plan_alpha_jobs(media, table, {"raw/2026-11-25-run-a.mp4": 5.0})
+            self.assertIn("o+16290ms", plans_cal[0]["dest"].name)
+            self.assertNotEqual(plans_cal[0]["dest"], dest)
             saved = json.loads(hud.hud_manifest_path(media).read_text(encoding="utf-8"))
             self.assertEqual(saved["signature"]["clock_offset_s"], 0.0)
+            # 即使删除 manifest，干跑也不会复用未校准的旧文件
+            hud.hud_manifest_path(media).unlink()
+            out_paths = hud.export_alphas(media, table, {"raw/2026-11-25-run-a.mp4": 5.0}, dry_run=True)
+            self.assertEqual(out_paths, [plans_cal[0]["dest"]])
+
+    def test_short_open_hud_tail_does_not_break_preview_and_bankers_rounding_safe(self) -> None:
+        # 情况 1：open 在开表后仅剩 0.11s（< xfade 0.2s），预览顺延扣减到前段，不出负时长
+        table = edl.empty_program("2026-11-25-short-tail")
+        edl.set_source_sync(
+            table,
+            [
+                {"clip": "raw/2026-11-25-open.mp4", "fit": "data/run.fit", "offset_s": -104.34, "fit_duration_s": 5000.0},
+                {"clip": "raw/2026-11-25-run-a.mp4", "fit": "data/run.fit", "offset_s": 10.0, "fit_duration_s": 5000.0},
+            ],
+        )
+        edl.upsert_keeps(
+            table,
+            [
+                {"clip": "raw/2026-11-25-open.mp4", "src_start_s": 0.0, "src_end_s": 104.45},
+                {"clip": "raw/2026-11-25-run-a.mp4", "src_start_s": 0.0, "src_end_s": 10.0},
+            ],
+        )
+        self.assertEqual(edl.validate(table), [])
+        pres = edl.preview_presentation(table, fps=30)
+        for row in pres:
+            play_dur = (row["src_end_s"] - row["src_start_s"]) - row["trim_head_s"] - row["trim_tail_s"]
+            self.assertGreater(play_dur, 0.0)
+        total_preview = sum(
+            (r["src_end_s"] - r["src_start_s"]) - r["trim_head_s"] - r["trim_tail_s"] for r in pres
+        )
+        self.assertAlmostEqual(total_preview, edl.frame_program_duration(table, fps=30), places=4)
+
+        # 情况 2：banker's rounding 边界（5.5/30 与 6.5/30 都四舍五入到第 6 帧），绝不切出 0 帧段
+        t2 = edl.empty_program("2026-11-25-round")
+        edl.set_source_sync(
+            t2,
+            [{"clip": "raw/2026-11-25-run-a.mp4", "fit": "data/run.fit", "offset_s": -6.5 / 30.0}],
+        )
+        edl.upsert_keeps(
+            t2,
+            [{"clip": "raw/2026-11-25-run-a.mp4", "src_start_s": 5.5 / 30.0, "src_end_s": 5.0}],
+        )
+        self.assertEqual(edl.validate(t2), [])
+
+    def test_calibrate_guards_inserts_and_refreshes_overlay_signatures(self) -> None:
+        table = edl.empty_program("2026-11-25-ov")
+        edl.set_source_sync(
+            table,
+            [
+                {"clip": "raw/2026-11-25-open.mp4", "fit": "data/run.fit", "offset_s": -120.63, "fit_duration_s": 5000.0},
+                {"clip": "raw/2026-11-25-run-a.mp4", "fit": "data/run.fit", "offset_s": 100.0, "fit_duration_s": 5000.0},
+                {"clip": "raw/2026-11-25-close.mp4", "fit": "data/run.fit", "offset_s": 5200.0, "fit_duration_s": 5000.0},
+            ],
+        )
+        edl.upsert_keeps(
+            table,
+            [
+                {"clip": "raw/2026-11-25-open.mp4", "src_start_s": 0.0, "src_end_s": 108.64},
+                {"clip": "raw/2026-11-25-run-a.mp4", "src_start_s": 0.0, "src_end_s": 20.0},
+                {"clip": "raw/2026-11-25-close.mp4", "src_start_s": 0.0, "src_end_s": 6.0},
+            ],
+        )
+        edl.add_close_stats(table, ["data/stats-01.jpg"])
+        # 同原片切分不改总长，校准后 close-stats 签名同步刷新，validate 通过
+        edl.calibrate_clock_from_clip(table, "raw/2026-11-25-open.mp4", 104.34)
+        self.assertEqual(edl.validate(table), [])
+
+        # 插入段存在时拒绝校准，避免 after_id 漂移
+        edl.add_insert(
+            table,
+            {
+                "id": "card",
+                "clip": "stills/card.png",
+                "src_start_s": 0.0,
+                "src_end_s": 2.0,
+                "after_id": table["program"][0]["id"],
+            },
+        )
+        with self.assertRaises(ValueError):
+            edl.calibrate_clock(table, clock_offset_s=17.0)
 
 
 if __name__ == "__main__":

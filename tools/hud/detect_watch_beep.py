@@ -13,8 +13,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
+import shlex
 import subprocess
 import sys
+from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 
@@ -37,25 +40,23 @@ def parse_timecode(value: str) -> float:
     if not text:
         raise ValueError("empty time value")
     parts = text.split(":")
-    if len(parts) == 1:
-        sec = float(parts[0])
-    elif len(parts) == 2:
-        minutes = float(parts[0])
-        seconds = float(parts[1])
-        if minutes < 0 or seconds < 0 or seconds >= 60:
+    if any(p.lstrip().startswith("-") for p in parts):
+        raise ValueError(f"timecode must be >= 0: {value}")
+    nums = [float(p) for p in parts]
+    if not all(math.isfinite(n) for n in nums):
+        raise ValueError(f"invalid timecode: {value}")
+    if len(nums) == 1:
+        sec = nums[0]
+    elif len(nums) == 2:
+        if nums[1] >= 60:
             raise ValueError(f"invalid MM:SS timecode: {value}")
-        sec = minutes * 60.0 + seconds
-    elif len(parts) == 3:
-        hours = float(parts[0])
-        minutes = float(parts[1])
-        seconds = float(parts[2])
-        if hours < 0 or minutes < 0 or minutes >= 60 or seconds < 0 or seconds >= 60:
+        sec = nums[0] * 60.0 + nums[1]
+    elif len(nums) == 3:
+        if nums[1] >= 60 or nums[2] >= 60:
             raise ValueError(f"invalid HH:MM:SS timecode: {value}")
-        sec = hours * 3600.0 + minutes * 60.0 + seconds
+        sec = nums[0] * 3600.0 + nums[1] * 60.0 + nums[2]
     else:
         raise ValueError(f"invalid timecode: {value}")
-    if sec < 0:
-        raise ValueError(f"timecode must be >= 0: {value}")
     return sec
 
 
@@ -191,8 +192,7 @@ def detect_beeps(
     )
 
 
-def implied_clock_offset_s(video_path: Path, beep_src_s: float, fit_path: Path) -> float:
-    """给定视频原片上的开表时刻 beep_src_s，算 FIT_start - camera_time(beep)。"""
+def _resolve_video_and_fit_starts(video_path: Path, fit_path: Path) -> tuple[datetime, datetime]:
     duration = ingest.run_ffprobe_duration(video_path)
     if duration is None:
         raise ValueError(f"cannot read duration: {video_path}")
@@ -200,6 +200,12 @@ def implied_clock_offset_s(video_path: Path, beep_src_s: float, fit_path: Path) 
     fit_start, _, _ = ingest.fit_window(fit_path)
     if fit_start is None:
         raise ValueError(f"FIT has no start time: {fit_path}")
+    return video_start, fit_start
+
+
+def implied_clock_offset_s(video_path: Path, beep_src_s: float, fit_path: Path) -> float:
+    """给定视频原片上的开表时刻 beep_src_s，算 FIT_start - camera_time(beep)。"""
+    video_start, fit_start = _resolve_video_and_fit_starts(video_path, fit_path)
     beep_camera_time = video_start + timedelta(seconds=float(beep_src_s))
     return (fit_start - beep_camera_time).total_seconds()
 
@@ -226,9 +232,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--video", required=True, help="Video clip path (e.g. raw/YYYY-MM-DD-open.mp4)")
     parser.add_argument("--fit", help="Optional FIT path; computes implied clock_offset_s")
     parser.add_argument("--media-dir", help="Optional media dir; auto-finds FIT and prints calibrate command")
-    parser.add_argument("--after", type=parse_timecode, default=0.0, help="Scan after this source time (sec or MM:SS)")
-    parser.add_argument("--before", type=parse_timecode, help="Scan before this source time (sec or MM:SS)")
-    parser.add_argument("--around", type=parse_timecode, help="Scan around this source time (sec or MM:SS)")
+    parser.add_argument("--after", type=parse_timecode, default=None, help="Scan after this source time (sec or MM:SS)")
+    parser.add_argument("--before", type=parse_timecode, default=None, help="Scan before this source time (sec or MM:SS)")
+    parser.add_argument("--around", type=parse_timecode, default=None, help="Scan around this source time (sec or MM:SS)")
     parser.add_argument("--window", type=float, default=6.0, help="Half-window in seconds for --around (default 6)")
     parser.add_argument(
         "--max-offset",
@@ -238,8 +244,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--min-ratio", type=float, default=15.0, help="Minimum narrowband local contrast ratio")
     parser.add_argument("--min-mag", type=float, default=2.0, help="Minimum FFT peak magnitude")
-    parser.add_argument("--json", action="store_true", help="Emit JSON")
+    parser.add_argument("--json", action="store_true", help="Emit JSON (exits 0 with recommended=null when none found)")
     args = parser.parse_args(argv)
+
+    if args.window <= 0 or not math.isfinite(args.window):
+        raise SystemExit("--window must be > 0")
+    if args.max_offset < 0 or not math.isfinite(args.max_offset):
+        raise SystemExit("--max-offset must be >= 0")
+    if args.around is not None and (args.after is not None or args.before is not None):
+        raise SystemExit("pass either --around or --after/--before, not both")
 
     video = Path(args.video).expanduser().resolve()
     if not video.is_file():
@@ -248,29 +261,38 @@ def main(argv: list[str] | None = None) -> int:
     fit_path: Path | None = None
     if args.fit:
         fit_path = Path(args.fit).expanduser().resolve()
+        if not fit_path.is_file():
+            raise SystemExit(f"FIT not found: {fit_path}")
     elif args.media_dir:
         fits = media_layout.find_fits(Path(args.media_dir).expanduser().resolve())
         if fits:
             fit_path = fits[0]
 
-    start_s = max(0.0, args.after)
+    start_s = max(0.0, args.after or 0.0)
     end_s = args.before
     if args.around is not None:
         start_s = max(0.0, args.around - args.window)
         end_s = args.around + args.window
+    if end_s is not None and end_s <= start_s:
+        raise SystemExit(f"empty search window: {start_s:.3f}s..{end_s:.3f}s")
 
-    events = detect_beeps(
-        video,
-        start_s=start_s,
-        end_s=end_s,
-        min_local_ratio=args.min_ratio,
-        min_mag=args.min_mag,
-    )
-    if fit_path is not None and fit_path.is_file():
-        for ev in events:
-            off = round(implied_clock_offset_s(video, ev["start_s"], fit_path), 3)
-            ev["implied_clock_offset_s"] = off
-            ev["plausible_start"] = abs(off) <= args.max_offset
+    try:
+        events = detect_beeps(
+            video,
+            start_s=start_s,
+            end_s=end_s,
+            min_local_ratio=args.min_ratio,
+            min_mag=args.min_mag,
+        )
+        if fit_path is not None:
+            video_start, fit_start = _resolve_video_and_fit_starts(video, fit_path)
+            for ev in events:
+                beep_camera_time = video_start + timedelta(seconds=float(ev["start_s"]))
+                off = round((fit_start - beep_camera_time).total_seconds(), 3)
+                ev["implied_clock_offset_s"] = off
+                ev["plausible_start"] = abs(off) <= args.max_offset
+    except (subprocess.CalledProcessError, ValueError, OSError) as exc:
+        raise SystemExit(f"beep detection failed: {exc}") from None
 
     best = pick_start_beep(events, max_offset_s=args.max_offset)
     payload = {
@@ -314,8 +336,8 @@ def main(argv: list[str] | None = None) -> int:
         rel = media_layout.rel_media_path(video, media_dir)
         print(
             "\nCalibrate command:\n"
-            f"  .venv/bin/python tools/program_edl.py --media-dir {media_dir} "
-            f"calibrate --clip {rel} --at {best['start_s']:.3f} --source beep"
+            f"  .venv/bin/python tools/program_edl.py --media-dir {shlex.quote(str(media_dir))} "
+            f"calibrate --clip {shlex.quote(rel)} --at {best['start_s']:.3f} --source beep"
         )
     return 0
 

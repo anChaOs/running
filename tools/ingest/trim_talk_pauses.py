@@ -458,6 +458,7 @@ def find_talk_clips(media_dir: Path, targets: set[str]) -> list[Path]:
                     or "hud" in p.name.lower()
                     or "preview" in p.name.lower()
                     or "final" in p.name.lower()
+                    or "trimtmp" in p.stem.lower()
                     or p.stem.endswith("-raw")
                 ):
                     continue
@@ -467,7 +468,7 @@ def find_talk_clips(media_dir: Path, targets: set[str]) -> list[Path]:
         matches = sorted(
             p
             for p in media_layout.glob_media(media_dir, "*-close.mp4", subdirs=(media_layout.RAW_DIR,))
-            if "hud" not in p.name.lower() and "raw" not in p.stem
+            if "hud" not in p.name.lower() and "raw" not in p.stem and "trimtmp" not in p.stem.lower()
         )
         if matches:
             found.append(matches[0])
@@ -479,6 +480,7 @@ def find_talk_clips(media_dir: Path, targets: set[str]) -> list[Path]:
                 if "hud" not in p.name.lower()
                 and "preview" not in p.name.lower()
                 and "final" not in p.name.lower()
+                and "trimtmp" not in p.stem.lower()
                 and not p.stem.endswith("-raw")
             )
         )

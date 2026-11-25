@@ -613,6 +613,8 @@ def _lock_source_sync(media_dir: Path, date: str, slug: str, rows: list[dict]) -
         return
     fit_duration_s = (fit_end - fit_start).total_seconds() if fit_end is not None else None
     fit_rel = media_layout.rel_media_path(fit_path, media_dir)
+    table = edl.load_or_init(media_dir, f"{date}-{slug}")
+    drift = edl.clock_offset(table)
     has_joined_close = any(str(r.get("role", "")) == "close" for r in rows)
     sync = []
     seen: set[str] = set()
@@ -628,10 +630,13 @@ def _lock_source_sync(media_dir: Path, date: str, slug: str, rows: list[dict]) -
         clip_rel = media_layout.rel_media_path(dest, media_dir)
         if clip_rel in seen:
             continue
-        seen.add(clip_rel)
         duration = run_ffprobe_duration(dest)
+        if not duration:
+            print(f"source sync skipped {dest.name}: cannot read duration")
+            continue
+        seen.add(clip_rel)
         video_start = video_window(dest, duration)[0]
-        offset = (video_start - fit_start).total_seconds()
+        offset = (video_start - fit_start).total_seconds() + drift
         entry: dict = {"clip": clip_rel, "fit": fit_rel, "offset_s": offset}
         if fit_duration_s is not None:
             entry["fit_duration_s"] = fit_duration_s
@@ -639,7 +644,6 @@ def _lock_source_sync(media_dir: Path, date: str, slug: str, rows: list[dict]) -
     if not sync:
         print("source sync not locked: no clips")
         return
-    table = edl.load_or_init(media_dir, f"{date}-{slug}")
     if table.get("program"):
         print("source sync already locked")
     else:

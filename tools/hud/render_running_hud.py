@@ -122,7 +122,7 @@ def discover_clips(media_dir: Path) -> list[Path]:
         return clips
     return [
         path for path in media_layout.glob_media(media_dir, "*.mp4", subdirs=(media_layout.RAW_DIR,))
-        if not path.name.endswith("-open.mp4") and "-close" not in path.name  # close / close-N / close-stats
+        if not edl.OPEN_STEM_RE.search(path.stem) and "-close" not in path.name  # open* / close*
         and not any(k in path.name for k in CLIP_SKIP)
     ]
 
@@ -492,13 +492,15 @@ def kept_source_steps(steps: list[float], start_s: float, end_s: float) -> list[
     return [float(tick) for tick in iter_kept_ticks((float(step) for step in steps), start, end)]
 
 
-def alpha_dest(media_dir: Path, job: dict, *, fps: int = 30) -> Path:
+def alpha_dest(media_dir: Path, job: dict, *, fps: int = 30, clock_offset_s: float = 0.0) -> Path:
     """透明层直接写到 hud-renders/<profile>/，不经过 hud-renders/keeps/。"""
     profile = str(job["overlay_profile"])
     stem = Path(str(job["clip"])).stem
     start_f = int(round(float(job["src_start_s"]) * fps))
     end_f = int(round(float(job["src_end_s"]) * fps))
-    return _alpha_dest(media_dir / "hud-renders", f"{stem}-f{start_f}-{end_f}", profile)
+    offset_ms = int(round(float(clock_offset_s) * 1000.0))
+    tag = f"-o{offset_ms:+d}ms" if offset_ms != 0 else ""
+    return _alpha_dest(media_dir / "hud-renders", f"{stem}-f{start_f}-{end_f}{tag}", profile)
 
 
 def job_is_full_clip(job: dict, full: float | None) -> bool:
@@ -534,6 +536,7 @@ def hud_manifest_path(media_dir: Path) -> Path:
 def plan_alpha_jobs(media_dir: Path, table: dict, durations: dict[str, float] | None = None, *, fps: int = 30) -> list[dict]:
     """每个要画 HUD 的留下区间一条。源是原片，产物不是 keeps。"""
     durations = durations or {}
+    offset_s = edl.clock_offset(table)
     plans = []
     for job in edl.hud_jobs(table, fps):
         full = durations.get(job["clip"])
@@ -542,7 +545,7 @@ def plan_alpha_jobs(media_dir: Path, table: dict, durations: dict[str, float] | 
             {
                 "clip": job["clip"],
                 "source": media_layout.resolve_media_path(media_dir, job["clip"], subdirs=(media_layout.RAW_DIR,)),
-                "dest": alpha_dest(media_dir, job, fps=fps),
+                "dest": alpha_dest(media_dir, job, fps=fps, clock_offset_s=offset_s),
                 "src_start_s": float(job["src_start_s"]),
                 "src_end_s": float(job["src_end_s"]),
                 "overlay_profile": str(job["overlay_profile"]),
@@ -774,8 +777,7 @@ def overlay_render_argv(
     else:
         argv.append("--no-weather")
     argv.extend(["--video-end-time-mode", str(hud.get("video_end_time_mode") or "file-modified")])
-    if abs(float(clock_offset_s)) > 1e-6:
-        argv.extend(["--clock-offset", f"{float(clock_offset_s):.6f}"])
+    argv.extend(["--clock-offset", f"{float(clock_offset_s):.6f}"])
     return argv
 
 
@@ -879,21 +881,31 @@ def export_alphas(
     weather = media_layout.weather_json_read_path(media_dir)
     clock_offset_s = edl.clock_offset(table)
     can_reuse_existing = True
+    saved_sizes: dict[str, int] | None = None
     manifest_file = hud_manifest_path(media_dir)
     if manifest_file.is_file():
         try:
-            saved_sig = (json.loads(manifest_file.read_text(encoding="utf-8")) or {}).get("signature") or {}
+            saved_payload = json.loads(manifest_file.read_text(encoding="utf-8")) or {}
+            saved_sig = saved_payload.get("signature") or {}
             cur_sig = hud_signature(table, fps=fps)
             global_keys = ("overlay_profile", "shoe_name", "shoe_km_after", "weather_city", "clock_offset_s", "fps")
             if any(saved_sig.get(k) != cur_sig.get(k) for k in global_keys):
                 can_reuse_existing = False
-        except json.JSONDecodeError:
+            elif isinstance(saved_payload.get("files"), list):
+                saved_sizes = {
+                    str(row["path"]): int(row["bytes"])
+                    for row in saved_payload["files"]
+                    if isinstance(row, dict) and "path" in row and "bytes" in row
+                }
+        except (json.JSONDecodeError, TypeError, ValueError):
             can_reuse_existing = False
     pending = []
     for plan in plans:
         dest = plan["dest"]
-        if can_reuse_existing and dest.is_file() and _alpha_matches(dest, plan["overlay_profile"]):
-            _log(f"reuse {dest.relative_to(media_dir).as_posix()}")
+        rel = dest.relative_to(media_dir).as_posix()
+        size_ok = (saved_sizes is None) or (dest.is_file() and saved_sizes.get(rel) == dest.stat().st_size)
+        if can_reuse_existing and size_ok and dest.is_file() and _alpha_matches(dest, plan["overlay_profile"]):
+            _log(f"reuse {rel}")
             continue
         pending.append(plan)
         if dry_run:
@@ -902,7 +914,7 @@ def export_alphas(
                 window = f" --hud-start {plan['src_start_s']:.6f} --hud-end {plan['src_end_s']:.6f}"
             off_note = f" clock_offset={clock_offset_s:+.3f}s" if abs(clock_offset_s) > 1e-6 else ""
             _log(
-                f"would render {dest.relative_to(media_dir).as_posix()} from {plan['source'].name}"
+                f"would render {rel} from {plan['source'].name}"
                 f"{window} profile={plan['overlay_profile']}{off_note}"
             )
     if dry_run:
@@ -917,6 +929,9 @@ def export_alphas(
                 f"with --jobs {usable}"
             )
         return [plan["dest"] for plan in plans]
+    if pending and not can_reuse_existing and manifest_file.is_file():
+        # 先撤销旧清单，避免中途失败时把旧参数和新渲染出的半截产物混在一起。
+        manifest_file.unlink(missing_ok=True)
     for profile, profile_plans in _plans_by_profile(pending).items():
         argv = overlay_render_argv(
             render_dir=media_dir,

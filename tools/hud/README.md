@@ -414,7 +414,8 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml
 ```bash
 .venv/bin/python tools/hud/detect_watch_beep.py \
   --video ~/Movies/running-content/YYYY-MM-DD-slug/raw/YYYY-MM-DD-open.mp4 \
-  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  --around 1:43 --window 6   # 可选：指定大概时间点（支持秒或 MM:SS）或 --after/--before；默认忽略 |偏移|>120s 的跑中提示音（--max-offset 可调）
 
 .venv/bin/python tools/program_edl.py \
   --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \

@@ -43,10 +43,10 @@ WIND_S = 0.08
 DEFAULT_OVERLAY_PROFILE = "qtrle"
 # 手写贴图允许的成片时长误差。小于一次 0.2s xfade，大于容器时长的零头。
 OVERLAY_DURATION_TOLERANCE_S = 0.15
-# 自动按 FIT 起止切分 HUD 时，丢弃短于 1 帧（30fps）的零头，避免切出 0 帧片段。
-MIN_HUD_SLIVER_S = 1.0 / 30.0
+# 自动按 FIT 起止切分 HUD 时，丢弃短于 1.5 帧（30fps）的零头，避免 banker's rounding 切出 0 帧片段。
+MIN_HUD_SLIVER_S = 0.05
 ROLE_ORDER = {"cold_open": 0, "run": 1, "close": 2}
-OPEN_STEM_RE = re.compile(r"(?:^|-)open(?:-[a-z0-9]+)?$")
+OPEN_STEM_RE = re.compile(r"(?:^|-)open(?:-(?!(?:hud|preview|final|trimtmp|stats)(?:-|$))[a-z0-9]+)?$")
 
 
 def program_path(media_dir: Path | str) -> Path:
@@ -396,6 +396,10 @@ def add_overlay(table: dict, overlay: dict, *, expect_duration_s: float | None =
     return table
 
 
+def _has_frame(start: float, end: float, fps: int = 30) -> bool:
+    return (end - start) >= MIN_HUD_SLIVER_S and int(round(end * fps)) > int(round(start * fps))
+
+
 def _segments_from_keep(keep: dict, sync_map: dict[str, dict], counts: dict[str, int]) -> list[dict]:
     """把一条保留区间转成成片片段；若跨 FIT 起止（如 open 里喊「开表」），自动按 FIT 窗口切开 HUD。"""
     clip = keep["clip"]
@@ -417,11 +421,11 @@ def _segments_from_keep(keep: dict, sync_map: dict[str, dict], counts: dict[str,
         fit_end_src = (float(fit_dur) - offset_s) if fit_dur is not None else math.inf
         active_start = max(s0, fit_start_src)
         active_end = min(s1, fit_end_src)
-        if active_end - active_start < MIN_HUD_SLIVER_S:
+        if not _has_frame(active_start, active_end):
             pieces = [(s0, s1, False)]
         else:
-            has_pre = (active_start - s0) >= MIN_HUD_SLIVER_S
-            has_post = (s1 - active_end) >= MIN_HUD_SLIVER_S
+            has_pre = _has_frame(s0, active_start)
+            has_post = _has_frame(active_end, s1)
             hud_start = active_start if has_pre else s0
             hud_end = active_end if has_post else s1
             pieces = []
@@ -590,11 +594,17 @@ def sync_runs_from_disk(table: dict, media_dir: Path) -> dict:
     rows = []
     seen: set[Path] = set()
     has_run = False
+    joined_closes = {
+        p.stem for p in media_layout.glob_media(media_dir, "*-close.mp4", subdirs=(media_layout.RAW_DIR,))
+        if not any(part in p.stem for part in ("hud", "raw", "preview", "final", "stats", "trimtmp"))
+    }
     for pattern in ("*-open.mp4", "*-open-*.mp4", "*-run-*.mp4", "*-close.mp4", "*-close-*.mp4"):
         for path in media_layout.glob_media(media_dir, pattern, subdirs=(media_layout.RAW_DIR,)):
             if path in seen:
                 continue
-            if any(part in path.stem for part in ("hud", "raw", "preview", "final", "stats")):
+            if any(part in path.stem for part in ("hud", "raw", "preview", "final", "stats", "trimtmp")):
+                continue
+            if joined_closes and re.search(r"-close-\d+$", path.stem):
                 continue
             seen.add(path)
             duration = ingest.run_ffprobe_duration(path)
@@ -655,12 +665,16 @@ def calibrate_clock(
 ) -> dict:
     """校准全片相机时钟偏移（FIT_time - camera_clock），平移 source_sync 并重算 HUD 切分。"""
     _refuse_if_frozen(table)
-    new_offset = _finite(clock_offset_s, "clock_offset_s")
+    if table.get("inserts"):
+        raise ValueError(
+            "cannot calibrate clock after inserts are placed; calibrate before layout or remove inserts first"
+        )
+    new_offset = round(_finite(clock_offset_s, "clock_offset_s"), 4)
     old_offset = clock_offset(table)
     delta = new_offset - old_offset
     for row in table.get("source_sync", []):
         row["offset_s"] = round(float(row["offset_s"]) + delta, 6)
-    table["clock_offset_s"] = round(new_offset, 4)
+    table["clock_offset_s"] = new_offset
     if anchor is not None:
         table["clock_calibration"] = dict(anchor)
     had = bool(table.get("program"))
@@ -671,6 +685,12 @@ def calibrate_clock(
         if had and abs(after_dur - before_dur) > 1e-4:
             table["subs_stale"] = True
             table["frozen"] = False
+        elif had and table.get("overlays"):
+            # 同一原片切分 HUD 不改变成片总长与任意画面时刻，刷新贴图签名避免误判过期。
+            sig = layout_signature(table)
+            for ov in table["overlays"]:
+                if "authored_signature" in ov:
+                    ov["authored_signature"] = sig
     return table
 
 
@@ -928,13 +948,39 @@ def preview_presentation(table: dict, fps: int = 30) -> list[dict]:
     """预览不做叠化，只把 xfade 的时长从非跑步那一侧剪掉，让成片时长和导出一致。
 
     跑步段的原片区间不动。窗口和 xfade 都落到和导出同一组整数帧上。
+    若 cold_open/close 末尾（如 open 跨开表切出的短尾）短于 xfade，把剩余扣减顺延到相邻同侧段，
+    不留下 <=0 秒的空预览项。
     """
     timeline = frame_timeline(table, fps)
+    head_trim = [0] * len(timeline)
+    tail_trim = [0] * len(timeline)
+    for index, sl in enumerate(timeline):
+        fade_n = int(sl["fade_frames"])
+        if not fade_n:
+            continue
+        if sl["type"] != "run":
+            rem = fade_n
+            pos = index
+            while rem > 0 and pos < len(timeline) and timeline[pos]["type"] == sl["type"]:
+                avail = max(0, int(timeline[pos]["frames"]) - head_trim[pos] - tail_trim[pos])
+                take = min(avail, rem)
+                head_trim[pos] += take
+                rem -= take
+                pos += 1
+        elif index > 0 and timeline[index - 1]["type"] != "run":
+            side_type = timeline[index - 1]["type"]
+            rem = fade_n
+            pos = index - 1
+            while rem > 0 and pos >= 0 and timeline[pos]["type"] == side_type:
+                avail = max(0, int(timeline[pos]["frames"]) - head_trim[pos] - tail_trim[pos])
+                take = min(avail, rem)
+                tail_trim[pos] += take
+                rem -= take
+                pos -= 1
     out = []
     for index, sl in enumerate(timeline):
-        trim_head = sl["fade_frames"] / fps if sl["fade_frames"] and sl["type"] != "run" else 0.0
-        next_fade = timeline[index + 1]["fade_frames"] if index + 1 < len(timeline) else 0
-        trim_tail = next_fade / fps if next_fade and sl["type"] != "run" else 0.0
+        if int(sl["frames"]) - head_trim[index] - tail_trim[index] <= 0:
+            continue
         out.append(
             {
                 "id": sl["id"],
@@ -944,8 +990,8 @@ def preview_presentation(table: dict, fps: int = 30) -> list[dict]:
                 "src_end_s": sl["src_end_s"],
                 "program_start_s": sl["program_start_frame"] / fps,
                 "hud": bool(sl["hud"]),
-                "trim_head_s": trim_head,
-                "trim_tail_s": trim_tail,
+                "trim_head_s": head_trim[index] / fps,
+                "trim_tail_s": tail_trim[index] / fps,
             }
         )
     return out
@@ -1076,6 +1122,35 @@ def light_video_args(target_codec: str) -> list[str]:
     return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
 
 
+def _parse_timecode_arg(value: str) -> float:
+    """支持纯秒数（104.35）或 MM:SS / HH:MM:SS（1:44.35）。"""
+    text = str(value).strip()
+    if not text:
+        raise argparse.ArgumentTypeError("empty time value")
+    parts = text.split(":")
+    if any(p.lstrip().startswith("-") for p in parts):
+        raise argparse.ArgumentTypeError(f"timecode must be >= 0: {value}")
+    try:
+        nums = [float(p) for p in parts]
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"invalid timecode: {value}") from exc
+    if not all(math.isfinite(n) for n in nums):
+        raise argparse.ArgumentTypeError(f"invalid timecode: {value}")
+    if len(nums) == 1:
+        sec = nums[0]
+    elif len(nums) == 2:
+        if nums[1] >= 60:
+            raise argparse.ArgumentTypeError(f"invalid MM:SS timecode: {value}")
+        sec = nums[0] * 60.0 + nums[1]
+    elif len(nums) == 3:
+        if nums[1] >= 60 or nums[2] >= 60:
+            raise argparse.ArgumentTypeError(f"invalid HH:MM:SS timecode: {value}")
+        sec = nums[0] * 3600.0 + nums[1] * 60.0 + nums[2]
+    else:
+        raise argparse.ArgumentTypeError(f"invalid timecode: {value}")
+    return sec
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Read and update logs/program.json.")
     parser.add_argument("--media-dir", required=True)
@@ -1096,7 +1171,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Calibrate camera clock offset (FIT_time - camera_clock) via clip start-watch anchor or explicit seconds",
     )
     cal_p.add_argument("--clip", help="Clip containing the watch-start moment (e.g. raw/YYYY-MM-DD-open.mp4)")
-    cal_p.add_argument("--at", type=float, help="Source second in --clip where watch starts (FIT_start = 0s)")
+    cal_p.add_argument("--at", type=_parse_timecode_arg, help="Source time in --clip where watch starts (sec or MM:SS)")
     cal_p.add_argument("--offset", type=float, help="Explicit clock_offset_s (= FIT_time - camera_clock)")
     cal_p.add_argument("--source", default="manual", choices=("manual", "beep", "asr"))
 
@@ -1171,6 +1246,14 @@ def main(argv: list[str] | None = None) -> int:
             table = load_media(media)
             if args.offset is not None and (args.clip is not None or args.at is not None):
                 raise SystemExit("pass either --offset or (--clip and --at), not both")
+            # 确保既有 keeps 涉及的原片都在 source_sync 里（兼容旧 program.json 仅收录 run-* 的情况）
+            for keep in table.get("keeps", []):
+                keep_clip = str(keep["clip"])
+                if not any(r["clip"] == keep_clip for r in table.get("source_sync", [])):
+                    try:
+                        ensure_clip_source_sync(table, media, keep_clip)
+                    except ValueError:
+                        pass
             if args.offset is not None:
                 save(media, calibrate_clock(table, clock_offset_s=args.offset, anchor={"source": args.source}))
             elif args.clip is not None and args.at is not None:
@@ -1182,7 +1265,14 @@ def main(argv: list[str] | None = None) -> int:
                 save(media, calibrate_clock_from_clip(table, clip_rel, args.at, source=args.source))
             else:
                 raise SystemExit("calibrate needs --offset <sec> or (--clip <path> --at <sec>)")
-            todo_list.clear_prep(media, ("hud-render",))
+            if table.get("subs_stale"):
+                todo_list.clear_prep(media)
+                try:
+                    todo_list.mark(media, "subs", "stale")
+                except ValueError:
+                    pass
+            else:
+                todo_list.clear_prep(media, ("hud-render",))
             print(f"clock_offset_s={clock_offset(table):+.3f}s")
         elif args.cmd == "keeps":
             table = load_media(media)

@@ -76,7 +76,7 @@ def is_excluded_mp4(name: str) -> bool:
     stem = Path(name).stem.lower()
     if stem.endswith("-open") or stem.endswith("-close") or stem in {"open", "close"}:
         return True
-    if stem.startswith("open-") or stem.startswith("close-"):
+    if stem.startswith("open-") or stem.startswith("close-") or "-open-" in stem or "-close-" in stem:
         return True
     return False
 

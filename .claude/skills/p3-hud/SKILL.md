@@ -21,7 +21,7 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json（-
 
 ## 阶段一：记录 HUD 规格（`hud-record`）
 
-先探测时间（不改 `todo.md`）；若相机时钟有漂移，或在 `open`/`open-*` 中喊「开表」按手表，可检测高驰开表提示音并校准全片时钟（校准后跨开表刻的片段会自动切开：开表前无 HUD、开表刻起立刻出 HUD）：
+先探测时间（不改 `todo.md`）；若相机时钟有漂移，或在 `open`/`open-*` 中喊「开表」按手表，**在 `layout`/`freeze` 前**检测高驰开表提示音并校准全片时钟（校准后跨开表刻的片段会自动切开：开表前无 HUD、开表刻起立刻出 HUD）：
 
 ```bash
 .venv/bin/python tools/hud/probe_video_times.py \

@@ -97,7 +97,11 @@ def main() -> int:
     covers = {n: media_layout.find_cover(media, n) is not None for n in ("cover-16x9-1920x1080.jpg", "cover-4x3-1920x1440.jpg", "cover-3x4-1080x1440.jpg")}
     final = media / f"{date}-run-final.mp4"
     titled = [p for p in media_layout.glob_media(media, "*.mp4", subdirs=(media_layout.UPLOAD_DIR,)) if not p.name.startswith(date)] if media.is_dir() else []
-    open_clips = media_layout.glob_media(media, f"{date}-open.mp4", subdirs=(media_layout.RAW_DIR,)) if media.is_dir() else []
+    open_clips = (
+        media_layout.glob_media(media, f"{date}-open.mp4", subdirs=(media_layout.RAW_DIR,))
+        + media_layout.glob_media(media, f"{date}-open-*.mp4", subdirs=(media_layout.RAW_DIR,))
+    ) if media.is_dir() else []
+    open_clips = [c for c in open_clips if not any(k in c.name for k in ("-raw", "-hud", "preview", "final", "trimtmp"))]
     close_clips = media_layout.glob_media(media, f"{date}-close.mp4", subdirs=(media_layout.RAW_DIR,)) if media.is_dir() else []
     subs_txt = ep / "subtitles.txt"
     print(f"# {name}  status={fm.get('status', '?')}")
