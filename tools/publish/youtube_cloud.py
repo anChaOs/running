@@ -237,11 +237,17 @@ def stage_to_gcs(
         ]
         if srt_path:
             transfers.append((srt_path, f"{prefix}/subtitles.srt"))
+        # Cap GCS parallel composite uploads to 4x2 streams and 20M chunks so
+        # proxy nodes (~100ms RTT) saturate bandwidth without stalling at 0B.
+        gcs_env = os.environ.copy()
+        gcs_env.setdefault("CLOUDSDK_STORAGE_PROCESS_COUNT", "4")
+        gcs_env.setdefault("CLOUDSDK_STORAGE_THREAD_COUNT", "2")
+        gcs_env.setdefault("CLOUDSDK_STORAGE_PARALLEL_COMPOSITE_UPLOAD_COMPONENT_SIZE", "20M")
         for src, dst in transfers:
             cmd = [gcloud, "storage", "cp", str(src), dst]
             print(f"[gcs] $ {' '.join(cmd)}", flush=True)
             if not dry_run:
-                subprocess.run(cmd, check=True)
+                subprocess.run(cmd, check=True, env=gcs_env)
 
 
 def stage_to_drive(
