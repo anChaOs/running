@@ -2,13 +2,10 @@
 type: concept
 category: running
 title: VO2max
-updated: 2026-10-28
+aliases: [最大摄氧量, VO2peak, VO₂max]
+updated: 2026-11-25
 sources:
   - raw/running/physiology/01-training-adaptation-02-concepts.md
-  - wiki/running/有氧能力提高.md
-  - wiki/running/高强度间歇训练.md
-  - wiki/running/Fatmax与脂肪氧化.md
-  - wiki/running/乳酸阈.md
 related: [有氧能力提高, 高强度间歇训练, 乳酸阈, Fatmax与脂肪氧化, 训练强度分布, 跑步经济性与力量]
 ---
 

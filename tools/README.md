@@ -9,5 +9,6 @@
 - `assemble/assemble_episode.py`、`burn_ass.py`、`loudness_only.py`：历史旁路，仅供旧期维护，不属于新流程。
 - `cover/`：三比例封面排版（4:3 / 3:4 / 16:9）。
 - `publish/`：上传打包（`pack_upload.py` → 媒体目录 `upload/`）；云端 YouTube 自动上传（`youtube_cloud.py` + `cloud_yt/` Cloud Run Job，默认 GCS 暂存、支持 `--source drive` 配合 `stage_drive_chunks.py` 分块切换）；复盘日志与发布报告同步到 Google Drive（`sync_retrospect_drive.py`）。
+- `kb_lint.py`：轻量知识库体检脚本，校验 `knowledge/wiki/` 的 frontmatter（含 `aliases`）、`index.md` 同步、`[[wikilink]]` / `related` 断链、`sources` 路径合法性、超长页与历史残留。
 
 规格统一配置：`tools/export-spec.json`。默认最终规格为 1080p30 HEVC；切换 4K 时先改配置并重新渲 HUD/预览，当前不做完整 4K 验收。

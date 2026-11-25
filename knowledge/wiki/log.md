@@ -29,3 +29,8 @@
 
 - 新增 [[VO2max]]（备选选题知识说明，非口播稿；应跑步自媒体/安超）。
 
+## 2026-11-25
+
+- 清理 [[VO2max]] `sources` 中的内部 `wiki/` 路径并补充 `aliases`；新增 `tools/kb_lint.py` 校验通过（0 error）。
+- 为 `wiki/running/` 下其余 20 页批量补充 `aliases` 中英文简称与俗称，经 `tools/kb_lint.py` 校验无别名冲突。
+

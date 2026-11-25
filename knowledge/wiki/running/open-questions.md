@@ -2,6 +2,7 @@
 type: questions
 category: running
 title: open-questions
+aliases: [待验证问题, running Q&A]
 updated: 2026-09-23
 sources: []
 related:

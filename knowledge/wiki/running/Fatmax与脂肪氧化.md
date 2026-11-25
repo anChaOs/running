@@ -2,6 +2,7 @@
 type: concept
 category: running
 title: Fatmax与脂肪氧化
+aliases: [Fatmax, MFO, 最大脂肪氧化, 燃脂区]
 updated: 2026-09-23
 sources:
   - raw/running/physiology/02-energy-metabolism-02-concepts.md
