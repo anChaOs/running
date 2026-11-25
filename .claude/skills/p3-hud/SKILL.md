@@ -14,18 +14,26 @@ description: 先把跑鞋、天气和透明层规格记进 logs/program.json（-
 
 ## 不要做的事
 
-- 不要给 `open` / `close` 加 HUD；不要把 FIT 经纬度发给 Open-Meteo（用 `--weather-city shanghai` 或 `--weather-json`）
+- 未开表段与 `close` 不加 HUD（跨「开表」的 `open`/`open-*` 校准后会自动从开表刻起加 HUD）；不要把 FIT 经纬度发给 Open-Meteo（用 `--weather-city shanghai` 或 `--weather-json`）
 - 温度写 `°C`，不要写 `℃`
 - 不要加 `--preview`（会重压未剪原片）；不要改 `--video-end-time-mode`（保持 `file-modified`）
 - 不要把区间先切到 `hud-renders/keeps/` 再画 HUD；不要用 HUD preview 当封面底图；不要为换封面重渲 HUD
 
 ## 阶段一：记录 HUD 规格（`hud-record`）
 
-先探测时间（不改 `todo.md`）：
+先探测时间（不改 `todo.md`）；若相机时钟有漂移，或在 `open`/`open-*` 中喊「开表」按手表，**在 `layout`/`freeze` 前**检测高驰开表提示音并校准全片时钟（校准后跨开表刻的片段会自动切开：开表前无 HUD、开表刻起立刻出 HUD）：
 
 ```bash
 .venv/bin/python tools/hud/probe_video_times.py \
   ~/Movies/running-content/YYYY-MM-DD-slug/raw/YYYY-MM-DD-run-a.mp4
+
+# 可选：检测 COROS 开表「滴」声并校准时钟（也可手填 --at <秒> 或 --offset <秒>）
+.venv/bin/python tools/hud/detect_watch_beep.py \
+  --video ~/Movies/running-content/YYYY-MM-DD-slug/raw/YYYY-MM-DD-open.mp4 \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
+.venv/bin/python tools/program_edl.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  calibrate --clip raw/YYYY-MM-DD-open.mp4 --at <开表秒> --source beep
 ```
 
 再只记录、不渲染（明确不要天气改 `--no-weather`；已有缓存用 `--weather-json`）：

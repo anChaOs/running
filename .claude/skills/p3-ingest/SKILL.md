@@ -36,7 +36,7 @@ description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/ru
      --slug <slug> \
      --episode-dir episodes/YYYY-MM-DD-slug
    ```
-   - 首段通常 `open`，尾段 `close`，中间 `run-a`/`run-b`…；无头尾加 `--no-open --no-close`；空镜标 `broll-01`（勿混进 `run-*`）。
+   - 首段通常 `open`（多段可手工命名 `open-1`/`open-2`），尾段 `close`，中间 `run-a`/`run-b`…；无头尾加 `--no-open --no-close`；空镜标 `broll-01`（勿混进 `run-*`）。
    - 默认写入分类目录：原片进 `raw/`，FIT 与 `stats-NN` 截图进 `data/`（如已有平铺旧文件或需旧布局可加 `--flat`）。`logs/program.json` 会记相对路径（如 `raw/...`）。
    - 多份 FIT 时脚本按时间重叠自动挑；若两场都重叠或都不重叠会停下列候选，用 `--fit <文件名>` 指定。
    - 多段 `close`（FIT 结束后拍摄）自动命名为 `close-1`/`close-2`… 并无损拼成 `raw/YYYY-MM-DD-close.mp4`（可用 `--close-clips N` 覆盖；保留 `close-N` 分段别删）。

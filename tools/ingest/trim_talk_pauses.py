@@ -449,17 +449,29 @@ def plan_clip(
 
 def find_talk_clips(media_dir: Path, targets: set[str]) -> list[Path]:
     found: list[Path] = []
-    if "open" in targets or "close" in targets:
-        for role in ("open", "close"):
-            if role not in targets:
-                continue
-            matches = sorted(
-                p
-                for p in media_layout.glob_media(media_dir, f"*-{role}.mp4", subdirs=(media_layout.RAW_DIR,))
-                if "hud" not in p.name.lower() and "raw" not in p.stem
-            )
-            if matches:
-                found.append(matches[0])
+    if "open" in targets:
+        seen_open: set[Path] = set()
+        for pat in ("*-open.mp4", "*-open-*.mp4"):
+            for p in sorted(media_layout.glob_media(media_dir, pat, subdirs=(media_layout.RAW_DIR,))):
+                if (
+                    p in seen_open
+                    or "hud" in p.name.lower()
+                    or "preview" in p.name.lower()
+                    or "final" in p.name.lower()
+                    or "trimtmp" in p.stem.lower()
+                    or p.stem.endswith("-raw")
+                ):
+                    continue
+                seen_open.add(p)
+                found.append(p)
+    if "close" in targets:
+        matches = sorted(
+            p
+            for p in media_layout.glob_media(media_dir, "*-close.mp4", subdirs=(media_layout.RAW_DIR,))
+            if "hud" not in p.name.lower() and "raw" not in p.stem and "trimtmp" not in p.stem.lower()
+        )
+        if matches:
+            found.append(matches[0])
     if "run" in targets:
         found.extend(
             sorted(
@@ -468,6 +480,7 @@ def find_talk_clips(media_dir: Path, targets: set[str]) -> list[Path]:
                 if "hud" not in p.name.lower()
                 and "preview" not in p.name.lower()
                 and "final" not in p.name.lower()
+                and "trimtmp" not in p.stem.lower()
                 and not p.stem.endswith("-raw")
             )
         )

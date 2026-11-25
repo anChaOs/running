@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import json
 import math
 import os
 import runpy
 import sys
 from datetime import datetime
+from datetime import timedelta
 from datetime import timezone
 from pathlib import Path
 
@@ -1038,7 +1040,63 @@ def _install_hud_range_window(start_s: str, end_s: str) -> None:
     FrameMeta.stepper = stepper
 
 
-_argv, _windows_path = _take_hud_windows(sys.argv[1:])
+def _take_clock_offset(argv: list[str]) -> tuple[list[str], float]:
+    """--clock-offset（秒，FIT_time - camera_clock）由本仓库注入，先拿掉再交给 gopro-dashboard。"""
+    raw: str | None = None
+    kept: list[str] = []
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if token == "--clock-offset" and index + 1 < len(argv):
+            raw = argv[index + 1]
+            index += 2
+            continue
+        if token.startswith("--clock-offset="):
+            raw = token.split("=", 1)[1]
+            index += 1
+            continue
+        kept.append(token)
+        index += 1
+    if raw is None:
+        raw = os.environ.get("HUD_CLOCK_OFFSET_S") or None
+    if raw is None:
+        return kept, 0.0
+    try:
+        value = float(raw)
+    except ValueError as exc:
+        raise SystemExit(f"invalid --clock-offset: {raw}") from exc
+    if not math.isfinite(value):
+        raise SystemExit(f"invalid --clock-offset: {raw}")
+    return kept, value
+
+
+def _install_clock_offset(offset_s: float) -> None:
+    """把视频文件时间往 FIT GPS 时间平移 offset_s 秒（正数=相机慢，补齐滞后）。"""
+    from gopro_overlay.ffmpeg_gopro import FFMPEGGoPro
+    from gopro_overlay.ffmpeg_gopro import FileStat
+
+    delta = timedelta(seconds=float(offset_s))
+    original = FFMPEGGoPro.find_recording
+
+    def shifted_find_recording(self, filepath, stat=os.stat):
+        rec = original(self, filepath, stat=stat)
+        f = rec.file
+        shifted = FileStat(
+            length=f.length,
+            mtime=f.mtime + delta,
+            ctime=f.ctime + delta,
+            atime=f.atime + delta,
+        )
+        print(f"HUD clock_offset_s={offset_s:+.3f}s (shifted {Path(filepath).name} timestamps)", flush=True)
+        return dataclasses.replace(rec, file=shifted)
+
+    FFMPEGGoPro.find_recording = shifted_find_recording
+
+
+_argv, _clock_offset_s = _take_clock_offset(sys.argv[1:])
+if abs(_clock_offset_s) > 1e-6:
+    _install_clock_offset(_clock_offset_s)
+_argv, _windows_path = _take_hud_windows(_argv)
 _argv, _range_start, _range_end = _take_hud_range(_argv)
 if _windows_path:
     # 批量窗口自己切换 stepper。不要再套一层单窗过滤，否则每段都会被收成同一个区间。

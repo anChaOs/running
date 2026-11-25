@@ -207,7 +207,7 @@ def sort_key(path: Path) -> datetime:
 
 
 def already_named(path: Path) -> str | None:
-    match = re.search(r"\d{4}-\d{2}-\d{2}-(open|close(?:-\d+)?|run-[a-z]|broll-\d+)$", path.stem)
+    match = re.search(r"\d{4}-\d{2}-\d{2}-(open(?:-[a-z0-9]+)?|close(?:-\d+)?|run-[a-z]|broll-\d+)$", path.stem)
     return match.group(1) if match else None
 
 
@@ -602,36 +602,53 @@ def _lock_source_sync(media_dir: Path, date: str, slug: str, rows: list[dict]) -
     """原片第 0 秒相对 FIT 开始的偏移。成片怎么剪都不改这张表。"""
     fit_name = f"{date}-run-data.fit"
     fit_path = media_layout.resolve_media_path(media_dir, fit_name, subdirs=(media_layout.DATA_DIR,))
-    fit_start = None
+    fit_start = fit_end = None
     if fit_path.is_file():
         try:
-            fit_start = fit_window(fit_path)[0]
+            fit_start, fit_end, _ = fit_window(fit_path)
         except Exception as exc:
             print(f"source sync offset unavailable: {exc}")
     if fit_start is None:
         print("source sync not locked: FIT start time is missing")
         return
+    fit_duration_s = (fit_end - fit_start).total_seconds() if fit_end is not None else None
     fit_rel = media_layout.rel_media_path(fit_path, media_dir)
+    table = edl.load_or_init(media_dir, f"{date}-{slug}")
+    drift = edl.clock_offset(table)
+    has_joined_close = any(str(r.get("role", "")) == "close" for r in rows)
     sync = []
+    seen: set[str] = set()
     for row in rows:
-        if not str(row.get("role", "")).startswith("run"):
+        role = str(row.get("role", ""))
+        if role.startswith("broll"):
+            continue
+        if has_joined_close and re.fullmatch(r"close-\d+", role):
             continue
         dest = media_layout.resolve_media_path(media_dir, row["dest"], subdirs=(media_layout.RAW_DIR,))
         if not dest.is_file():
             continue
+        clip_rel = media_layout.rel_media_path(dest, media_dir)
+        if clip_rel in seen:
+            continue
         duration = run_ffprobe_duration(dest)
+        if not duration:
+            print(f"source sync skipped {dest.name}: cannot read duration")
+            continue
+        seen.add(clip_rel)
         video_start = video_window(dest, duration)[0]
-        offset = (video_start - fit_start).total_seconds()
-        sync.append({"clip": media_layout.rel_media_path(dest, media_dir), "fit": fit_rel, "offset_s": offset})
+        offset = (video_start - fit_start).total_seconds() + drift
+        entry: dict = {"clip": clip_rel, "fit": fit_rel, "offset_s": offset}
+        if fit_duration_s is not None:
+            entry["fit_duration_s"] = fit_duration_s
+        sync.append(entry)
     if not sync:
-        print("source sync not locked: no run clip")
+        print("source sync not locked: no clips")
         return
-    table = edl.load_or_init(media_dir, f"{date}-{slug}")
     if table.get("program"):
         print("source sync already locked")
     else:
         edl.save(media_dir, edl.set_source_sync(table, sync))
-        print(f"source sync locked for {len(sync)} run clip(s)")
+        print(f"source sync locked for {len(sync)} clip(s)")
     try:
         todo_list.mark(media_dir, "ingest", "done")
     except ValueError as exc:
