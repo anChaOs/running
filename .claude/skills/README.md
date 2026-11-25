@@ -16,6 +16,7 @@
   README.md
   p3-library         备选主题库（还没拍摄日）
   p3-topic           选题对谈 → 按拍摄分段的可念口播
+  p3-kb              知识库（knowledge/wiki/）的 ingest / query / lint 维护与检索
   p3-episode         成片总调度、总序与全局协议真源
   p3-scaffold        建 episodes/YYYY-MM-DD-slug 与初始 logs/
   p3-ingest          VID_ / 高驰 FIT → open/run-*/close + 句间刀入表

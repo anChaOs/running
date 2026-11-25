@@ -2,6 +2,7 @@
 type: concept
 category: running
 title: 碳水周期化与train-low
+aliases: [train-low, 碳水周期化, sleep-low, 糖原阈值]
 updated: 2026-09-23
 sources:
   - raw/running/physiology/02-energy-metabolism-02-concepts.md

@@ -59,6 +59,7 @@ knowledge/
 type: concept | questions | source-summary
 category: running
 title: 短标题
+aliases: []
 updated: YYYY-MM-DD
 sources: []
 related: []
@@ -68,6 +69,7 @@ related: []
 - `concept`：一个概念或一套指标
 - `questions`：待验证问题
 - `source-summary`：一篇来源的摘要（可选；来源本身放 `raw/`）
+- `aliases`：可选；中英文简称或俗称列表，方便检索和避免重复开页
 
 正文用 `[[页名]]` 链到 wiki 里已有的页。事实 / 个人体验 / 推测分开。引用过来源。
 
@@ -86,9 +88,9 @@ related: []
 
 先读 `wiki/index.md`，再打开相关页。wiki 没有的再去查网或 MCP。新的稳定结论可以 ingest 回去。
 
-**lint**（有空再做）
+**lint**
 
-断链、两页打架、过期数字、只有结论没有来源、index 漏了页。
+跑 `.venv/bin/python tools/kb_lint.py` 自动查断链、`index.md` 同步、`sources` 路径合法性、别名冲突、超长页与过期日志；内容层面的两页打架和过期数字按需人工复核。
 
 ## 不要
 
