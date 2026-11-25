@@ -190,9 +190,54 @@ class PackUploadTest(unittest.TestCase):
             self.assertFalse(final.exists())
             self.assertEqual(os.stat(packed).st_ino, final_ino)
             self.assertTrue((media / "upload" / "subtitles.srt").is_file())
-            # 二次重跑幂等
+            # 二次重跑幂等；更新仓库内 subtitles.srt 后重跑应同步新字幕且不共享硬链 inode
+            (ep / "subtitles.srt").write_text("1\n00:00:00,000 --> 00:00:02,000\n改字后\n", encoding="utf-8")
             self.assertEqual(pu.main(["--media-dir", str(media), "--episode-dir", str(ep)]), 0)
             self.assertEqual(os.stat(packed).st_ino, final_ino)
+            self.assertIn("改字后", (media / "upload" / "subtitles.srt").read_text(encoding="utf-8"))
+            self.assertNotEqual(
+                os.stat(ep / "subtitles.srt").st_ino,
+                os.stat(media / "upload" / "subtitles.srt").st_ino,
+            )
+
+    def test_title_from_plan_legacy_and_edge_formats(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            ep = Path(td)
+            # 历史格式：提示行 + 引用行
+            (ep / "plan.md").write_text("# 计划\n\n## 标题\n\n发这个（和封面一致）：\n\n> 今天体感不错？\n", encoding="utf-8")
+            self.assertEqual(pu.title_from_plan(ep), "今天体感不错？")
+            # 保留标题开头负号，不被 lstrip 误吞
+            (ep / "plan.md").write_text("## 标题\n\n-5℃ 跑步实战\n", encoding="utf-8")
+            self.assertEqual(pu.title_from_plan(ep), "-5℃ 跑步实战")
+            # 遇到 ### 停止并回退 `- 标题：`
+            (ep / "plan.md").write_text("## 标题\n\n### 备选\n\n- 标题：回退标题\n", encoding="utf-8")
+            self.assertEqual(pu.title_from_plan(ep), "回退标题")
+
+    def test_episode_dir_with_explicit_title_mp4_and_conflict_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            media = Path(td) / "media"
+            ep = Path(td) / "ep"
+            (media / "covers").mkdir(parents=True)
+            ep.mkdir()
+            (ep / "plan.md").write_text("## 标题\n\n最终标题\n", encoding="utf-8")
+            (ep / "subtitles.srt").write_text("1\n", encoding="utf-8")
+            for name in pu.COVERS:
+                self._touch(media / "covers" / name, b"jpg")
+            self._allow_pack(media)
+
+            # 同目录既有旧标题片又有新 run-final 时报错防误打旧片
+            self._touch(media / "最终标题.mp4", b"old")
+            new_final = self._touch(media / "2026-11-25-run-final.mp4", b"new")
+            with self.assertRaises(SystemExit) as ctx:
+                pu.pack(media, episode_dir=ep)
+            self.assertIn("Both", str(ctx.exception))
+
+            # 显式传 --title-mp4 + --episode-dir 时仍按 plan.md 标题改名移入 upload/
+            pu.pack(media, title_mp4=new_final, episode_dir=ep)
+            packed = media / "upload" / "最终标题.mp4"
+            self.assertTrue(packed.is_file())
+            self.assertEqual(packed.read_bytes(), b"new")
+            self.assertFalse(new_final.exists())
 
 
 if __name__ == "__main__":

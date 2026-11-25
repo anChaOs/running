@@ -99,7 +99,7 @@ def load_person(path: Path, *, cache_dir: Path | None = None) -> Image.Image:
                     if cached.mode == "RGBA" and cached.getextrema()[3][0] < 250:
                         print(f"[cover] 复用已抠人像缓存：{cache_png.name}", file=sys.stderr)
                         return cached.copy()
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError, ValueError, SyntaxError):
             pass
     try:
         from rembg import remove  # type: ignore
@@ -124,9 +124,9 @@ def precheck_title(lines: list[str], font_path: str | Path) -> None:
         if layout == "portrait":
             box_w, box_h = W - 2 * margin, int(H * 0.30)
         else:
-            # 抠图前未知人像精确宽高，按最宽松人像占宽（30% 画宽）做保守上界预检；
-            # 若连最宽文字区都放不下，抠完图一定放不下。
-            box_w, box_h = W - 2 * margin - int(W * 0.30), int(H * 0.72)
+            # 抠图前未知人像精确宽高，按极保守人像占宽（20% 画宽）做上界预检；
+            # 避免窄全身自拍被误杀，若连 20% 下界都放不下，抠完图一定放不下。
+            box_w, box_h = W - 2 * margin - int(W * 0.20), int(H * 0.72)
         min_px = max(int(H * TITLE_MIN_FRAC[layout]), -(-THUMB_MIN_PX * W // THUMB_W))
         if fit_title(lines, font_path, box_w, box_h, min_px, int(H * 0.30)) is None:
             raise SystemExit(
@@ -310,10 +310,10 @@ def main() -> int:
 
 def _compose(args) -> int:
     out = Path(args.out_dir).expanduser()
-    work = out / "cover-work"
-    work.mkdir(parents=True, exist_ok=True)
     lines = split_title(args.title)
     precheck_title(lines, args.font)
+    work = out / "cover-work"
+    work.mkdir(parents=True, exist_ok=True)
     person = load_person(Path(args.person).expanduser(), cache_dir=work)
     ol = outline(person, args.stroke_frac)
     ol.save(work / "person-outlined.png")

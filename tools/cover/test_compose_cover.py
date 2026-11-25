@@ -30,7 +30,7 @@ class ComposeCoverTest(unittest.TestCase):
             args = SimpleNamespace(
                 person=str(selfie),
                 bg=str(bg),
-                title="这是一个非常非常长一行根本放不下的封面标题测试",
+                title="这是一行绝对放不下的超长封面主标题测试|第二行",
                 series="破三实验室",
                 out_dir=str(root),
                 side="right",
@@ -43,6 +43,7 @@ class ComposeCoverTest(unittest.TestCase):
                 with self.assertRaises(SystemExit) as ctx:
                     cc._compose(args)
             self.assertIn("放不下", str(ctx.exception))
+            self.assertFalse((root / "cover-work").exists())
 
     def test_load_person_caches_cutout_and_invalidates_on_change(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -74,10 +75,15 @@ class ComposeCoverTest(unittest.TestCase):
                 self.assertEqual(calls, 1)
                 self.assertEqual(im2.mode, "RGBA")
 
+                # 缓存 PNG 损坏时自动回退重抠，不崩
+                (cache / "person-cutout.png").write_bytes(b"corrupted-not-a-png")
+                cc.load_person(selfie, cache_dir=cache)
+                self.assertEqual(calls, 2)
+
                 # 换一张不同尺寸的新自拍，缓存失效重新抠
                 Image.new("RGB", (140, 200), (50, 60, 70)).save(selfie)
                 cc.load_person(selfie, cache_dir=cache)
-                self.assertEqual(calls, 2)
+                self.assertEqual(calls, 3)
 
 
 if __name__ == "__main__":

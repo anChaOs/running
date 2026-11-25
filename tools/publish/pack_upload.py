@@ -85,7 +85,7 @@ def is_excluded_mp4(name: str) -> bool:
 
 
 def title_from_plan(episode_dir: Path) -> str:
-    """从 episodes/<slug>/plan.md 读取视频标题（优先 `## 标题` 段，回退 `- 标题：` 行）。"""
+    """从 episodes/<slug>/plan.md 读取视频标题（对齐 youtube_cloud 口径：跳过「发这个」提示，支持 > 引用与 - 标题：回退）。"""
     plan = Path(episode_dir).expanduser().resolve() / "plan.md"
     if not plan.is_file():
         raise SystemExit(f"plan.md not found: {plan}")
@@ -97,14 +97,24 @@ def title_from_plan(episode_dir: Path) -> str:
             in_title = True
             continue
         if in_title:
-            if stripped.startswith("## "):
+            if re.match(r"^#{2,3}\s+", stripped):
                 break
-            if stripped:
-                return stripped.lstrip("- ").strip("`").strip()
+            if not stripped:
+                continue
+            s = re.sub(r"^>\s*", "", stripped)
+            s = re.sub(r"^-\s+", "", s).strip("`").strip()
+            if not s:
+                continue
+            if "发这个" in s:
+                m = re.search(r"发这个[^：:]*[：:]\s*(.+)$", s)
+                if m and m.group(1).strip():
+                    return m.group(1).strip().strip("`").strip()
+                continue
+            return s
     for raw in lines:
         m = re.match(r"^-\s*标题[：:]\s*(.+)$", raw.strip())
         if m and m.group(1).strip():
-            return m.group(1).strip()
+            return m.group(1).strip().strip("`").strip()
     raise SystemExit(f"Could not parse title from {plan}")
 
 
@@ -237,19 +247,27 @@ def pack(media_dir: Path, title_mp4: Path | None = None, episode_dir: Path | Non
     except ValueError as exc:
         raise SystemExit(str(exc)) from None
 
-    if episode_dir is not None and title_mp4 is None:
+    if episode_dir is not None:
         target_name = filename_from_title(title_from_plan(episode_dir))
-        titled_root = media_dir / target_name
-        titled_up = media_dir / UPLOAD_DIRNAME / target_name
-        run_final = _find_run_final(media_dir)
-        if titled_root.is_file():
-            title = titled_root.resolve()
-        elif run_final is not None:
-            title = run_final
-        elif titled_up.is_file():
-            title = titled_up.resolve()
-        else:
+        if title_mp4 is not None:
             title = find_title_mp4(media_dir, title_mp4)
+        else:
+            titled_root = media_dir / target_name
+            titled_up = media_dir / UPLOAD_DIRNAME / target_name
+            run_final = _find_run_final(media_dir)
+            if titled_root.is_file() and run_final is not None:
+                raise SystemExit(
+                    f"Both {titled_root.name} and {run_final.name} exist in {media_dir}; "
+                    "remove the stale one or pass --title-mp4"
+                )
+            if titled_root.is_file():
+                title = titled_root.resolve()
+            elif run_final is not None:
+                title = run_final
+            elif titled_up.is_file():
+                title = titled_up.resolve()
+            else:
+                title = find_title_mp4(media_dir, title_mp4)
     else:
         title = find_title_mp4(media_dir, title_mp4)
         target_name = title.name
@@ -262,11 +280,13 @@ def pack(media_dir: Path, title_mp4: Path | None = None, episode_dir: Path | Non
             missing.append(name)
         else:
             cover_paths.append(p)
-    srt = resolve_small(media_dir, SRT_NAME)
-    if srt is None and episode_dir is not None:
-        ep_srt = Path(episode_dir).expanduser().resolve() / SRT_NAME
-        if ep_srt.is_file():
-            srt = ep_srt
+    srt_from_repo = False
+    ep_srt = (Path(episode_dir).expanduser().resolve() / SRT_NAME) if episode_dir is not None else None
+    if ep_srt is not None and ep_srt.is_file():
+        srt = ep_srt
+        srt_from_repo = True
+    else:
+        srt = resolve_small(media_dir, SRT_NAME)
     if srt is None:
         missing.append(SRT_NAME)
     if missing or srt is None:
@@ -281,7 +301,15 @@ def pack(media_dir: Path, title_mp4: Path | None = None, episode_dir: Path | Non
     for c in cover_paths:
         how = hardlink_or_copy_small(c, upload / c.name)
         print(f"  {c.name}  ← {c}  [{how}]")
-    how = hardlink_or_copy_small(srt, upload / SRT_NAME)
+    if srt_from_repo:
+        # 仓库内字幕不与 upload/ 共享硬链 inode，避免改字/切分支后陈旧或串改。
+        dst_srt = upload / SRT_NAME
+        if dst_srt.exists() or dst_srt.is_symlink():
+            dst_srt.unlink()
+        shutil.copy2(srt, dst_srt)
+        how = "copy"
+    else:
+        how = hardlink_or_copy_small(srt, upload / SRT_NAME)
     print(f"  {SRT_NAME}  ← {srt}  [{how}]")
     packed = upload / target_name
     digest = sha256_file(packed)
