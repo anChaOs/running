@@ -42,7 +42,7 @@ description: 把手机未重命名导出（VID_*.mp4、DCIM）收进 ~/Movies/ru
    - 多段 `close`（FIT 结束后拍摄）自动命名为 `close-1`/`close-2`… 并无损拼成 `raw/YYYY-MM-DD-close.mp4`（可用 `--close-clips N` 覆盖；保留 `close-N` 分段别删）。
    - 高驰截图（`Screenshot_*`/`*coros*`/`截图*`）改名为 `data/YYYY-MM-DD-stats-01.jpg`。
    - `VID_` 文件名是开始时间；若 `mtime` 与「开始 + 时长」差超 5 分钟，脚本会校正 `mtime` 为结束时间，先把变更给用户看一眼。
-2. **用户确认后加 `--apply`**：默认直接 `mv` 移动归位（避免大视频占双份空间，保留 mtime；需留原件才加 `--copy`）、锁原片↔FIT 写入 `logs/program.json` 的 `source_sync`，并自动执行句间刀 `--record`（不需要句间刀时加 `--skip-pause-trim`）。跑完自动记 `ingest` 墙钟并核对 `logs/todo.md`（`ingest: done`，有句间刀时 `edl: done`）。
+2. **用户确认后加 `--apply`**：默认 `mv` 归位并保留 mtime（需留原件加 `--copy`），锁原片↔FIT 写入 `logs/program.json`，并自动执行句间刀 `--record`（不剪加 `--skip-pause-trim`）。跑完记 `ingest` 墙钟并核对 `logs/todo.md`（`ingest: done`，有句间刀时 `edl: done`）。
 3. **已收过素材需单独补句间刀**（默认 dry-run，确认后加 `--record`；默认保留片头，掐片头加 `--no-keep-lead-silence`）：
    ```bash
    .venv/bin/python tools/ingest/trim_talk_pauses.py \
