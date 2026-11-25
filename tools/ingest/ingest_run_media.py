@@ -439,7 +439,8 @@ def main() -> int:
     parser.add_argument("--fit", help="源目录里有多个 FIT 且自动挑不出时，指定文件名")
     parser.add_argument("--close-clips", type=int,
                         help="最后几段是跑后口播 close（默认：有 FIT 时按「FIT 结束后才开拍」自动数，否则 1）。>1 时自动拼成一条 close")
-    parser.add_argument("--move", action="store_true", help="Move instead of copy")
+    parser.add_argument("--move", action="store_true", help="Move instead of copy (default)")
+    parser.add_argument("--copy", action="store_true", help="Copy instead of moving (keep originals in --src)")
     parser.add_argument("--apply", action="store_true", help="Actually copy/rename. Default is dry-run")
     parser.add_argument("--force", action="store_true")
     parser.add_argument(
@@ -504,7 +505,8 @@ def _ingest(args) -> int:
         print(f"  {path.name}  {start.strftime('%H:%M:%S')}  {duration or '?'}s  -> {dest_rel}  [{role}]")
         if exists and not args.force:
             raise SystemExit(f"Refusing to overwrite {dest} (pass --force)")
-        copy_or_move(path, dest, move=args.move, dry_run=dry_run)
+        do_move = args.move or not args.copy
+        copy_or_move(path, dest, move=do_move, dry_run=dry_run)
         target = dest if (args.apply or dest.exists()) else path
         if re.fullmatch(r"close-\d+", role):
             close_parts.append((int(role.rsplit("-", 1)[1]), target, len(rows)))
@@ -536,18 +538,19 @@ def _ingest(args) -> int:
                      "role": "close", "start": rows[close_parts[0][2]]["start"],
                      "mtime": f"拼接（{mode}），mtime=最后一段"})
 
+    do_move = args.move or not args.copy
     fit_pairs: list[tuple[str, str]] = []
     if primary_fit is not None:
         dest_fit = media_layout.data_dest_path(media_dir, f"{date}-run-data.fit", classified=classified)
         fit_rel = f"{media_layout.DATA_DIR}/{dest_fit.name}" if classified else dest_fit.name
-        copy_or_move(primary_fit, dest_fit, move=args.move, dry_run=dry_run)
+        copy_or_move(primary_fit, dest_fit, move=do_move, dry_run=dry_run)
         fit_pairs.append((primary_fit.name, fit_rel))
 
     for i, path in enumerate(discover_raw_stats(src), start=1):
         dest_stat = media_layout.data_dest_path(media_dir, f"{date}-stats-{i:02d}{path.suffix.lower()}", classified=classified)
         stat_rel = f"{media_layout.DATA_DIR}/{dest_stat.name}" if classified else dest_stat.name
         print(f"  STAT {path.name} -> {stat_rel}")
-        copy_or_move(path, dest_stat, move=args.move, dry_run=dry_run)
+        copy_or_move(path, dest_stat, move=do_move, dry_run=dry_run)
 
     payload = {
         "media_dir": str(media_dir),
