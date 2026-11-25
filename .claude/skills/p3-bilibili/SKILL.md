@@ -56,6 +56,8 @@ biliup -u ~/Movies/running-content/.biliup/cookies.json renew
 | 标题 | `plan.md`「发这个」那一行 |
 | 简介 | `plan.md`「### B 站」正文，原样投稿（可先写入临时文件再 `--desc`） |
 | 分区 `--tid` | `238`（运动） |
+| 并发 `--limit` | `6`（默认 `3` 偏慢，调到 `6` 跑满上行） |
+| 双封面（方案 A） | `--cover` 传 `cover-16x9-1920x1080.jpg`，先用 `cookies.json` 调 `member.bilibili.com/x/vu/web/cover/up` 上传 `cover-4x3-1920x1440.jpg` 拿 URL，再加 `--extra-fields '{"cover43":"<4:3 URL>"}'`（若 `app` 回退接口不透传 `cover43`，备选方案 B：Python `upos` 分片 + `x/vu/web/add/v3` 直投） |
 | 标签 `--tag` | 从当期 `plan.md`「## 标签」里 **B 站** 那栏抄（由 `/p3-subs` 按字幕写好）；去掉 `#`、改逗号分隔给 CLI；**不要**在本 skill 写死一套默认标签 |
 | 版权 | `--copyright 1`（自制） |
 | 线路 `-l` | 优先 `bda2`；证书/超时/SSL 再换 `bldsa` / `tx` / `qn` |
@@ -74,6 +76,7 @@ DESC_FILE="$(mktemp)"
 
 biliup -u "$COOKIE" upload \
   -l bda2 \
+  --limit 6 \
   --copyright 1 \
   --tid 238 \
   --tag "〈plan.md 标签，逗号分隔〉" \
