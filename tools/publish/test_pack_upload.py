@@ -138,7 +138,7 @@ class PackUploadTest(unittest.TestCase):
             real_rename = os.rename
 
             def boom(src, dst):
-                if Path(src) == fresh:
+                if Path(src).resolve() == fresh.resolve():
                     raise OSError("cross-device")
                 real_rename(src, dst)
 
@@ -166,6 +166,33 @@ class PackUploadTest(unittest.TestCase):
             self._touch(media / "subtitles.srt", b"1\n")
             with self.assertRaises(SystemExit):
                 pu.pack(media)
+
+    def test_episode_dir_renames_run_final_and_ignores_vid_raws(self) -> None:
+        self.assertTrue(pu.is_excluded_mp4("VID_20261125_053718_018.mp4"))
+        with tempfile.TemporaryDirectory() as td:
+            media = Path(td) / "media"
+            ep = Path(td) / "ep"
+            (media / "covers").mkdir(parents=True)
+            ep.mkdir()
+            (ep / "plan.md").write_text("# 计划\n\n## 标题\n\n从古法编程到古法跑步\n", encoding="utf-8")
+            (ep / "subtitles.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\n你好\n", encoding="utf-8")
+            final = self._touch(media / "2026-11-25-run-final.mp4", b"final-video")
+            final_ino = os.stat(final).st_ino
+            # 根目录遗留 VID_ 原片不应干扰
+            self._touch(media / "VID_20261125_053718_018.mp4", b"raw")
+            for name in pu.COVERS:
+                self._touch(media / "covers" / name, b"jpg")
+            self._allow_pack(media)
+
+            self.assertEqual(pu.main(["--media-dir", str(media), "--episode-dir", str(ep)]), 0)
+            packed = media / "upload" / "从古法编程到古法跑步.mp4"
+            self.assertTrue(packed.is_file())
+            self.assertFalse(final.exists())
+            self.assertEqual(os.stat(packed).st_ino, final_ino)
+            self.assertTrue((media / "upload" / "subtitles.srt").is_file())
+            # 二次重跑幂等
+            self.assertEqual(pu.main(["--media-dir", str(media), "--episode-dir", str(ep)]), 0)
+            self.assertEqual(os.stat(packed).st_ino, final_ino)
 
 
 if __name__ == "__main__":

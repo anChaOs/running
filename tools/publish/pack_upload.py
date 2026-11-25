@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -74,11 +75,50 @@ def is_excluded_mp4(name: str) -> bool:
     if any(part in lower for part in EXCLUDED_PARTS):
         return True
     stem = Path(name).stem.lower()
+    if re.match(r"^vid_\d{8}_\d{6}", stem):
+        return True
     if stem.endswith("-open") or stem.endswith("-close") or stem in {"open", "close"}:
         return True
     if stem.startswith("open-") or stem.startswith("close-") or "-open-" in stem or "-close-" in stem:
         return True
     return False
+
+
+def title_from_plan(episode_dir: Path) -> str:
+    """从 episodes/<slug>/plan.md 读取视频标题（优先 `## 标题` 段，回退 `- 标题：` 行）。"""
+    plan = Path(episode_dir).expanduser().resolve() / "plan.md"
+    if not plan.is_file():
+        raise SystemExit(f"plan.md not found: {plan}")
+    lines = plan.read_text(encoding="utf-8").splitlines()
+    in_title = False
+    for raw in lines:
+        stripped = raw.strip()
+        if re.match(r"^##\s+标题\s*$", stripped):
+            in_title = True
+            continue
+        if in_title:
+            if stripped.startswith("## "):
+                break
+            if stripped:
+                return stripped.lstrip("- ").strip("`").strip()
+    for raw in lines:
+        m = re.match(r"^-\s*标题[：:]\s*(.+)$", raw.strip())
+        if m and m.group(1).strip():
+            return m.group(1).strip()
+    raise SystemExit(f"Could not parse title from {plan}")
+
+
+def _find_run_final(media_dir: Path) -> Path | None:
+    cands = sorted(
+        p
+        for p in media_dir.iterdir()
+        if p.is_file() and re.fullmatch(r"\d{4}-\d{2}-\d{2}-run-final\.mp4", p.name)
+    )
+    if len(cands) > 1:
+        raise SystemExit(
+            "Multiple *-run-final.mp4 files: " + ", ".join(p.name for p in cands) + "; pass --title-mp4"
+        )
+    return cands[0].resolve() if cands else None
 
 
 def _title_candidates(directory: Path) -> list[Path]:
@@ -188,7 +228,7 @@ def hardlink_or_copy_small(src: Path, dst: Path) -> str:
         return f"copy (hardlink failed: {exc})"
 
 
-def pack(media_dir: Path, title_mp4: Path | None = None) -> Path:
+def pack(media_dir: Path, title_mp4: Path | None = None, episode_dir: Path | None = None) -> Path:
     media_dir = media_dir.expanduser().resolve()
     if not media_dir.is_dir():
         raise SystemExit(f"media-dir not a directory: {media_dir}")
@@ -197,7 +237,23 @@ def pack(media_dir: Path, title_mp4: Path | None = None) -> Path:
     except ValueError as exc:
         raise SystemExit(str(exc)) from None
 
-    title = find_title_mp4(media_dir, title_mp4)
+    if episode_dir is not None and title_mp4 is None:
+        target_name = filename_from_title(title_from_plan(episode_dir))
+        titled_root = media_dir / target_name
+        titled_up = media_dir / UPLOAD_DIRNAME / target_name
+        run_final = _find_run_final(media_dir)
+        if titled_root.is_file():
+            title = titled_root.resolve()
+        elif run_final is not None:
+            title = run_final
+        elif titled_up.is_file():
+            title = titled_up.resolve()
+        else:
+            title = find_title_mp4(media_dir, title_mp4)
+    else:
+        title = find_title_mp4(media_dir, title_mp4)
+        target_name = title.name
+
     missing: list[str] = []
     cover_paths: list[Path] = []
     for name in COVERS:
@@ -207,6 +263,10 @@ def pack(media_dir: Path, title_mp4: Path | None = None) -> Path:
         else:
             cover_paths.append(p)
     srt = resolve_small(media_dir, SRT_NAME)
+    if srt is None and episode_dir is not None:
+        ep_srt = Path(episode_dir).expanduser().resolve() / SRT_NAME
+        if ep_srt.is_file():
+            srt = ep_srt
     if srt is None:
         missing.append(SRT_NAME)
     if missing or srt is None:
@@ -216,14 +276,14 @@ def pack(media_dir: Path, title_mp4: Path | None = None) -> Path:
     upload.mkdir(parents=True, exist_ok=True)
 
     print(f"pack → {upload}")
-    how = place_title_mp4(title, upload / title.name)
-    print(f"  {title.name}  [{how}]")
+    how = place_title_mp4(title, upload / target_name)
+    print(f"  {target_name}  [{how}]")
     for c in cover_paths:
         how = hardlink_or_copy_small(c, upload / c.name)
         print(f"  {c.name}  ← {c}  [{how}]")
     how = hardlink_or_copy_small(srt, upload / SRT_NAME)
     print(f"  {SRT_NAME}  ← {srt}  [{how}]")
-    packed = upload / title.name
+    packed = upload / target_name
     digest = sha256_file(packed)
     record = media_dir / "logs" / "pack-sha256.txt"
     record.parent.mkdir(parents=True, exist_ok=True)
@@ -239,6 +299,12 @@ def main(argv: list[str] | None = None) -> int:
         "--media-dir",
         type=Path,
         help="~/Movies/running-content/YYYY-MM-DD-slug",
+    )
+    ap.add_argument(
+        "--episode-dir",
+        type=Path,
+        default=None,
+        help="episodes/YYYY-MM-DD-slug；读取 plan.md 标题并自动把 *-run-final.mp4 改名移入 upload/",
     )
     ap.add_argument("--check-desc", type=Path, help="Refuse if this Bilibili description exceeds 2000 characters")
     ap.add_argument(
@@ -263,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.media_dir is None:
         ap.error("--media-dir is required")
     with log_timeline.span(args.media_dir, "pack-upload"):
-        pack(args.media_dir, args.title_mp4)
+        pack(args.media_dir, args.title_mp4, episode_dir=args.episode_dir)
     return 0
 
 

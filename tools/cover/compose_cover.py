@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import shutil
 import sys
@@ -78,19 +79,60 @@ def u2net_cutout(im: Image.Image) -> Image.Image | None:
     return out
 
 
-def load_person(path: Path) -> Image.Image:
-    im = Image.open(path)
-    if im.mode == "RGBA" and im.getextrema()[3][0] < 250:
-        return im
+def _person_cache_meta(path: Path) -> dict:
+    st = path.stat()
+    return {"name": path.name, "size": st.st_size, "mtime_ns": st.st_mtime_ns}
+
+
+def load_person(path: Path, *, cache_dir: Path | None = None) -> Image.Image:
+    with Image.open(path) as raw:
+        if raw.mode == "RGBA" and raw.getextrema()[3][0] < 250:
+            return raw.copy()
+        rgb = raw.convert("RGB")
+    cache_png = cache_dir / "person-cutout.png" if cache_dir else None
+    cache_meta = cache_dir / "person-cutout.meta.json" if cache_dir else None
+    meta = _person_cache_meta(path) if cache_dir else None
+    if cache_png and cache_meta and cache_png.is_file() and cache_meta.is_file():
+        try:
+            if json.loads(cache_meta.read_text(encoding="utf-8")) == meta:
+                with Image.open(cache_png) as cached:
+                    if cached.mode == "RGBA" and cached.getextrema()[3][0] < 250:
+                        print(f"[cover] 复用已抠人像缓存：{cache_png.name}", file=sys.stderr)
+                        return cached.copy()
+        except (OSError, json.JSONDecodeError):
+            pass
     try:
         from rembg import remove  # type: ignore
     except ImportError:
-        cut = u2net_cutout(im)
+        cut = u2net_cutout(rgb)
         if cut is None:
             sys.exit(f"{path} 没有透明通道，本机也没有 rembg 或 onnxruntime+u2net.onnx。先抠图存成 RGBA PNG 再跑。")
-        return cut
-    print("[cover] rembg 抠图中…", file=sys.stderr)
-    return remove(im.convert("RGB"))
+    else:
+        print("[cover] rembg 抠图中…", file=sys.stderr)
+        cut = remove(rgb)
+    if cache_png and cache_meta and meta is not None:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        cut.save(cache_png)
+        cache_meta.write_text(json.dumps(meta, ensure_ascii=False) + "\n", encoding="utf-8")
+    return cut
+
+
+def precheck_title(lines: list[str], font_path: str | Path) -> None:
+    """在耗时抠图之前先做快速字号预检，明显放不下时 0.05 秒直接失败。"""
+    for _name, W, H, layout in FORMATS:
+        margin = int(min(W, H) * 0.05)
+        if layout == "portrait":
+            box_w, box_h = W - 2 * margin, int(H * 0.30)
+        else:
+            # 抠图前未知人像精确宽高，按最宽松人像占宽（30% 画宽）做保守上界预检；
+            # 若连最宽文字区都放不下，抠完图一定放不下。
+            box_w, box_h = W - 2 * margin - int(W * 0.30), int(H * 0.72)
+        min_px = max(int(H * TITLE_MIN_FRAC[layout]), -(-THUMB_MIN_PX * W // THUMB_W))
+        if fit_title(lines, font_path, box_w, box_h, min_px, int(H * 0.30)) is None:
+            raise SystemExit(
+                f"{W}x{H}：封面句在最小字号 {min_px}px 下放不下（{lines}）。"
+                "按规则不缩字：用 | 多断一行，或减字。"
+            )
 
 
 def trim(im: Image.Image) -> Image.Image:
@@ -270,7 +312,9 @@ def _compose(args) -> int:
     out = Path(args.out_dir).expanduser()
     work = out / "cover-work"
     work.mkdir(parents=True, exist_ok=True)
-    person = load_person(Path(args.person).expanduser())
+    lines = split_title(args.title)
+    precheck_title(lines, args.font)
+    person = load_person(Path(args.person).expanduser(), cache_dir=work)
     ol = outline(person, args.stroke_frac)
     ol.save(work / "person-outlined.png")
     bg = Image.open(Path(args.bg).expanduser())
@@ -279,7 +323,6 @@ def _compose(args) -> int:
     written = []
     dest_dir = media_layout.cover_dest_dir(out, args.prefix)
     for name, W, H, layout in FORMATS:
-        lines = split_title(args.title)
         img, size, s_size, thumb = compose(bg, ol, lines, args.series, args.font, W, H, layout, args.side, color)
         dst = dest_dir / f"{args.prefix}{name}"
         dst.parent.mkdir(parents=True, exist_ok=True)
