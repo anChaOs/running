@@ -96,7 +96,7 @@ def test_end_to_end() -> None:
         stub_windows({"morning.fit": (t("06:59:30"), t("07:40:00"), "records"),
                       "evening.fit": (t("18:00:00"), t("18:30:00"), "records")})
         sys.argv = ["ingest", "--src", str(src), "--media-root", str(media.parent), "--date", "2026-01-02", "--slug", "test",
-                    "--episode-dir", str(ep), "--apply", "--skip-pause-trim"]
+                    "--episode-dir", str(ep), "--copy", "--apply", "--skip-pause-trim"]
         ing.main()
         raw_names = sorted(p.name for p in (media / "raw").iterdir())
         for n in ("open", "run-a", "run-b", "close-1", "close-2", "close"):

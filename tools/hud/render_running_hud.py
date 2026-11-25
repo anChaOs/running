@@ -349,6 +349,7 @@ def render_one_clip(
     output_path: Path | None = None,
     range_start: float | None = None,
     range_end: float | None = None,
+    clock_offset_s: float = 0.0,
 ) -> Path:
     """Render one clip. Returns output path. Raises on failure with clip in message."""
     clip = clip.expanduser().resolve()
@@ -381,6 +382,7 @@ def render_one_clip(
             shoe_total_km_after_run=shoe_total_km_after_run,
             range_start=range_start,
             range_end=range_end,
+            clock_offset_s=clock_offset_s,
         )
     else:
         if range_start is not None:
@@ -412,6 +414,8 @@ def render_one_clip(
             "--shoe-total-km-after-run",
             str(shoe_total_km_after_run),
         ]
+        if abs(float(clock_offset_s)) > 1e-6:
+            cmd.extend(["--clock-offset", f"{float(clock_offset_s):.6f}"])
     _log(f"[{label}] start -> {out.name}")
     try:
         run(cmd, dry_run=dry_run, log_path=None if dry_run else log_path, label=label)
@@ -510,6 +514,7 @@ def hud_signature(table: dict, *, fps: int = 30) -> dict:
         "shoe_name": hud.get("shoe_name"),
         "shoe_km_after": hud.get("shoe_km_after"),
         "weather_city": hud.get("weather_city"),
+        "clock_offset_s": round(edl.clock_offset(table), 4),
         "fps": fps,
         "jobs": [
             {
@@ -565,6 +570,7 @@ def hud_overlay_command(
     range_end: float | None = None,
     config_dir: Path | None = None,
     windows_file: Path | None = None,
+    clock_offset_s: float = 0.0,
 ) -> list[str]:
     """对原片画透明层。切开的区间用 --hud-start/--hud-end，不另写画面文件。
 
@@ -604,6 +610,8 @@ def hud_overlay_command(
         "--shoe-total-km-after-run",
         str(shoe_total_km_after_run),
     ]
+    if abs(float(clock_offset_s)) > 1e-6:
+        cmd.extend(["--clock-offset", f"{float(clock_offset_s):.6f}"])
     if windows_file is not None:
         cmd.extend(["--hud-windows", str(windows_file)])
     elif range_start is not None or range_end is not None:
@@ -746,6 +754,7 @@ def overlay_render_argv(
     weather: Path,
     profile: str,
     jobs: int,
+    clock_offset_s: float = 0.0,
 ) -> list[str]:
     argv = [
         "--media-dir", str(render_dir),
@@ -765,6 +774,8 @@ def overlay_render_argv(
     else:
         argv.append("--no-weather")
     argv.extend(["--video-end-time-mode", str(hud.get("video_end_time_mode") or "file-modified")])
+    if abs(float(clock_offset_s)) > 1e-6:
+        argv.extend(["--clock-offset", f"{float(clock_offset_s):.6f}"])
     return argv
 
 
@@ -866,10 +877,22 @@ def export_alphas(
         raise SystemExit(f"No FIT file found in {media_dir}")
     fit = fits[0] if fits else media_layout.weather_json_write_path(media_dir).with_name("run-data.fit")
     weather = media_layout.weather_json_read_path(media_dir)
+    clock_offset_s = edl.clock_offset(table)
+    can_reuse_existing = True
+    manifest_file = hud_manifest_path(media_dir)
+    if manifest_file.is_file():
+        try:
+            saved_sig = (json.loads(manifest_file.read_text(encoding="utf-8")) or {}).get("signature") or {}
+            cur_sig = hud_signature(table, fps=fps)
+            global_keys = ("overlay_profile", "shoe_name", "shoe_km_after", "weather_city", "clock_offset_s", "fps")
+            if any(saved_sig.get(k) != cur_sig.get(k) for k in global_keys):
+                can_reuse_existing = False
+        except json.JSONDecodeError:
+            can_reuse_existing = False
     pending = []
     for plan in plans:
         dest = plan["dest"]
-        if dest.is_file() and _alpha_matches(dest, plan["overlay_profile"]):
+        if can_reuse_existing and dest.is_file() and _alpha_matches(dest, plan["overlay_profile"]):
             _log(f"reuse {dest.relative_to(media_dir).as_posix()}")
             continue
         pending.append(plan)
@@ -877,9 +900,10 @@ def export_alphas(
             window = ""
             if plan["ranged"]:
                 window = f" --hud-start {plan['src_start_s']:.6f} --hud-end {plan['src_end_s']:.6f}"
+            off_note = f" clock_offset={clock_offset_s:+.3f}s" if abs(clock_offset_s) > 1e-6 else ""
             _log(
                 f"would render {dest.relative_to(media_dir).as_posix()} from {plan['source'].name}"
-                f"{window} profile={plan['overlay_profile']}"
+                f"{window} profile={plan['overlay_profile']}{off_note}"
             )
     if dry_run:
         if pending:
@@ -903,6 +927,7 @@ def export_alphas(
             weather=weather,
             profile=profile,
             jobs=worker_count,
+            clock_offset_s=clock_offset_s,
         )
         args = _parse_args(argv)
         args.alpha_jobs = profile_plans
@@ -931,6 +956,7 @@ def alpha_batch_argv(
     shoe_name: str,
     shoe_total_km_after_run: float,
     cache_dir: Path | None = None,
+    clock_offset_s: float = 0.0,
 ) -> list[str]:
     """一条原片、一个 wrap。窗口清单写在该进程自己的缓存目录里。"""
     if not batch:
@@ -972,6 +998,7 @@ def alpha_batch_argv(
         shoe_name=shoe_name,
         shoe_total_km_after_run=shoe_total_km_after_run,
         windows_file=windows_path,
+        clock_offset_s=clock_offset_s,
     )
 
 
@@ -989,6 +1016,7 @@ def launch_alpha_batch(
     shoe_name: str,
     shoe_total_km_after_run: float,
     dry_run: bool,
+    clock_offset_s: float = 0.0,
 ) -> None:
     source = Path(batch[0]["source"])
     cmd = alpha_batch_argv(
@@ -1003,6 +1031,7 @@ def launch_alpha_batch(
         overlay_profile=overlay_profile,
         shoe_name=shoe_name,
         shoe_total_km_after_run=shoe_total_km_after_run,
+        clock_offset_s=clock_offset_s,
     )
     log_path = Path(batch[0]["dest"]).parent / f"{source.stem}-batch-{batch_index}-hud-render.log"
     run(cmd, dry_run=dry_run, log_path=None if dry_run else log_path, label=source.name)
@@ -1064,6 +1093,7 @@ def _render_alpha_jobs(
     shoe_total_km_after_run: float,
     dry_run: bool,
     jobs_n: int,
+    clock_offset_s: float = 0.0,
 ) -> int:
     """按原片合并启动 wrap。每个窗口仍然写成自己的 alpha mov。"""
     batches = batch_alpha_plans(plans, jobs_n)
@@ -1082,6 +1112,7 @@ def _render_alpha_jobs(
             shoe_name=shoe_name,
             shoe_total_km_after_run=shoe_total_km_after_run,
             dry_run=dry_run,
+            clock_offset_s=clock_offset_s,
         )
 
     render_alpha_batches(batches, jobs_n, _launch)
@@ -1225,6 +1256,13 @@ def _parse_args(argv: list[str] | None = None):
         choices=sorted(WEATHER_CITIES),
         help="Fetch Open-Meteo with city coordinates and FIT time window. Do not send FIT GPS.",
     )
+    parser.add_argument(
+        "--clock-offset",
+        type=float,
+        default=None,
+        help="Camera clock offset in seconds (FIT_time - camera_clock; positive when camera is behind GPS). "
+        "Defaults to logs/program.json clock_offset_s (or 0.0).",
+    )
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
         "-j",
@@ -1336,6 +1374,17 @@ def _render_main(args) -> int:
         weather_ok=weather_ok,
     )
 
+    clock_offset_s = args.clock_offset
+    if clock_offset_s is None:
+        program_file = edl.program_path(media_dir)
+        if program_file.is_file():
+            try:
+                clock_offset_s = edl.clock_offset(edl.load(program_file))
+            except (ValueError, OSError, json.JSONDecodeError):
+                clock_offset_s = 0.0
+        else:
+            clock_offset_s = 0.0
+
     alpha_jobs = list(getattr(args, "alpha_jobs", None) or [])
     if alpha_jobs:
         return _render_alpha_jobs(
@@ -1351,6 +1400,7 @@ def _render_main(args) -> int:
             shoe_total_km_after_run=default_shoe_total_km_after_run,
             dry_run=args.dry_run,
             jobs_n=args.jobs,
+            clock_offset_s=clock_offset_s,
         )
 
     if args.jobs < 1:
@@ -1374,6 +1424,7 @@ def _render_main(args) -> int:
             shoe_name=args.shoe_name,
             shoe_total_km_after_run=default_shoe_total_km_after_run,
             dry_run=args.dry_run,
+            clock_offset_s=clock_offset_s,
         )
 
     failures: list[str] = []

@@ -402,18 +402,26 @@ tools/hud/templates/gopro-dashboard-overlay-running-hud-landscape-map-safe.xml
 
 ## 遇到问题先看哪里
 
-### 1. 时间对不齐
-先跑：
+### 1. 时间对不齐 / 相机时钟慢或快
+先探测时间：
 
 ```bash
 .venv/bin/python tools/hud/probe_video_times.py <你的mp4>
 ```
 
-检查：
+如果相机时钟与高驰 FIT（GPS 时间）有偏差，或在 `open`/`open-*` 片段中喊「开表」并按下手表开始，可以自动检测高驰开表提示音并校准全片时钟偏移（`clock_offset_s = FIT_time - camera_clock`）：
 
-- `ffprobe creation_time`
-- `stat created`
-- 反推开始时间
+```bash
+.venv/bin/python tools/hud/detect_watch_beep.py \
+  --video ~/Movies/running-content/YYYY-MM-DD-slug/raw/YYYY-MM-DD-open.mp4 \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
+
+.venv/bin/python tools/program_edl.py \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug \
+  calibrate --clip raw/YYYY-MM-DD-open.mp4 --at 104.341 --source beep
+```
+
+校准后会同步平移 `logs/program.json` 里所有片段的 `source_sync`，跨开表刻的任意片段（含多段 `open`）自动在开表刻切分为「无 HUD → 有 HUD」，渲染 HUD 时自动透传 `--clock-offset`。也可直接 `--offset <秒>` 手动指定偏移。
 
 ### 2. HUD 没生成
 先跑：

@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 from pathlib import Path
 
 import media_layout
@@ -42,7 +43,10 @@ WIND_S = 0.08
 DEFAULT_OVERLAY_PROFILE = "qtrle"
 # 手写贴图允许的成片时长误差。小于一次 0.2s xfade，大于容器时长的零头。
 OVERLAY_DURATION_TOLERANCE_S = 0.15
+# 自动按 FIT 起止切分 HUD 时，丢弃短于 1 帧（30fps）的零头，避免切出 0 帧片段。
+MIN_HUD_SLIVER_S = 1.0 / 30.0
 ROLE_ORDER = {"cold_open": 0, "run": 1, "close": 2}
+OPEN_STEM_RE = re.compile(r"(?:^|-)open(?:-[a-z0-9]+)?$")
 
 
 def program_path(media_dir: Path | str) -> Path:
@@ -55,6 +59,7 @@ def empty_program(episode: str) -> dict:
         "episode": episode,
         "frozen": False,
         "subs_stale": False,
+        "clock_offset_s": 0.0,
         "source_sync": [],
         "keeps": [],
         "program": [],
@@ -66,6 +71,12 @@ def empty_program(episode: str) -> dict:
         "wind_s": WIND_S,
         "hud": {"recorded": False, "overlay_profile": DEFAULT_OVERLAY_PROFILE},
     }
+
+
+def clock_offset(table: dict) -> float:
+    """相机时钟相对 FIT GPS 时间的偏差（秒）：FIT_time - camera_clock。正数=相机慢。"""
+    raw = table.get("clock_offset_s")
+    return 0.0 if raw is None else _finite(raw, "clock_offset_s")
 
 
 def load(path: Path) -> dict:
@@ -98,7 +109,7 @@ def load_or_init(media_dir: Path | str, episode: str) -> dict:
 
 def classify_clip(name: str) -> str:
     stem = Path(name).stem
-    if stem.endswith("-open") or stem.endswith("-open-raw"):
+    if OPEN_STEM_RE.search(stem):
         return "cold_open"
     if "-close" in stem:
         return "close"
@@ -158,13 +169,17 @@ def set_source_sync(table: dict, rows: list[dict]) -> dict:
         if clip in seen:
             raise ValueError(f"duplicate source sync clip: {clip}")
         seen.add(clip)
-        cleaned.append(
-            {
-                "clip": clip,
-                "fit": str(row["fit"]),
-                "offset_s": _finite(row.get("offset_s", 0.0), f"{clip} offset_s"),
-            }
-        )
+        entry = {
+            "clip": clip,
+            "fit": str(row["fit"]),
+            "offset_s": _finite(row.get("offset_s", 0.0), f"{clip} offset_s"),
+        }
+        if row.get("fit_duration_s") is not None:
+            dur = _finite(row["fit_duration_s"], f"{clip} fit_duration_s")
+            if dur <= 0:
+                raise ValueError(f"{clip} fit_duration_s must be > 0")
+            entry["fit_duration_s"] = dur
+        cleaned.append(entry)
     table["source_sync"] = cleaned
     return table
 
@@ -381,18 +396,56 @@ def add_overlay(table: dict, overlay: dict, *, expect_duration_s: float | None =
     return table
 
 
-def _segment_from_keep(keep: dict, index: int) -> dict:
-    role = classify_clip(keep["clip"])
-    stem = Path(keep["clip"]).stem
-    return {
-        "id": f"{stem}-{index}",
-        "type": role,
-        "clip": keep["clip"],
-        "src_start_s": float(keep["src_start_s"]),
-        "src_end_s": float(keep["src_end_s"]),
-        "program_start_s": 0.0,
-        "hud": role == "run",
-    }
+def _segments_from_keep(keep: dict, sync_map: dict[str, dict], counts: dict[str, int]) -> list[dict]:
+    """把一条保留区间转成成片片段；若跨 FIT 起止（如 open 里喊「开表」），自动按 FIT 窗口切开 HUD。"""
+    clip = keep["clip"]
+    role = classify_clip(clip)
+    stem = Path(clip).stem
+    s0 = float(keep["src_start_s"])
+    s1 = float(keep["src_end_s"])
+    sync = sync_map.get(clip)
+
+    pieces: list[tuple[float, float, bool]]
+    if role == "close":
+        pieces = [(s0, s1, False)]
+    elif sync is None:
+        pieces = [(s0, s1, role == "run")]
+    else:
+        offset_s = float(sync["offset_s"])
+        fit_start_src = -offset_s
+        fit_dur = sync.get("fit_duration_s")
+        fit_end_src = (float(fit_dur) - offset_s) if fit_dur is not None else math.inf
+        active_start = max(s0, fit_start_src)
+        active_end = min(s1, fit_end_src)
+        if active_end - active_start < MIN_HUD_SLIVER_S:
+            pieces = [(s0, s1, False)]
+        else:
+            has_pre = (active_start - s0) >= MIN_HUD_SLIVER_S
+            has_post = (s1 - active_end) >= MIN_HUD_SLIVER_S
+            hud_start = active_start if has_pre else s0
+            hud_end = active_end if has_post else s1
+            pieces = []
+            if has_pre:
+                pieces.append((s0, hud_start, False))
+            pieces.append((hud_start, hud_end, True))
+            if has_post:
+                pieces.append((hud_end, s1, False))
+
+    segments: list[dict] = []
+    for start, end, hud_on in pieces:
+        counts[stem] = counts.get(stem, 0) + 1
+        segments.append(
+            {
+                "id": f"{stem}-{counts[stem]}",
+                "type": role,
+                "clip": clip,
+                "src_start_s": start,
+                "src_end_s": end,
+                "program_start_s": 0.0,
+                "hud": hud_on,
+            }
+        )
+    return segments
 
 
 def default_fades(segments: list[dict], xfade: float) -> list[float]:
@@ -487,10 +540,9 @@ def _rebuild(table: dict) -> dict:
                 "hud": bool(lead.get("hud")),
             }
         )
+    sync_map = {row["clip"]: row for row in table.get("source_sync", [])}
     for keep in table.get("keeps", []):
-        stem = Path(keep["clip"]).stem
-        counts[stem] = counts.get(stem, 0) + 1
-        segments.append(_segment_from_keep(keep, counts[stem]))
+        segments.extend(_segments_from_keep(keep, sync_map, counts))
     ids = {seg["id"] for seg in segments}
     for insert in table.get("inserts", []):
         if insert["after_id"] not in ids:
@@ -521,7 +573,7 @@ def _rebuild(table: dict) -> dict:
 
 
 def sync_runs_from_disk(table: dict, media_dir: Path) -> dict:
-    """按 HUD 的口径锁偏移：mtime 是原片结束，开始 = 结束 − 时长，再减 FIT 开始。"""
+    """按 HUD 的口径锁偏移：mtime 是原片结束，开始 = 结束 − 时长 + clock_offset_s，再减 FIT 开始。"""
     import ingest_run_media as ingest
 
     if table.get("program"):
@@ -529,28 +581,121 @@ def sync_runs_from_disk(table: dict, media_dir: Path) -> dict:
     fits = media_layout.find_fits(media_dir)
     if len(fits) != 1:
         raise ValueError("need exactly one *-run-data.fit to lock source sync")
-    fit_start = ingest.fit_window(fits[0])[0]
+    fit_start, fit_end, _ = ingest.fit_window(fits[0])
     if fit_start is None:
         raise ValueError(f"FIT has no start time: {fits[0].name}")
+    fit_duration_s = (fit_end - fit_start).total_seconds() if fit_end is not None else None
     fit_rel = media_layout.rel_media_path(fits[0], media_dir)
+    drift = clock_offset(table)
     rows = []
-    for path in media_layout.glob_media(media_dir, "*-run-*.mp4", subdirs=(media_layout.RAW_DIR,)):
-        if any(part in path.stem for part in ("hud", "raw", "preview", "final", "stats")):
-            continue
-        duration = ingest.run_ffprobe_duration(path)
-        if not duration:
-            raise ValueError(f"cannot read duration: {path.name}")
-        video_start = ingest.video_window(path, duration)[0]
-        rows.append(
-            {
-                "clip": media_layout.rel_media_path(path, media_dir),
+    seen: set[Path] = set()
+    has_run = False
+    for pattern in ("*-open.mp4", "*-open-*.mp4", "*-run-*.mp4", "*-close.mp4", "*-close-*.mp4"):
+        for path in media_layout.glob_media(media_dir, pattern, subdirs=(media_layout.RAW_DIR,)):
+            if path in seen:
+                continue
+            if any(part in path.stem for part in ("hud", "raw", "preview", "final", "stats")):
+                continue
+            seen.add(path)
+            duration = ingest.run_ffprobe_duration(path)
+            if not duration:
+                raise ValueError(f"cannot read duration: {path.name}")
+            video_start = ingest.video_window(path, duration)[0]
+            clip_rel = media_layout.rel_media_path(path, media_dir)
+            if classify_clip(clip_rel) == "run":
+                has_run = True
+            entry: dict = {
+                "clip": clip_rel,
                 "fit": fit_rel,
-                "offset_s": (video_start - fit_start).total_seconds(),
+                "offset_s": (video_start - fit_start).total_seconds() + drift,
             }
-        )
-    if not rows:
+            if fit_duration_s is not None:
+                entry["fit_duration_s"] = fit_duration_s
+            rows.append(entry)
+    if not rows or not has_run:
         raise ValueError("no run clips to lock")
     return set_source_sync(table, rows)
+
+
+def ensure_clip_source_sync(table: dict, media_dir: Path, clip_rel: str) -> dict:
+    """若旧时间表的 source_sync 还没收录某个原片（如 open），从磁盘探测补进。"""
+    if any(row["clip"] == clip_rel for row in table.get("source_sync", [])):
+        return table
+    import ingest_run_media as ingest
+
+    fits = media_layout.find_fits(media_dir)
+    if len(fits) != 1:
+        raise ValueError("need exactly one *-run-data.fit to add clip to source_sync")
+    fit_start, fit_end, _ = ingest.fit_window(fits[0])
+    if fit_start is None:
+        raise ValueError(f"FIT has no start time: {fits[0].name}")
+    clip_path = media_layout.resolve_media_path(media_dir, clip_rel, subdirs=(media_layout.RAW_DIR,))
+    if not clip_path.is_file():
+        raise ValueError(f"clip not found: {clip_path}")
+    duration = ingest.run_ffprobe_duration(clip_path)
+    if not duration:
+        raise ValueError(f"cannot read duration: {clip_path.name}")
+    video_start = ingest.video_window(clip_path, duration)[0]
+    entry: dict = {
+        "clip": clip_rel,
+        "fit": media_layout.rel_media_path(fits[0], media_dir),
+        "offset_s": (video_start - fit_start).total_seconds() + clock_offset(table),
+    }
+    if fit_end is not None:
+        entry["fit_duration_s"] = (fit_end - fit_start).total_seconds()
+    table.setdefault("source_sync", []).append(entry)
+    return table
+
+
+def calibrate_clock(
+    table: dict,
+    *,
+    clock_offset_s: float,
+    anchor: dict | None = None,
+) -> dict:
+    """校准全片相机时钟偏移（FIT_time - camera_clock），平移 source_sync 并重算 HUD 切分。"""
+    _refuse_if_frozen(table)
+    new_offset = _finite(clock_offset_s, "clock_offset_s")
+    old_offset = clock_offset(table)
+    delta = new_offset - old_offset
+    for row in table.get("source_sync", []):
+        row["offset_s"] = round(float(row["offset_s"]) + delta, 6)
+    table["clock_offset_s"] = round(new_offset, 4)
+    if anchor is not None:
+        table["clock_calibration"] = dict(anchor)
+    had = bool(table.get("program"))
+    before_dur = program_duration(table) if had else 0.0
+    if table.get("keeps") or table.get("lead"):
+        _rebuild(table)
+        after_dur = program_duration(table)
+        if had and abs(after_dur - before_dur) > 1e-4:
+            table["subs_stale"] = True
+            table["frozen"] = False
+    return table
+
+
+def calibrate_clock_from_clip(
+    table: dict,
+    clip: str,
+    src_s: float,
+    *,
+    source: str = "manual",
+) -> dict:
+    """以某段原片上的「开表」时刻 src_s 对齐 FIT_start（fit_time=0），反推全片 clock_offset_s。"""
+    _refuse_if_frozen(table)
+    at = _finite(src_s, "src_s")
+    if at < 0:
+        raise ValueError("src_s must be >= 0")
+    row = next((r for r in table.get("source_sync", []) if r["clip"] == clip), None)
+    if row is None:
+        raise ValueError(f"no source sync for {clip}")
+    # 目标：new_row_offset + at == 0  =>  delta = -(old_row_offset + at)
+    new_clock_offset = clock_offset(table) - (float(row["offset_s"]) + at)
+    return calibrate_clock(
+        table,
+        clock_offset_s=new_clock_offset,
+        anchor={"clip": clip, "src_s": round(at, 3), "source": source},
+    )
 
 
 def adopt_full_clips(table: dict, clips: list[dict]) -> dict:
@@ -573,7 +718,7 @@ def freeze(table: dict) -> dict:
         raise ValueError("; ".join(problems))
     if not table.get("hud", {}).get("recorded"):
         raise ValueError("cannot freeze before HUD data is recorded")
-    if not any(seg["type"] == "run" for seg in table["program"]):
+    if not any(seg["type"] == "run" or seg.get("hud") for seg in table["program"]):
         raise ValueError("cannot freeze without a run segment")
     table["frozen"] = True
     return table
@@ -585,6 +730,11 @@ def validate(table: dict, *, require_frozen: bool = False, check_subs_stale: boo
     if table.get("version") != VERSION:
         problems.append(f"unsupported version {table.get('version')}")
         return problems
+    if table.get("clock_offset_s") is not None:
+        try:
+            _finite(table["clock_offset_s"], "clock_offset_s")
+        except ValueError as exc:
+            problems.append(str(exc))
     sync = {row["clip"]: row for row in table.get("source_sync", [])}
     if len(sync) != len(table.get("source_sync", [])):
         problems.append("duplicate source_sync clip")
@@ -623,9 +773,7 @@ def validate(table: dict, *, require_frozen: bool = False, check_subs_stale: boo
     for seg in program:
         if seg["type"] == "insert" and seg.get("hud"):
             problems.append(f"insert {seg['id']} cannot carry a running HUD")
-        if seg["type"] == "run" and not seg.get("hud"):
-            problems.append(f"run {seg['id']} must carry HUD")
-        if seg.get("hud") and seg["clip"] not in sync and seg["type"] != "run":
+        if seg.get("hud") and seg["clip"] not in sync:
             problems.append(f"{seg['id']} HUD clip is not in source_sync")
         if seg["type"] == "run" and seg["clip"] not in sync:
             problems.append(f"run clip {seg['clip']} has no source sync")
@@ -660,6 +808,7 @@ def validate(table: dict, *, require_frozen: bool = False, check_subs_stale: boo
 
 def _expected_layout(table: dict) -> tuple[list[dict], list[dict]]:
     scratch = {
+        "source_sync": table.get("source_sync", []),
         "keeps": table.get("keeps", []),
         "lead": table.get("lead"),
         "inserts": table.get("inserts", []),
@@ -688,6 +837,16 @@ def _transitions_close(got: list[dict], want: list[dict]) -> bool:
     return True
 
 
+def _coalesce_ranges(ranges: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    merged: list[tuple[float, float]] = []
+    for start, end in ranges:
+        if merged and abs(start - merged[-1][1]) <= 1e-6:
+            merged[-1] = (merged[-1][0], end)
+        else:
+            merged.append((start, end))
+    return merged
+
+
 def _check_keep_partition(table: dict, problems: list[str]) -> None:
     """open / run / close 的成片片段必须刚好盖住 keeps。lead 和插入段不参与对账。"""
     lead_id = (table.get("lead") or {}).get("id")
@@ -703,7 +862,12 @@ def _check_keep_partition(table: dict, problems: list[str]) -> None:
         problems.append("program clips do not match keeps")
         return
     for clip, want in keep_map.items():
-        if from_program.get(clip) != want:
+        got = _coalesce_ranges(from_program.get(clip, []))
+        expected = _coalesce_ranges(want)
+        if len(got) != len(expected) or any(
+            abs(a[0] - b[0]) > 1e-6 or abs(a[1] - b[1]) > 1e-6
+            for a, b in zip(got, expected, strict=True)
+        ):
             problems.append(f"program ranges for {clip} do not match keeps")
 
 
@@ -927,6 +1091,15 @@ def main(argv: list[str] | None = None) -> int:
     sync_p.add_argument("--fit", required=True)
     sync_p.add_argument("--offset", type=float, required=True)
 
+    cal_p = sub.add_parser(
+        "calibrate",
+        help="Calibrate camera clock offset (FIT_time - camera_clock) via clip start-watch anchor or explicit seconds",
+    )
+    cal_p.add_argument("--clip", help="Clip containing the watch-start moment (e.g. raw/YYYY-MM-DD-open.mp4)")
+    cal_p.add_argument("--at", type=float, help="Source second in --clip where watch starts (FIT_start = 0s)")
+    cal_p.add_argument("--offset", type=float, help="Explicit clock_offset_s (= FIT_time - camera_clock)")
+    cal_p.add_argument("--source", default="manual", choices=("manual", "beep", "asr"))
+
     keeps_p = sub.add_parser("keeps")
     keeps_p.add_argument("--clip", required=True)
     keeps_p.add_argument("--windows", required=True, help="start-end,start-end in source seconds")
@@ -994,6 +1167,23 @@ def main(argv: list[str] | None = None) -> int:
             rows.append({"clip": args.clip, "fit": args.fit, "offset_s": args.offset})
             save(media, set_source_sync(table, rows))
             todo_list.mark(media, "ingest", "done")
+        elif args.cmd == "calibrate":
+            table = load_media(media)
+            if args.offset is not None and (args.clip is not None or args.at is not None):
+                raise SystemExit("pass either --offset or (--clip and --at), not both")
+            if args.offset is not None:
+                save(media, calibrate_clock(table, clock_offset_s=args.offset, anchor={"source": args.source}))
+            elif args.clip is not None and args.at is not None:
+                clip_rel = media_layout.rel_media_path(
+                    media_layout.resolve_media_path(media, args.clip, subdirs=(media_layout.RAW_DIR,)),
+                    media,
+                )
+                ensure_clip_source_sync(table, media, clip_rel)
+                save(media, calibrate_clock_from_clip(table, clip_rel, args.at, source=args.source))
+            else:
+                raise SystemExit("calibrate needs --offset <sec> or (--clip <path> --at <sec>)")
+            todo_list.clear_prep(media, ("hud-render",))
+            print(f"clock_offset_s={clock_offset(table):+.3f}s")
         elif args.cmd == "keeps":
             table = load_media(media)
             windows = []
@@ -1030,7 +1220,7 @@ def main(argv: list[str] | None = None) -> int:
                     todo_list.clear_prep(media)
                 else:
                     save(media, table)
-            if not any(seg["type"] == "run" for seg in table.get("program", [])):
+            if not any(seg["type"] == "run" or seg.get("hud") for seg in table.get("program", [])):
                 raise SystemExit("program has no run segment")
             structural = [item for item in validate(table) if "stale" not in item]
             if structural:
@@ -1107,7 +1297,7 @@ def adopt_clips_on_disk(table: dict, media_dir: Path) -> dict:
     import subprocess
 
     clips = []
-    for pattern in ("*-open.mp4", "*-run-*.mp4", "*-close.mp4"):
+    for pattern in ("*-open.mp4", "*-open-*.mp4", "*-run-*.mp4", "*-close.mp4"):
         for path in media_layout.glob_media(media_dir, pattern, subdirs=(media_layout.RAW_DIR,)):
             if any(part in path.stem for part in ("hud", "raw", "stats", "preview", "final")):
                 continue
