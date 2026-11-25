@@ -13,6 +13,6 @@ Antigravity does not auto-load subdirectory `CLAUDE.md` files. Always follow the
 ## Quick Guardrails
 
 - Never edit files under `knowledge/raw/` (read-only sources).
-- Keep `sources` in wiki frontmatter pointing strictly to `raw/...`; put internal wiki links in `related`.
+- Keep `sources` in wiki frontmatter pointing to `raw/...` or authoritative `http(s)` URLs; put internal wiki links in `related`.
 - Use `aliases: []` for Chinese/English synonyms or abbreviations to improve lookup and avoid duplicate pages.
 - After editing `knowledge/wiki/`, run `.venv/bin/python tools/kb_lint.py` to verify links, index sync, and frontmatter schema.

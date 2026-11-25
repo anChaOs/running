@@ -4,10 +4,11 @@
 Checks:
 1. Frontmatter schema (type, category, title, updated, sources, related, optional aliases).
 2. wiki/index.md sync (unindexed pages and dangling index links).
-3. Broken [[wikilink]] and related references.
-4. sources path validity (must point to existing files under knowledge/raw/).
-5. Duplicate aliases or alias/title collisions.
-6. Hygiene warnings: oversized pages, missing concept sources, log.md staleness,
+3. Broken [[wikilink]] and related references (ignoring fenced and inline code).
+4. sources path validity (must be an existing file inside knowledge/raw/ or an http(s) URL).
+5. Case-insensitive duplicate aliases, same-page duplicate aliases, alias/stem collisions,
+   and full-width Chinese commas in aliases.
+6. Hygiene warnings: oversized pages, missing concept sources, empty/stale log.md,
    and uncleaned incoming/ or legacy knowledge/running/ directories.
 """
 
@@ -24,7 +25,8 @@ from typing import Any
 VALID_TYPES = {"concept", "questions", "source-summary"}
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 WIKILINK_RE = re.compile(r"\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]")
-FENCE_RE = re.compile(r"^```.*?^```", re.MULTILINE | re.DOTALL)
+FENCE_RE = re.compile(r"^[ \t]*```.*?^[ \t]*```", re.MULTILINE | re.DOTALL)
+INLINE_CODE_RE = re.compile(r"`[^`\n]+`")
 LOG_DATE_RE = re.compile(r"^##\s+(\d{4}-\d{2}-\d{2})\b", re.MULTILINE)
 
 
@@ -130,6 +132,7 @@ def _as_list(value: Any) -> list[str] | None:
 
 def _extract_wikilinks(body: str) -> list[str]:
     cleaned = FENCE_RE.sub("", body)
+    cleaned = INLINE_CODE_RE.sub("", cleaned)
     return [m.group(1).strip() for m in WIKILINK_RE.finditer(cleaned)]
 
 
@@ -144,6 +147,7 @@ def lint_kb(kb_dir: Path, max_kb: float = 15.0) -> LintReport:
     report = LintReport()
     wiki_dir = kb_dir / "wiki"
     raw_dir = kb_dir / "raw"
+    raw_root = raw_dir.resolve()
     index_path = wiki_dir / "index.md"
     log_path = wiki_dir / "log.md"
 
@@ -160,7 +164,11 @@ def lint_kb(kb_dir: Path, max_kb: float = 15.0) -> LintReport:
     # First pass: parse frontmatter, build stem & alias maps.
     parsed: dict[Path, tuple[dict[str, Any] | None, str]] = {}
     stem_to_paths: dict[str, list[Path]] = {}
+    stem_to_paths_ci: dict[str, list[Path]] = {}
+    stem_display_ci: dict[str, str] = {}
     alias_to_pages: dict[str, list[Path]] = {}
+    alias_to_pages_ci: dict[str, list[Path]] = {}
+    alias_display_ci: dict[str, str] = {}
     latest_updated = ""
 
     for path in page_paths:
@@ -168,6 +176,9 @@ def lint_kb(kb_dir: Path, max_kb: float = 15.0) -> LintReport:
         fm, body = parse_frontmatter(text)
         parsed[path] = (fm, body)
         stem_to_paths.setdefault(path.stem, []).append(path)
+        stem_ci = path.stem.casefold()
+        stem_to_paths_ci.setdefault(stem_ci, []).append(path)
+        stem_display_ci.setdefault(stem_ci, path.stem)
 
         rel_path = _rel(path, kb_dir)
         size_kb = path.stat().st_size / 1024.0
@@ -226,8 +237,28 @@ def lint_kb(kb_dir: Path, max_kb: float = 15.0) -> LintReport:
             if aliases is None:
                 report.add("error", "invalid-aliases", rel_path, "aliases must be a YAML list")
             else:
+                seen_in_page: set[str] = set()
                 for alias in aliases:
+                    if "，" in alias:
+                        report.add(
+                            "warning",
+                            "chinese-comma-in-alias",
+                            rel_path,
+                            f"alias {alias!r} contains full-width comma '，'; split with ASCII ','",
+                        )
+                    alias_ci = alias.casefold()
+                    if alias_ci in seen_in_page:
+                        report.add(
+                            "warning",
+                            "duplicate-alias-in-page",
+                            rel_path,
+                            f"duplicate alias {alias!r} within the same page",
+                        )
+                        continue
+                    seen_in_page.add(alias_ci)
                     alias_to_pages.setdefault(alias, []).append(path)
+                    alias_to_pages_ci.setdefault(alias_ci, []).append(path)
+                    alias_display_ci.setdefault(alias_ci, alias)
 
         # Validate sources.
         if "sources" not in fm or _as_list(fm.get("sources")) is None:
@@ -262,39 +293,47 @@ def lint_kb(kb_dir: Path, max_kb: float = 15.0) -> LintReport:
                         f"source {src!r} must point under raw/ or be an http(s) URL",
                     )
                 else:
-                    target = raw_dir / norm_src.removeprefix("raw/")
-                    if not target.exists():
+                    target = (raw_dir / norm_src.removeprefix("raw/")).resolve()
+                    if not target.is_relative_to(raw_root):
+                        report.add(
+                            "error",
+                            "source-outside-raw",
+                            rel_path,
+                            f"source {src!r} resolves outside knowledge/raw/",
+                        )
+                    elif not target.is_file():
                         report.add(
                             "error",
                             "missing-source-file",
                             rel_path,
-                            f"source file not found: {src}",
+                            f"source file not found (or is a directory): {src}",
                         )
 
         # Validate related type.
         if "related" not in fm or _as_list(fm.get("related")) is None:
             report.add("error", "invalid-related", rel_path, "related must be a YAML list")
 
-    # Check duplicate stems or alias collisions.
-    for stem, paths in stem_to_paths.items():
+    # Check duplicate stems or case-insensitive alias collisions.
+    for stem_ci, paths in stem_to_paths_ci.items():
         if len(paths) > 1:
             joined = ", ".join(_rel(p, kb_dir) for p in paths)
-            report.add("error", "duplicate-stem", joined, f"duplicate wiki page name [[{stem}]]")
+            report.add("error", "duplicate-stem", joined, f"duplicate wiki page name [[{stem_display_ci[stem_ci]}]]")
 
-    for alias, paths in alias_to_pages.items():
+    for alias_ci, paths in alias_to_pages_ci.items():
+        display = alias_display_ci[alias_ci]
         if len(paths) > 1:
             joined = ", ".join(_rel(p, kb_dir) for p in paths)
-            report.add("warning", "duplicate-alias", joined, f"alias {alias!r} is claimed by multiple pages")
-        if alias in stem_to_paths:
-            owners = set(stem_to_paths[alias])
-            non_self = [p for p in paths if p not in owners]
-            if non_self:
-                report.add(
-                    "warning",
-                    "alias-collides-stem",
-                    _rel(non_self[0], kb_dir),
-                    f"alias {alias!r} collides with existing page [[{alias}]]",
-                )
+            report.add("warning", "duplicate-alias", joined, f"alias {display!r} is claimed by multiple pages")
+        if alias_ci in stem_to_paths_ci:
+            owners = set(stem_to_paths_ci[alias_ci])
+            for conflicting_path in paths:
+                if conflicting_path not in owners:
+                    report.add(
+                        "warning",
+                        "alias-collides-stem",
+                        _rel(conflicting_path, kb_dir),
+                        f"alias {display!r} collides with existing page [[{stem_display_ci[alias_ci]}]]",
+                    )
 
     valid_targets = set(stem_to_paths.keys()) | set(alias_to_pages.keys())
 
@@ -306,8 +345,11 @@ def lint_kb(kb_dir: Path, max_kb: float = 15.0) -> LintReport:
                 continue
             norm_target = target.removeprefix("knowledge/")
             if norm_target.startswith("raw/"):
-                raw_candidate = kb_dir / norm_target
-                if raw_candidate.exists() or raw_candidate.with_suffix(".md").exists():
+                raw_candidate = (raw_dir / norm_target.removeprefix("raw/")).resolve()
+                raw_md_candidate = raw_candidate.with_suffix(".md")
+                if raw_candidate.is_relative_to(raw_root) and (
+                    raw_candidate.is_file() or raw_md_candidate.is_file()
+                ):
                     continue
             report.add("error", "broken-wikilink", rel_path, f"broken wikilink [[{target}]]")
 
@@ -347,7 +389,14 @@ def lint_kb(kb_dir: Path, max_kb: float = 15.0) -> LintReport:
     elif latest_updated:
         log_dates = LOG_DATE_RE.findall(log_path.read_text(encoding="utf-8"))
         latest_log = max(log_dates) if log_dates else ""
-        if latest_log and latest_updated > latest_log:
+        if not latest_log:
+            report.add(
+                "warning",
+                "stale-log",
+                "wiki/log.md",
+                "wiki/log.md has no '## YYYY-MM-DD' date headings",
+            )
+        elif latest_updated > latest_log:
             report.add(
                 "warning",
                 "stale-log",

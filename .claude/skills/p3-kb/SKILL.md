@@ -12,7 +12,7 @@ description: 跑步自媒体知识库（knowledge/wiki/）的维护与检索工�
 - 修改 `knowledge/raw/` 里的任何文件（只读）
 - 把单期选题卡、口播稿、日记、过期热点或纯个人流水账写进 `knowledge/wiki/`
 - 用 wiki 覆盖 `knowledge/production/` 里的拍摄、HUD 或剪辑参数
-- 在 `sources` 里写 `wiki/...` 或 `incoming/...` 路径（内部互链放 `related`，来源先入 `raw/`）
+- 在 `sources` 里写 `wiki/...` 或 `incoming/...` 路径（内部互链放 `related`，本地来源先入 `raw/`，外部可直接填权威 `http(s)` URL）
 - 一次 ingest 开一堆空页或薄页；优先并入已有概念页
 
 ## 模式路由
@@ -31,7 +31,7 @@ description: 跑步自媒体知识库（knowledge/wiki/）的维护与检索工�
 2. 外部整包交件（如 zip）先进 `knowledge/incoming/YYYY-MM-DD/` 检疫，验收合并后再清理；不要把外部 wiki 直接拷进 `knowledge/wiki/`。
 3. 原始材料放进 `knowledge/raw/<category>/`（如 `raw/running/physiology/`、`raw/running/bili-up/`），保存后不再改动。
 4. 新建或更新 `knowledge/wiki/<category>/<概念名>.md`：
-   - 新建页使用 `templates/wiki-page.md`，补全 `type`、`category`、`title`、`aliases`（中英文简称/俗称）、`updated`、`sources`（指向 `raw/...`）、`related`（指向其他 wiki 页名）。
+   - 新建页使用 `templates/wiki-page.md`，补全 `type`、`category`、`title`、`aliases`（中英文简称/俗称）、`updated`、`sources`（指向 `raw/...` 或权威 `http(s)` URL）、`related`（指向其他 wiki 页名或别名）。
    - 正文区分事实 / 个人体验 / 推测，来源按层级标注（如 `【文献】`、`【口播】`），冲突观点并列不硬揉。
    - 正文用 `[[页名]]` 链到已有页，并给相关页补反向链接。
    - 保持原子粒度（单页尽量控制在 15 KB 以内；长专题拆成主概念 + 子题页）。

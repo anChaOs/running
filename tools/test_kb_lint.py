@@ -19,7 +19,8 @@ class TestKbLint(unittest.TestCase):
         _write(root / "raw" / "running" / "src-a.md", "# raw source\n")
         _write(
             root / "wiki" / "index.md",
-            "# wiki index\n\n| 页 | 一句话 |\n|---|---|\n| [[VO2max]] | 最大摄氧量 |\n| [[乳酸阈]] | 乳酸拐点 |\n",
+            "# wiki index\n\n语法示例 `[[占位页]]`。\n\n"
+            "| 页 | 一句话 |\n|---|---|\n| [[VO2max]] | 最大摄氧量 |\n| [[乳酸阈]] | 乳酸拐点 |\n",
         )
         _write(root / "wiki" / "log.md", "# wiki log\n\n## 2026-11-25\n\n- init\n")
         _write(
@@ -37,7 +38,11 @@ related: [乳酸阈]
 
 # VO2max
 
-参考 [[乳酸阈]]。
+参考 [[乳酸阈]]，语法示例 `[[不存在的示例]]`。
+
+  ```markdown
+  [[代码块内的示例]]
+  ```
 """,
         )
         _write(
@@ -48,13 +53,15 @@ category: running
 title: 乳酸阈
 aliases: [LT2, 阈值]
 updated: 2026-11-25
-sources: [raw/running/src-a.md]
+sources:
+  - raw/running/src-a.md
+  - https://worldathletics.org/
 related: [最大摄氧量]
 ---
 
 # 乳酸阈
 
-参考 [[最大摄氧量]]。
+参考 [[最大摄氧量]] 与 [[raw/running/src-a]]。
 """,
         )
 
@@ -71,6 +78,7 @@ related: [最大摄氧量]
         with tempfile.TemporaryDirectory() as tmp:
             kb = Path(tmp)
             self._make_valid_kb(kb)
+            _write(kb / "outside.md", "outside")
             _write(
                 kb / "wiki" / "running" / "新页.md",
                 """---
@@ -80,6 +88,8 @@ title: 新页
 updated: 2026-11-25
 sources:
   - wiki/running/VO2max.md
+  - raw/running
+  - raw/../outside.md
   - raw/running/not-found.md
 related: [不存在]
 ---
@@ -92,10 +102,11 @@ related: [不存在]
             self.assertIn("unindexed-page", codes)
             self.assertIn("wiki-in-sources", codes)
             self.assertIn("missing-source-file", codes)
+            self.assertIn("source-outside-raw", codes)
             self.assertIn("broken-wikilink", codes)
             self.assertIn("broken-related", codes)
 
-    def test_detects_alias_collision_and_hygiene_warnings(self) -> None:
+    def test_detects_alias_collisions_chinese_comma_and_hygiene_warnings(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             kb = Path(tmp)
             self._make_valid_kb(kb)
@@ -105,7 +116,7 @@ related: [不存在]
 type: concept
 category: running
 title: 乳酸阈
-aliases: [最大摄氧量]
+aliases: [vo2max, VO2PEAK, lt2, LT2, 中文别名，漏用英文逗号]
 updated: 2026-11-26
 sources: []
 related: []
@@ -114,12 +125,16 @@ related: []
 """
                 + ("测试正文" * 2000),
             )
+            _write(kb / "wiki" / "log.md", "# wiki log\n\n暂无日期标题\n")
             _write(kb / "incoming" / "2026-09-22" / "pack.txt", "leftover")
             _write(kb / "running" / "README.md", "legacy")
 
             report = lint_kb(kb, max_kb=10.0)
             warn_codes = {i.code for i in report.warnings}
+            self.assertIn("alias-collides-stem", warn_codes)
             self.assertIn("duplicate-alias", warn_codes)
+            self.assertIn("duplicate-alias-in-page", warn_codes)
+            self.assertIn("chinese-comma-in-alias", warn_codes)
             self.assertIn("empty-sources", warn_codes)
             self.assertIn("oversized-page", warn_codes)
             self.assertIn("stale-log", warn_codes)
