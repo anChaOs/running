@@ -28,6 +28,35 @@ import media_layout  # noqa: E402
 SAMPLE_RATE = 48000
 N_FFT = 2048
 HOP = 512
+DEFAULT_MAX_OFFSET_S = 120.0
+
+
+def parse_timecode(value: str) -> float:
+    """解析秒数（103 / 103.5）或时分秒（1:43 / 0:01:43.5）为浮点秒。"""
+    text = str(value).strip()
+    if not text:
+        raise ValueError("empty time value")
+    parts = text.split(":")
+    if len(parts) == 1:
+        sec = float(parts[0])
+    elif len(parts) == 2:
+        minutes = float(parts[0])
+        seconds = float(parts[1])
+        if minutes < 0 or seconds < 0 or seconds >= 60:
+            raise ValueError(f"invalid MM:SS timecode: {value}")
+        sec = minutes * 60.0 + seconds
+    elif len(parts) == 3:
+        hours = float(parts[0])
+        minutes = float(parts[1])
+        seconds = float(parts[2])
+        if hours < 0 or minutes < 0 or minutes >= 60 or seconds < 0 or seconds >= 60:
+            raise ValueError(f"invalid HH:MM:SS timecode: {value}")
+        sec = hours * 3600.0 + minutes * 60.0 + seconds
+    else:
+        raise ValueError(f"invalid timecode: {value}")
+    if sec < 0:
+        raise ValueError(f"timecode must be >= 0: {value}")
+    return sec
 
 
 def _extract_mono_pcm(video_path: Path, start_s: float = 0.0, end_s: float | None = None) -> np.ndarray:
@@ -175,12 +204,20 @@ def implied_clock_offset_s(video_path: Path, beep_src_s: float, fit_path: Path) 
     return (fit_start - beep_camera_time).total_seconds()
 
 
-def pick_start_beep(events: list[dict]) -> dict | None:
-    """在候选提示音里挑最像「开表」的那次：优先多音（滴-滴）且最靠后的那次。"""
+def pick_start_beep(events: list[dict], *, max_offset_s: float | None = DEFAULT_MAX_OFFSET_S) -> dict | None:
+    """在候选提示音里挑最像「开表」的那次：排除超出时钟偏差阈值的跑中提示音，优先多音且最靠后。"""
     if not events:
         return None
-    multi = [ev for ev in events if ev["note_count"] >= 2]
-    pool = multi or events
+    plausible = []
+    for ev in events:
+        off = ev.get("implied_clock_offset_s")
+        if off is not None and max_offset_s is not None and abs(float(off)) > max_offset_s:
+            continue
+        plausible.append(ev)
+    if not plausible:
+        return None
+    multi = [ev for ev in plausible if ev["note_count"] >= 2]
+    pool = multi or plausible
     return pool[-1]
 
 
@@ -189,10 +226,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--video", required=True, help="Video clip path (e.g. raw/YYYY-MM-DD-open.mp4)")
     parser.add_argument("--fit", help="Optional FIT path; computes implied clock_offset_s")
     parser.add_argument("--media-dir", help="Optional media dir; auto-finds FIT and prints calibrate command")
-    parser.add_argument("--after", type=float, default=0.0, help="Only scan after this source second")
-    parser.add_argument("--before", type=float, help="Only scan before this source second")
-    parser.add_argument("--around", type=float, help="Scan around this source second (e.g. '开表' ASR time)")
+    parser.add_argument("--after", type=parse_timecode, default=0.0, help="Scan after this source time (sec or MM:SS)")
+    parser.add_argument("--before", type=parse_timecode, help="Scan before this source time (sec or MM:SS)")
+    parser.add_argument("--around", type=parse_timecode, help="Scan around this source time (sec or MM:SS)")
     parser.add_argument("--window", type=float, default=6.0, help="Half-window in seconds for --around (default 6)")
+    parser.add_argument(
+        "--max-offset",
+        type=float,
+        default=DEFAULT_MAX_OFFSET_S,
+        help=f"Reject start-beep candidates with |implied_clock_offset_s| > this threshold (default {DEFAULT_MAX_OFFSET_S:.0f}s)",
+    )
     parser.add_argument("--min-ratio", type=float, default=15.0, help="Minimum narrowband local contrast ratio")
     parser.add_argument("--min-mag", type=float, default=2.0, help="Minimum FFT peak magnitude")
     parser.add_argument("--json", action="store_true", help="Emit JSON")
@@ -225,13 +268,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     if fit_path is not None and fit_path.is_file():
         for ev in events:
-            ev["implied_clock_offset_s"] = round(implied_clock_offset_s(video, ev["start_s"], fit_path), 3)
+            off = round(implied_clock_offset_s(video, ev["start_s"], fit_path), 3)
+            ev["implied_clock_offset_s"] = off
+            ev["plausible_start"] = abs(off) <= args.max_offset
 
-    best = pick_start_beep(events)
+    best = pick_start_beep(events, max_offset_s=args.max_offset)
     payload = {
         "video": str(video),
         "fit": str(fit_path) if fit_path else None,
         "window": {"start_s": start_s, "end_s": end_s},
+        "max_offset_s": args.max_offset,
         "events": events,
         "recommended": best,
     }
@@ -245,14 +291,25 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Detected {len(events)} watch beep candidate(s) in {video.name}:")
     for idx, ev in enumerate(events, start=1):
-        mark = " <-- recommended" if ev is best else ""
+        if ev is best:
+            mark = " <-- recommended"
+        elif ev.get("plausible_start") is False:
+            mark = f" [ignored: |offset| > {args.max_offset:.0f}s, likely mid-run countdown/lap beep]"
+        else:
+            mark = ""
         off_str = f", implied clock_offset_s={ev['implied_clock_offset_s']:+.3f}s" if "implied_clock_offset_s" in ev else ""
         print(
             f"  #{idx}: t={ev['start_s']:.3f}..{ev['end_s']:.3f}s "
             f"(notes={ev['note_count']}, peak={ev['peak_freq_hz']:.0f}Hz, "
             f"ratio={ev['max_local_ratio']:.1f}, mag={ev['max_mag']:.1f}{off_str}){mark}"
         )
-    if best and args.media_dir:
+    if best is None:
+        print(
+            f"\nNo plausible start beep within ±{args.max_offset:.0f}s clock offset "
+            "(adjust --max-offset if camera clock truly drifted farther)."
+        )
+        return 1
+    if args.media_dir:
         media_dir = Path(args.media_dir).expanduser().resolve()
         rel = media_layout.rel_media_path(video, media_dir)
         print(

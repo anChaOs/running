@@ -200,6 +200,28 @@ class ClockCalibrationTest(unittest.TestCase):
         self.assertAlmostEqual(ev["start_s"], 101.50, delta=0.05)
         self.assertAlmostEqual(ev["peak_freq_hz"], 7734.0, delta=30.0)
 
+    def test_parse_timecode_and_offset_guard(self) -> None:
+        self.assertAlmostEqual(beep.parse_timecode("104.35"), 104.35)
+        self.assertAlmostEqual(beep.parse_timecode("1:44"), 104.0)
+        self.assertAlmostEqual(beep.parse_timecode("1:44.5"), 104.5)
+        self.assertAlmostEqual(beep.parse_timecode("0:01:44.5"), 104.5)
+        for bad in ("", "-5", "1:60", "1:2:3:4"):
+            with self.assertRaises(ValueError):
+                beep.parse_timecode(bad)
+
+        # 跑中倒计时（反推偏移 -900s）绝不能被当成开表音推荐
+        countdown_only = [
+            {"start_s": 12.0, "note_count": 4, "implied_clock_offset_s": -900.0},
+        ]
+        self.assertIsNone(beep.pick_start_beep(countdown_only, max_offset_s=120.0))
+
+        # 合法开表音 + 离谱跑中音：只挑合法的
+        mixed = [
+            {"start_s": 104.3, "note_count": 2, "implied_clock_offset_s": 16.3},
+            {"start_s": 500.0, "note_count": 4, "implied_clock_offset_s": -380.0},
+        ]
+        self.assertEqual(beep.pick_start_beep(mixed, max_offset_s=120.0), mixed[0])
+
     def test_export_alphas_manifest_invalidates_reuse_on_clock_offset_change(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             media = Path(td)
