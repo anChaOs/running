@@ -7,7 +7,7 @@ faster-whisper large-v3-turbo 词级时间（专名表当提示，只纠拼写�
 
 产物：
   <wav>.words.json        词级识别缓存（force_align / check_subs 共用）
-  <wav 同名>.draft.srt    原始初稿，不要覆盖
+  draft-<wav stem>.srt    原始初稿（不与成片同前缀，避免 IINA 自动挂载），不要覆盖
   --txt 指定的 subtitles.txt
 """
 
@@ -213,7 +213,7 @@ def _draft(args) -> int:
     header = ["# 字幕初稿（单行短条；时间是成片轴，草稿，未对口型）", "# 这一轮只改字。改好后跑 force_align.py 对时间。"]
     txt.parent.mkdir(parents=True, exist_ok=True)
     sc.write_txt(txt, header, cues)
-    draft = wav.with_suffix(".draft.srt")
+    draft = wav.with_name(f"draft-{wav.stem}.srt")
     sc.write_srt(draft, cues)
     print(f"cues={len(cues)}\n写入 {txt}\n原始初稿 {draft}（不要覆盖）")
     try:

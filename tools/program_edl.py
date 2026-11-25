@@ -579,7 +579,7 @@ def freeze(table: dict) -> dict:
     return table
 
 
-def validate(table: dict, *, require_frozen: bool = False) -> list[str]:
+def validate(table: dict, *, require_frozen: bool = False, check_subs_stale: bool = True) -> list[str]:
     """返回问题列表。空列表表示时间表自洽。"""
     problems: list[str] = []
     if table.get("version") != VERSION:
@@ -653,7 +653,7 @@ def validate(table: dict, *, require_frozen: bool = False) -> list[str]:
         problems.append(str(exc))
     if require_frozen and not table.get("frozen"):
         problems.append("program is not frozen")
-    if table.get("subs_stale"):
+    if check_subs_stale and table.get("subs_stale"):
         problems.append("subtitles are stale; realign them to this timeline")
     return problems
 
