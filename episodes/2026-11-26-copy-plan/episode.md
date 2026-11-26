@@ -27,4 +27,4 @@ media: ~/Movies/running-content/2026-11-26-copy-plan/
 
 - YouTube：https://youtu.be/MGPX3YW9HSU
 - Bilibili：https://www.bilibili.com/video/BV1VAymzQEoB
-- 抖音：
+- 抖音：https://v.douyin.com/eUi2B1mtwhg/
