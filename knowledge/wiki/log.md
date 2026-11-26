@@ -33,4 +33,18 @@
 
 - 清理 [[VO2max]] `sources` 中的内部 `wiki/` 路径并补充 `aliases`；新增 `tools/kb_lint.py` 校验通过（0 error）。
 - 为 `wiki/running/` 下其余 20 页批量补充 `aliases` 中英文简称与俗称，经 `tools/kb_lint.py` 校验无别名冲突。
+- 核对高温与热适应文献摘要（Ely 2007、Mantzios 2022、Nybo 2014、Périard 2021、Racinais 2015、Sawka 2007、Tyler 2016/2024），原文摘录进 `raw/running/physiology/heat-stress-abstracts-2026-11-25.md`，新建概念页 [[温度与热应激]] 并与 [[夏训保量]] 双向互链。
+- 批量调研并入库 4 个新概念页（均先核对 PubMed/PMC 原始摘要写入 `raw/running/physiology/`）：
+  - [[碳板鞋与跑鞋力学]]（`aft-shoes-abstracts-2026-11-25.md`：Hoogkamer 2018、Healey & Hoogkamer 2022、Tenforde 2023、Malisoux 2015、Joubert 2023）
+  - [[高原训练与高住低训]]（`altitude-training-abstracts-2026-11-25.md`：Levine & Stray-Gundersen 1997、Siebenmann 2012、Saugy 2016/2017、Porcari 2016、Garvican-Lewis 2016、Stellingwerff 2019、Chapman 2014）
+  - [[体重与马拉松配速]]（`weight-performance-abstracts-2026-11-25.md`：Cureton 1978、Hoogkamer 2016、Garthe 2011、Hall 2011）
+  - [[赛前减量]]（`tapering-abstracts-2026-11-25.md`：Bosquet 2007、Mujika & Padilla 2003、Smyth & Lawlor 2021、Campbell & Turner 2018）
+  - 同步更新 `index.md` 与 [[跑步经济性与力量]]、[[日常能量与吸收]]、[[相对能量缺乏与骨应力]]、[[训练强度分布]] 的双向 `related` 互链。
+
+## 2026-11-26
+
+- 按原始文献摘要标准补齐 3 个既有概念页缺口（新增 3 份 `raw/running/physiology/*-2026-11-26.md` 核对稿，不改旧 `raw/`）：
+  - [[训练强度分布]]：补齐 Seiler 2010（80/20 课次口径 vs 时间口径）、Muñoz et al. 2014（业余 10 km 极化 RCT）、Bull et al. 2020（WHO 2020 指南 150–300′ 中等 / 75–150′ 高强度）。
+  - [[乳酸阈]]：补齐 Robergs et al. 2004（2004 酸中毒翻案）、Brooks 2018（乳酸穿梭）、Faude et al. 2009（25 种 LT 概念三分框架）、McGehee et al. 2005（30′ 场地测 SEE 0.21 m/s、8.0 bpm），并更新索引摘要。
+  - [[停训与复训]]：补齐 Coyle et al. 1986（血浆容量 −12% 致 SV 降与心率虚高）、Madsen et al. 1993（VO₂max 不变但力竭时间 −21% 与 RER 升高）、Billat et al. 2000（30s/30s 短间歇 VO₂max 时间与复训软组织边界），并补充与 [[赛前减量]]、[[肌腱病连续体与复跑]] 的互链。
 
