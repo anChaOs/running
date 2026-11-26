@@ -39,7 +39,7 @@
   - [[高原训练与高住低训]]（`altitude-training-abstracts-2026-11-25.md`：Levine & Stray-Gundersen 1997、Siebenmann 2012、Saugy 2016/2017、Porcari 2016、Garvican-Lewis 2016、Stellingwerff 2019、Chapman 2014）
   - [[体重与马拉松配速]]（`weight-performance-abstracts-2026-11-25.md`：Cureton 1978、Hoogkamer 2016、Garthe 2011、Hall 2011）
   - [[赛前减量]]（`tapering-abstracts-2026-11-25.md`：Bosquet 2007、Mujika & Padilla 2003、Smyth & Lawlor 2021、Campbell & Turner 2018）
-  - 同步更新 `index.md` 与 [[跑步经济性与力量]]、[[日常能量与吸收]]、[[相对能量缺乏与骨应力]]、[[训练强度分布]] 的双向 `related` 互链。
+- 同步更新 `index.md` 与 [[跑步经济性与力量]]、[[日常能量与吸收]]、[[相对能量缺乏与骨应力]]、[[训练强度分布]] 的双向 `related` 互链。
 
 ## 2026-11-26
 
