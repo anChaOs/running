@@ -59,11 +59,28 @@ biliup -u ~/Movies/running-content/.biliup/cookies.json renew
 | 并发 `--limit` | `6` |
 | 标签 | 「## 标签」下 B 站那一段（代码块或「B 站：」同一行）。去掉 `#`，逗号分隔。最多 10 个，单条 ≤ 20 个码位。不要用 YouTube 那一段，也不要写死一套默认标签 |
 | 版权 | `copyright=1`（自制） |
-| 线路 `-l` | 优先 `bda2`；证书/超时/SSL 再换 `bldsa` / `tx` / `qn` |
+| 线路 `-l` | 本机优先 `bda2` / `tx`；云端 `us-west1` 用 `ws`（备选 `qn`）；证书/超时再换线 |
 | Cookie | `~/Movies/running-content/.biliup/cookies.json` |
 | 稿件 | `https://member.bilibili.com/x/vu/web/add/v3?csrf=<bili_jct>` |
 
 脚本自己从 `--media-dir` 的目录名找到 `episodes/<slug>/plan.md`。不在仓库根目录跑时，这个定位仍然有效。
+
+## 云端异步投稿（GCS + Cloud Run Job，可合盖断网）
+
+需要与 `/p3-youtube` 共用同一份 `gs://<bucket>/staging/<slug>/video.mp4`、传完 GCS 即合盖断网时，使用 `tools/publish/bilibili_cloud.py`（一次部署见 `tools/publish/cloud_bili/deploy.sh`，默认 `us-west1` + `ws` 线路）：
+
+```bash
+# 1. 触发云端投稿（若 YouTube 已把 video.mp4 传进 GCS staging，自动跳过视频重传）
+.venv/bin/python tools/publish/bilibili_cloud.py upload \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
+
+# 2. 稍后取回 BV 号与链接并标 bilibili: done
+.venv/bin/python tools/publish/bilibili_cloud.py result \
+  --media-dir ~/Movies/running-content/YYYY-MM-DD-slug
+
+# 3. 本机 cookies.json renew/重新扫码后同步到 Secret Manager
+.venv/bin/python tools/publish/bilibili_cloud.py sync-cookies
+```
 
 ## 命令模板
 

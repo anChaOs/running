@@ -300,6 +300,31 @@ class YoutubeCloudTests(unittest.TestCase):
             self.assertIn("旧期\\|新标题", rendered)
             self.assertIn("| 5 files |", rendered)
 
+    def test_should_keep_gcs_staging_when_bili_metadata_exists(self) -> None:
+        bucket = mock.Mock()
+        bili_blob = mock.Mock()
+        bili_blob.exists.return_value = True
+        bucket.blob.return_value = bili_blob
+        client = mock.Mock()
+        client.bucket.return_value = bucket
+        with mock.patch.object(job_main.storage, "Client", return_value=client):
+            removed = job_main.cleanup_gcs_staging("bucket", "2026-11-27-taper-week")
+        self.assertEqual(removed, 0)
+        client.list_blobs.assert_not_called()
+        bucket.blob.assert_called_with("staging/2026-11-27-taper-week/bili_metadata.json")
+
+    def test_should_delete_gcs_staging_when_bili_metadata_is_absent(self) -> None:
+        blob = mock.Mock()
+        bucket = mock.Mock()
+        bucket.blob.return_value.exists.return_value = False
+        client = mock.Mock()
+        client.bucket.return_value = bucket
+        client.list_blobs.return_value = [blob]
+        with mock.patch.object(job_main.storage, "Client", return_value=client):
+            removed = job_main.cleanup_gcs_staging("bucket", "slug")
+        self.assertEqual(removed, 1)
+        blob.delete.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -876,6 +876,34 @@ class BilibiliUploadTests(unittest.TestCase):
         self.assertTrue(all(item.closed for item in created))
         self.assertEqual(sorted(reads), [(0, 4), (4, 8), (8, 12), (12, 16)])
 
+    def test_should_put_custom_tid_and_copyright_on_submit(self) -> None:
+        class SubmitSession:
+            def __init__(self) -> None:
+                self.payload: dict | None = None
+
+            def post(self, url: str, **kwargs: object) -> FakeResponse:
+                payload = kwargs.get("json")
+                self.payload = payload if isinstance(payload, dict) else None
+                return FakeResponse(json_data={"code": 0, "data": {"bvid": "BV1tid", "aid": 3}})
+
+        session = SubmitSession()
+        bilibili_upload.submit_video(
+            session,
+            cookies={"bili_jct": "jct-token"},
+            title="标题",
+            desc="简介",
+            tags=["跑步"],
+            cover="https://img/16x9.jpg",
+            cover43="https://img/4x3.jpg",
+            filename="n220101abcdef",
+            biz_id=42,
+            tid=137,
+            copyright=2,
+        )
+        assert session.payload is not None
+        self.assertEqual(session.payload["tid"], 137)
+        self.assertEqual(session.payload["copyright"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()
