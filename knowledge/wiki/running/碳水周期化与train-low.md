@@ -12,6 +12,7 @@ sources:
   - raw/running/bili-up/04-运动营养.md
   - raw/running/bili-up/04-运动营养-一页速查.md
 related:
+  - 赛前断碳与冲碳
   - 耐力赛能量补充
   - 日常能量与吸收
   - 相对能量缺乏与骨应力

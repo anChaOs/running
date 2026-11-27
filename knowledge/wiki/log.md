@@ -48,3 +48,7 @@
   - [[乳酸阈]]：补齐 Robergs et al. 2004（2004 酸中毒翻案）、Brooks 2018（乳酸穿梭）、Faude et al. 2009（25 种 LT 概念三分框架）、McGehee et al. 2005（30′ 场地测 SEE 0.21 m/s、8.0 bpm），并更新索引摘要。
   - [[停训与复训]]：补齐 Coyle et al. 1986（血浆容量 −12% 致 SV 降与心率虚高）、Madsen et al. 1993（VO₂max 不变但力竭时间 −21% 与 RER 升高）、Billat et al. 2000（30s/30s 短间歇 VO₂max 时间与复训软组织边界），并补充与 [[赛前减量]]、[[肌腱病连续体与复跑]] 的互链。
 
+## 2026-11-27
+
+- 新建并深度扩充概念页 [[赛前断碳与冲碳]]（原始摘要核对稿 `raw/running/physiology/carb-loading-abstracts-2026-11-27.md`，覆盖 23 篇 PubMed/PMC 权威文献）：整合三大国际权威共识（ACSM/AND/DC 2016、ISSN 2017、IAAF 2019 共识与长跑专项综述）、三代冲碳协议演进（Bergström 1967、Sherman 1981、Bussau 2002、Fairchild 2002）、亚细胞与分子机制（Ørtenblad 2013 肌原纤维内糖原-Ca²⁺、Hingst 2018 AMPK/GS）、肝糖原与果糖协同（Gonzalez 2016）、3–5 天维持窗（Goforth 1997、Arnall 2007）、离心肌损伤（Costill 1990、Solem 2025 meta）、低 FODMAP 胃肠策略（Lis 2018）及 90% 实地知行脱节（Sampson 2024）；同步更新 `index.md` 及双向 `related` 互链。
+
