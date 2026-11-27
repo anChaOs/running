@@ -13,10 +13,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import txt_to_ass as ta  # noqa: E402
 
 
-def test_style_matches_burned_episodes():
+def test_style_is_slightly_larger_and_tracked():
+    """官方默认：字号 72→80，字间距 Spacing/\\fsp 0→3。字体、描边、底边距不动。"""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from export_spec import FINAL_SPEC
+
+    sub = FINAL_SPEC.subtitle
+    assert (sub.font_size, sub.spacing, sub.margin_v) == (80, 3, 100)
     cues = [("0:00:02.97", "0:00:05.48", "大家好 我是安超")]
     text = ta.render_ass(cues)
-    assert "Style: Default,Source Han Sans SC Heavy,72,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,0,2,80,80,100,1\n" in text
+    style = (
+        "Style: Default,Source Han Sans SC Heavy,"
+        f"{sub.font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,"
+        f"0,0,0,0,100,100,{sub.spacing},0,1,3,0,2,80,80,{sub.margin_v},1\n"
+    )
+    assert style in text
     assert "PlayResX: 1920\nPlayResY: 1080\n" in text
     assert text.endswith("Dialogue: 0,0:00:02.97,0:00:05.48,Default,,0,0,0,,大家好 我是安超\n")
 

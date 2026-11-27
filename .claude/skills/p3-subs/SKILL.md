@@ -81,3 +81,5 @@ description: 字幕支路：faster-whisper large-v3-turbo 转写（忠于原句�
 ## 完成后（字幕已 confirmed）
 
 > 下一步走最终导出：`final_export.py --confirmed`（缺的透明层或响度会自动补齐）。还要 60–90 秒短视频才提 `/p3-jianying`。
+
+烧字 ASS 由 `final_export.py` 调 `txt_to_ass.py` 生成，样式以 `tools/export-spec.json` 的 `subtitle` 为准：Source Han Sans SC Heavy，字号 **80**（原先 72），字间距 Spacing **3**（ASS `\fsp`，中文也拉开；原先 0），Outline 3，MarginV 100。不要在 `subtitles.txt` 里写样式，也不要回改已发布成片的字幕。

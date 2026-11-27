@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """把 subtitles.txt 收成烧字 ASS。
 
-样式与已烧进成片的各期 subtitles.ass 相同（Source Han Sans SC Heavy / 72 / Outline 3 / MarginV 100），不另起一套。
+官方烧字样式从 export-spec.json 的 subtitle 读，不另起一套：
+Source Han Sans SC Heavy / Fontsize / Spacing（ASS \\fsp，中文也加字距）/ Outline 3 / MarginV。
+已发布成片里烧过的旧字幕不回改；之后的导出用这份默认。
 不进 git。默认写在 txt 旁边。--media-dir 再拷到媒体目录。
 """
 
@@ -30,7 +32,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Source Han Sans SC Heavy,{spec.subtitle.font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,0,2,80,80,{spec.subtitle.margin_v},1
+Style: Default,Source Han Sans SC Heavy,{spec.subtitle.font_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,{spec.subtitle.spacing},0,1,3,0,2,80,80,{spec.subtitle.margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

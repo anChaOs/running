@@ -4,7 +4,8 @@
 只做「排版 + 合成」这一步，把每期手工重复的活固定下来：
   - 人像：已抠好的 RGBA PNG（推荐），或原自拍 + 本机装了 rembg 时自动抠
   - 背景：AI／设计底图（任意尺寸，按比例 cover 裁切；不要用 HUD preview）
-  - 字：封面句大字（硬性下限，小图可读）+ 系列名「破三实验室」（较小但可读）
+  - 字：多行封面句分出焦点（更大、强调色、略松字距、白边黑描边），其余行更小且换色；
+    系列名「破三实验室」仍更小。人物缩放和落点不动，抠图里的手和手势保持入画。
 三个比例各自重排人物和字，不是从 16:9 裁出来。脚本不打开任何图片查看器。
 
 例：
@@ -25,6 +26,7 @@ import json
 import re
 import shutil
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -43,12 +45,174 @@ FORMATS = [
     ("cover-16x9-1920x1080.jpg", 1920, 1080, "landscape"),
 ]
 
-# 硬性字号下限（占画面高度的比例）。封面句宁可少字多行也不缩到这之下。
+# 硬性字号下限（占画面高度的比例）。量的是焦点行；宁可少字多行也不缩到这之下。
 TITLE_MIN_FRAC = {"landscape": 0.11, "portrait": 0.075}
-SERIES_RATIO = 0.42      # 系列名 ≈ 封面句的 42%
+SERIES_RATIO = 0.42      # 系列名 ≈ 焦点行的 42%
 SERIES_MIN_FRAC = 0.045  # 系列名也有下限，保证可读
+SERIES_TRACK_EM = 0.14   # 系列名当标签，字距略松
 THUMB_W = 320            # 手机信息流小图宽度，自检用
-THUMB_MIN_PX = 22        # 小图上封面句字高至少这么多像素
+THUMB_MIN_PX = 22        # 小图上焦点行字高至少这么多像素
+# 焦点行默认琥珀金。次行白，更小的一档暖米。纯白焦点会和次行糊成一片，所以近白改回金。
+FOCAL_RGB = (255, 208, 48)
+SUPPORT_RGB = (255, 255, 255)
+TERTIARY_RGB = (255, 228, 176)
+SERIES_RGB = (255, 214, 0)
+INK = (10, 10, 10, 255)
+EDGE_RGB = (255, 255, 255, 255)
+
+
+@dataclass(frozen=True)
+class LineStyle:
+    scale: float
+    track_em: float
+    fill: tuple[int, int, int, int]
+    focal: bool
+
+
+@dataclass(frozen=True)
+class TitleLayout:
+    styles: list[LineStyle]
+    sizes: list[int]
+    widths: list[int]
+    gap: int
+    block_w: int
+    block_h: int
+
+
+def _near(a: tuple[int, ...], b: tuple[int, ...], tol: int = 18) -> bool:
+    return all(abs(int(x) - int(y)) <= tol for x, y in zip(a, b))
+
+
+def resolve_focal_color(color: tuple[int, ...]) -> tuple[int, int, int, int]:
+    """焦点行填色。接近纯白（旧的整句默认）改回琥珀金，保证和白字次行分开。"""
+    rgb = tuple(int(c) for c in color[:3])
+    if _near(rgb, (255, 255, 255)):
+        rgb = FOCAL_RGB
+    return (*rgb, 255)
+
+
+def parse_title_color(text: str) -> tuple[int, int, int, int]:
+    parts = [p.strip() for p in text.split(",")]
+    if len(parts) != 3:
+        raise SystemExit("--title-color 需要 R,G,B")
+    try:
+        rgb = tuple(int(p) for p in parts)
+    except ValueError as exc:
+        raise SystemExit("--title-color 需要 R,G,B 三个整数") from exc
+    if any(c < 0 or c > 255 for c in rgb):
+        raise SystemExit("--title-color 每个通道要在 0–255")
+    return resolve_focal_color(rgb)
+
+
+def _hook_line(line: str) -> bool:
+    """数字或拉丁钩子（80/20、10km、Go Ultra）单独当焦点。"""
+    if re.search(r"\d", line):
+        return True
+    compact = re.sub(r"\s+", "", line)
+    if not compact:
+        return False
+    latin = sum(1 for ch in compact if ("A" <= ch <= "Z") or ("a" <= ch <= "z"))
+    return latin >= 2 and latin / len(compact) >= 0.5
+
+
+def focal_index(lines: list[str]) -> int:
+    if len(lines) <= 1:
+        return 0
+    hooks = [i for i, line in enumerate(lines) if _hook_line(line)]
+    if len(hooks) == 1:
+        return hooks[0]
+    return len(lines) - 1
+
+
+def title_styles(lines: list[str], focal_color: tuple[int, int, int, int]) -> list[LineStyle]:
+    """多行字号阶梯 + 分色。焦点 1.0，相邻约 0.82，再远约 0.70。"""
+    n = len(lines)
+    focal = focal_index(lines)
+    if n <= 1:
+        scales = [1.0]
+    elif n == 2:
+        scales = [1.0, 0.78] if focal == 0 else [0.78, 1.0]
+    else:
+        scales = [0.70] * n
+        scales[focal] = 1.0
+        others = sorted((i for i in range(n) if i != focal), key=lambda i: (abs(i - focal), i))
+        ladder = (0.82, 0.70, 0.64)
+        for rank, i in enumerate(others):
+            scales[i] = ladder[min(rank, len(ladder) - 1)]
+    nonfocal = sorted({scales[i] for i in range(n) if i != focal}, reverse=True)
+    secondary = nonfocal[0] if nonfocal else None
+    support = (*SUPPORT_RGB, 255)
+    tertiary = (*TERTIARY_RGB, 255)
+    if _near(focal_color, tertiary, tol=28):
+        tertiary = (186, 224, 255, 255)
+    if _near(focal_color, support, tol=28):
+        support = (210, 236, 255, 255)
+    styles: list[LineStyle] = []
+    for i, scale in enumerate(scales):
+        if i == focal:
+            styles.append(LineStyle(scale, 0.08, focal_color, True))
+        elif scale == secondary:
+            styles.append(LineStyle(scale, 0.03, support, False))
+        else:
+            styles.append(LineStyle(scale, 0.03, tertiary, False))
+    return styles
+
+
+def line_stroke(size: int, focal: bool) -> int:
+    if focal:
+        return max(4, size // 11)
+    return max(3, size // 13)
+
+
+def glyph_tracking(size: int, track_em: float) -> int:
+    return max(0, int(round(size * track_em)))
+
+
+def _char_advance(font: ImageFont.FreeTypeFont, ch: str) -> float:
+    return float(font.getlength(ch))
+
+
+def tracked_width(font: ImageFont.FreeTypeFont, text: str, tracking: int, stroke: int) -> int:
+    if not text:
+        return 0
+    adv = sum(_char_advance(font, ch) for ch in text) + tracking * (len(text) - 1)
+    return int(round(adv + stroke * 2))
+
+
+def _draw_tracked(
+    draw: ImageDraw.ImageDraw,
+    x: int,
+    y: int,
+    text: str,
+    font: ImageFont.FreeTypeFont,
+    fill: tuple[int, int, int, int],
+    stroke_w: int,
+    stroke_fill: tuple[int, int, int, int],
+    tracking: int,
+) -> None:
+    cursor = float(x)
+    for ch in text:
+        draw.text((cursor, y), ch, font=font, fill=fill, stroke_width=stroke_w, stroke_fill=stroke_fill)
+        cursor += _char_advance(font, ch) + tracking
+
+
+def layout_title(
+    lines: list[str],
+    font_path: str | Path,
+    focal_size: int,
+    styles: list[LineStyle],
+) -> TitleLayout:
+    sizes = [max(8, int(round(focal_size * style.scale))) for style in styles]
+    for i, style in enumerate(styles):
+        if style.focal:
+            sizes[i] = focal_size
+    widths: list[int] = []
+    for line, style, size in zip(lines, styles, sizes):
+        font = ImageFont.truetype(str(font_path), size)
+        widths.append(tracked_width(font, line, glyph_tracking(size, style.track_em), line_stroke(size, style.focal)))
+    gap = max(4, int(round(focal_size * 0.14))) if len(lines) > 1 else 0
+    block_h = sum(sizes) + gap * (len(sizes) - 1)
+    return TitleLayout(styles, sizes, widths, gap, max(widths, default=0), block_h)
 
 
 U2NET_PATHS = [Path.home() / ".u2net/u2net.onnx",
@@ -117,18 +281,25 @@ def load_person(path: Path, *, cache_dir: Path | None = None) -> Image.Image:
     return cut
 
 
-def precheck_title(lines: list[str], font_path: str | Path) -> None:
+def precheck_title(lines: list[str], font_path: str | Path, focal_color: tuple[int, int, int, int]) -> None:
     """在耗时抠图之前先做快速字号预检，明显放不下时 0.05 秒直接失败。"""
     for _name, W, H, layout in FORMATS:
         margin = int(min(W, H) * 0.05)
         if layout == "portrait":
             box_w, box_h = W - 2 * margin, int(H * 0.30)
+            # 竖版人物最高约占 60% 画高，字要停在这之上。
+            person_top = H - int(H * 0.60)
+            bottom = person_top - text_gap_above_person(H)
         else:
             # 抠图前未知人像精确宽高，按极保守人像占宽（20% 画宽）做上界预检；
             # 避免窄全身自拍被误杀，若连 20% 下界都放不下，抠完图一定放不下。
             box_w, box_h = W - 2 * margin - int(W * 0.20), int(H * 0.72)
+            bottom = None
         min_px = max(int(H * TITLE_MIN_FRAC[layout]), -(-THUMB_MIN_PX * W // THUMB_W))
-        if fit_title(lines, font_path, box_w, box_h, min_px, int(H * 0.30)) is None:
+        if fit_title(
+            lines, font_path, box_w, box_h, min_px, int(H * 0.30), focal_color,
+            frame_h=H, margin=margin, bottom=bottom,
+        ) is None:
             raise SystemExit(
                 f"{W}x{H}：封面句在最小字号 {min_px}px 下放不下（{lines}）。"
                 "按规则不缩字：用 | 多断一行，或减字。"
@@ -210,45 +381,101 @@ def split_title(title: str, max_lines: int = 3) -> list[str]:
     return [p for p in parts if p]
 
 
-def text_size(font: ImageFont.FreeTypeFont, s: str, stroke: int) -> tuple[int, int]:
-    b = font.getbbox(s, stroke_width=stroke)
-    return b[2] - b[0], b[3] - b[1]
+def text_gap_above_person(frame_h: int) -> int:
+    """竖版字块停在人物头顶之上，避免焦点行压住举起的手。"""
+    return max(12, int(frame_h * 0.035))
 
 
-def fit_title(lines, font_path, box_w, box_h, min_px, max_px):
+def title_ink_overflow(size: int) -> int:
+    """末行描边、投影和模糊会伸出 em 框，竖版要算进人物头顶的空隙。"""
+    return line_stroke(size, True) + max(3, size // 18) + max(2, size // 30)
+
+
+def fit_title(
+    lines,
+    font_path,
+    box_w,
+    box_h,
+    min_px,
+    max_px,
+    focal_color=(*FOCAL_RGB, 255),
+    *,
+    frame_h: int = 0,
+    margin: int = 0,
+    bottom: int | None = None,
+):
+    """二分焦点行字号。次行按 title_styles 缩小，整块仍要落进字框。
+
+    bottom 给定时（竖版），系列名起点之下的标题块必须停在人物头顶之上。
+    """
+    styles = title_styles(lines, focal_color)
     lo, hi, best = min_px, max_px, None
     while lo <= hi:
         mid = (lo + hi) // 2
-        f = ImageFont.truetype(str(font_path), mid)
-        st = max(3, mid // 12)
-        ws = [text_size(f, l, st)[0] for l in lines]
-        total_h = int(mid * 1.18 * len(lines))
-        if max(ws) <= box_w and total_h <= box_h:
+        layout = layout_title(lines, font_path, mid, styles)
+        ok = layout.block_w <= box_w and layout.block_h <= box_h
+        if ok and bottom is not None:
+            s_size = max(int(mid * SERIES_RATIO), int(frame_h * SERIES_MIN_FRAC))
+            ty = margin + int(s_size * 1.4)
+            ok = ty + layout.block_h + title_ink_overflow(mid) <= bottom
+        if ok:
             best, lo = mid, mid + 1
         else:
             hi = mid - 1
     return best
 
 
-def draw_block(img, x, y, lines, size, font_path, align="left", color=(255, 255, 255, 255)):
-    f = ImageFont.truetype(str(font_path), size)
-    st = max(3, size // 12)
+def _line_origin(x: int, align: str, block_w: int, line_w: int) -> int:
+    if align == "left":
+        return x
+    return x + (block_w - line_w) // 2
+
+
+def draw_label(img, x, y, text, size, font_path, color, align="left", track_em=SERIES_TRACK_EM):
+    """系列名：小一号、略松字距，不跟焦点行抢同一套描边。"""
+    font = ImageFont.truetype(str(font_path), size)
+    stroke = max(3, size // 14)
+    tracking = glyph_tracking(size, track_em)
+    width = tracked_width(font, text, tracking, stroke)
+    origin = _line_origin(x, align, width, width)
     shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
     sd = ImageDraw.Draw(shadow)
-    d = ImageDraw.Draw(img)
-    lh = int(size * 1.18)
-    widths = [text_size(f, l, st)[0] for l in lines]
-    block_w = max(widths)
-    for i, l in enumerate(lines):
-        lx = x if align == "left" else x + (block_w - widths[i]) // 2
-        ly = y + i * lh
-        off = max(3, size // 18)
-        sd.text((lx + off, ly + off), l, font=f, fill=(0, 0, 0, 170), stroke_width=st, stroke_fill=(0, 0, 0, 170))
-    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(max(2, size // 30))))
-    for i, l in enumerate(lines):
-        lx = x if align == "left" else x + (block_w - widths[i]) // 2
-        d.text((lx, y + i * lh), l, font=f, fill=color, stroke_width=st, stroke_fill=(10, 10, 10, 255))
-    return block_w, lh * len(lines)
+    off = max(2, size // 18)
+    _draw_tracked(sd, origin + off, y + off, text, font, (0, 0, 0, 150), stroke, (0, 0, 0, 150), tracking)
+    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(max(2, size // 28))))
+    _draw_tracked(ImageDraw.Draw(img), origin, y, text, font, color, stroke, INK, tracking)
+    return width, size
+
+
+def draw_title_block(img, x, y, lines, layout: TitleLayout, font_path, align="left"):
+    """焦点行：填色 + 白内边 + 黑外描边。其余行：填色 + 黑描边。字距按行分开。"""
+    fonts = [ImageFont.truetype(str(font_path), size) for size in layout.sizes]
+    strokes = [line_stroke(size, style.focal) for size, style in zip(layout.sizes, layout.styles)]
+    trackings = [glyph_tracking(size, style.track_em) for size, style in zip(layout.sizes, layout.styles)]
+    shadow = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    cy = y
+    for i, line in enumerate(lines):
+        lx = _line_origin(x, align, layout.block_w, layout.widths[i])
+        off = max(3, layout.sizes[i] // 18)
+        _draw_tracked(sd, lx + off, cy + off, line, fonts[i], (0, 0, 0, 170), strokes[i], (0, 0, 0, 170), trackings[i])
+        cy += layout.sizes[i] + layout.gap
+    blur = max(2, max(layout.sizes) // 30)
+    img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(blur)))
+    draw = ImageDraw.Draw(img)
+    cy = y
+    for i, line in enumerate(lines):
+        lx = _line_origin(x, align, layout.block_w, layout.widths[i])
+        style = layout.styles[i]
+        if style.focal:
+            _draw_tracked(draw, lx, cy, line, fonts[i], INK, strokes[i], INK, trackings[i])
+            edge = max(2, layout.sizes[i] // 22)
+            _draw_tracked(draw, lx, cy, line, fonts[i], EDGE_RGB, edge, EDGE_RGB, trackings[i])
+            _draw_tracked(draw, lx, cy, line, fonts[i], style.fill, 0, style.fill, trackings[i])
+        else:
+            _draw_tracked(draw, lx, cy, line, fonts[i], style.fill, strokes[i], INK, trackings[i])
+        cy += layout.sizes[i] + layout.gap
+    return layout.block_w, layout.block_h
 
 
 def compose(bg, person_ol, lines, series, font_path, W, H, layout, side, title_color):
@@ -265,6 +492,7 @@ def compose(bg, person_ol, lines, series, font_path, W, H, layout, side, title_c
         tx0 = margin if side == "right" else px + p.width + margin // 2
         tx1 = px - margin // 2 if side == "right" else W - margin
         box_w, box_h = tx1 - tx0, int(H * 0.72)
+        text_bottom = None
     else:
         ph = int(H * 0.60)
         p = person_ol.resize((int(person_ol.width * ph / person_ol.height), ph), Image.LANCZOS)
@@ -273,21 +501,29 @@ def compose(bg, person_ol, lines, series, font_path, W, H, layout, side, title_c
             p = person_ol.resize((pw, int(person_ol.height * pw / person_ol.width)), Image.LANCZOS)
         img.alpha_composite(p, ((W - p.width) // 2, H - p.height))
         tx0, box_w, box_h = margin, W - 2 * margin, int(H * 0.30)
-    # 两条下限取大：画高比例，和 320px 小图字高门（16:9 下后者更严），免得排出来再被自检打回
+        text_bottom = (H - p.height) - text_gap_above_person(H)
+    # 两条下限取大：画高比例，和 320px 小图字高门（16:9 下后者更严），免得排出来再被自检打回。
+    # 下限量焦点行；次行按比例缩小，不把每一行都撑到同一字号。
+    focal = title_color if len(title_color) == 4 else resolve_focal_color(title_color)
     min_px = max(int(H * TITLE_MIN_FRAC[layout]), -(-THUMB_MIN_PX * W // THUMB_W))
-    size = fit_title(lines, font_path, box_w, box_h, min_px, int(H * 0.30))
+    size = fit_title(
+        lines, font_path, box_w, box_h, min_px, int(H * 0.30), focal,
+        frame_h=H, margin=margin, bottom=text_bottom,
+    )
     if size is None:
         raise SystemExit(
             f"{W}x{H}：封面句在最小字号 {min_px}px 下放不下（{lines}）。"
             "按规则不缩字：用 | 多断一行，或减字。")
+    styles = title_styles(lines, focal)
+    placed = layout_title(lines, font_path, size, styles)
     s_size = max(int(size * SERIES_RATIO), int(H * SERIES_MIN_FRAC))
     ty = margin + int(s_size * 1.4)
     if layout == "landscape":
-        ty = max(ty, (H - int(size * 1.18 * len(lines))) // 2 - int(s_size * 0.7))
-    draw_block(img, tx0, ty - int(s_size * 1.35), [series], s_size, font_path, color=(255, 214, 0, 255))
-    draw_block(img, tx0, ty, lines, size, font_path, color=title_color)
+        ty = max(ty, (H - placed.block_h) // 2 - int(s_size * 0.7))
+    draw_label(img, tx0, ty - int(s_size * 1.35), series, s_size, font_path, (*SERIES_RGB, 255))
+    draw_title_block(img, tx0, ty, lines, placed, font_path)
     thumb_px = size * THUMB_W / W
-    return img.convert("RGB"), size, s_size, thumb_px
+    return img.convert("RGB"), size, s_size, thumb_px, placed.sizes
 
 
 def main() -> int:
@@ -300,7 +536,11 @@ def main() -> int:
     ap.add_argument("--side", choices=["right", "left"], default="right", help="横版人物在哪侧（默认右，字在左半）")
     ap.add_argument("--font", default=str(DEFAULT_FONT))
     ap.add_argument("--stroke-frac", type=float, default=0.018, help="白描边宽 / 人像高")
-    ap.add_argument("--title-color", default="255,255,255", help="封面句颜色 R,G,B（默认白，配深描边）")
+    ap.add_argument(
+        "--title-color",
+        default="255,208,48",
+        help="焦点行填色 R,G,B（默认琥珀金）。其余行固定白/暖米。接近纯白时仍用琥珀金。",
+    )
     ap.add_argument("--prefix", default="", help="出候选时加前缀，如 cover-candidates/b-")
     args = ap.parse_args()
     with log_timeline.span(Path(args.out_dir).expanduser(), "cover") as wall:
@@ -311,27 +551,29 @@ def main() -> int:
 def _compose(args) -> int:
     out = Path(args.out_dir).expanduser()
     lines = split_title(args.title)
-    precheck_title(lines, args.font)
+    color = parse_title_color(args.title_color)
+    precheck_title(lines, args.font, color)
     work = out / "cover-work"
     work.mkdir(parents=True, exist_ok=True)
     person = load_person(Path(args.person).expanduser(), cache_dir=work)
     ol = outline(person, args.stroke_frac)
     ol.save(work / "person-outlined.png")
     bg = Image.open(Path(args.bg).expanduser())
-    color = tuple(int(c) for c in args.title_color.split(",")) + (255,)
     ok = True
     written = []
     dest_dir = media_layout.cover_dest_dir(out, args.prefix)
     for name, W, H, layout in FORMATS:
-        img, size, s_size, thumb = compose(bg, ol, lines, args.series, args.font, W, H, layout, args.side, color)
+        img, size, s_size, thumb, sizes = compose(
+            bg, ol, lines, args.series, args.font, W, H, layout, args.side, color
+        )
         dst = dest_dir / f"{args.prefix}{name}"
         dst.parent.mkdir(parents=True, exist_ok=True)
         img.save(dst, quality=92)
         written.append(dst)
         flag = "OK" if thumb >= THUMB_MIN_PX else "偏小"
         ok &= thumb >= THUMB_MIN_PX
-        print(f"{dst.name}: 封面句 {size}px（{size / H:.0%} 画高）×{len(lines)} 行 {lines}；"
-              f"系列名 {s_size}px；{THUMB_W}px 小图字高 {thumb:.0f}px [{flag}]")
+        print(f"{dst.name}: 焦点 {size}px（{size / H:.0%} 画高）行字号 {sizes} ×{len(lines)} 行 {lines}；"
+              f"系列名 {s_size}px；{THUMB_W}px 小图焦点字高 {thumb:.0f}px [{flag}]")
     # 只留三张比例命名，不再写 cover.jpg / 无比例旧名
     if not ok:
         print("有比例小图字高偏小：减字或改断行，不要接受。", file=sys.stderr)
