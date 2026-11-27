@@ -2,7 +2,7 @@
 date: 2026-11-27
 slug: taper-week
 title: 上马最后一周：如何真正减量不减强度
-status: planned
+status: published
 series: 破三实验室
 media: ~/Movies/running-content/2026-11-27-taper-week/
 ---
@@ -13,10 +13,16 @@ media: ~/Movies/running-content/2026-11-27-taper-week/
 
 当天训练：轻松恢复跑（待实拍回填）
 
-专名：上马、上海马拉松、黑影儿TV、博哥、Nike、黑马、马配、strides、乳酸阈、最大摄氧量、taper
+专名：上马、上海马拉松、马配、strides、taper
 
 ## 文件
 
 - `plan.md`：拍摄 / 发布计划
 - `talk.md`：边跑边说可念口播
 - `assets.md`：素材索引（模板 `templates/assets.md`）
+
+## 发布
+
+- Bilibili：https://www.bilibili.com/video/BV1Yh1pzJE6o
+- YouTube：https://youtu.be/YjbuCrFHHAM
+- 抖音：
