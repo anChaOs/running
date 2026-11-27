@@ -1,35 +1,34 @@
 ---
 name: p3-bilibili
-description: 用 biliup-rs 把本期 upload/ 成片自动投到 B 站（标题/简介/4×3 封面/分区/标签）。用户说 B 站上传、biliup、投 B 站、自动发 B 站时用。独立于 p3-publish：本 skill 只负责投稿拿 BV；双链齐后走 p3-publish。
+description: 用 tools/publish/bilibili_upload.py 把本期 upload/ 成片双封面投到 B 站（16:9 cover + 4:3 cover43）。biliup 单封面 4:3 只作备选。用户说 B 站上传、biliup、投 B 站、自动发 B 站时用。独立于 p3-publish：本 skill 只负责投稿拿 BV；双链齐后走 p3-publish。
 ---
 
-# B 站自动投稿（biliup）
+# B 站自动投稿
 
-官方开放平台个人号走不通；用 **biliup-rs** + 扫码 cookie 投稿。本 skill **只上传**，不写 `published`、不合 PR、不拷复盘日志、不清临时。
+默认用 `tools/publish/bilibili_upload.py` 走 Web UPOS，一次提交两张封面：`cover` 是 `cover-16x9-1920x1080.jpg`，`cover43` 是 `cover-4x3-1920x1440.jpg`。Cookie 仍是 biliup 扫码得到的 `cookies.json`（CSRF 用 `bili_jct`）。
+
+biliup 单封面留作备选：只传 4:3。Web `add/v3` 不可用、或 UPOS 线路证书失败且换线仍不行时再用。
+
+本 skill **只上传**，不写 `published`、不合 PR、不拷复盘日志、不清临时。
 
 ## 不要做的事
 
-- 不要缺成片 / 缺封面 / cookie 失效时硬传
-- 不要用 16:9 当投稿封面（接口只收一张时必须用 **4×3**）
-- 不要再推荐官方个人开放平台 / 企业入驻当默认投稿路径（死路）
-- 投稿成功后若要用创作中心 / member API 改封面：接口常回 **-400**，失败就请用户在创作中心手换，不要死磕自动化
+- 缺成片、缺 16:9 或 4:3 任一张封面、简介超过 2000 个 Unicode 码位、标题超过 80 个码位、标签超过 10 个或单条超过 20 个码位、cookie 缺失或 `expires` 已过期时，不要硬传
+- biliup 备选只收一张封面，用 `cover-4x3-1920x1440.jpg`。16:9 只在默认脚本里当 `cover`
+- 不要再推荐官方个人开放平台 / 企业入驻当投稿路径（死路）
+- 不要用 biliup `--extra-fields '{"cover43":...}'` 当双封面方案。客户端提交会退回 APP，APP 不透传 `cover43`
+- `--dry-run` 只打印检查。脚本这时不改 `logs/timeline.txt`，也不改 `logs/todo.md`
 
 ## 前置
 
 1. 本期已 `upload: ready`（最终导出并打包后）：媒体目录有 `upload/`
-   - 标题名烧字成片 `.mp4`（已 MOVE 进 `upload/`，根目录无第二份）  
-   - `cover-4x3-1920x1440.jpg`（另两张可并存，**投稿只用这张**）  
-   - 可选 `subtitles.srt`（biliup 本次不挂外挂；创作中心可后补）
-2. `plan.md` 已有标题 +「### B 站」简介。投稿前先数简介字数，超过 2000 字就停：
-
-```bash
-.venv/bin/python tools/publish/pack_upload.py --check-desc /tmp/bilibili-desc.txt
-```
-
-字数按 Python Unicode 码位算；`--check-desc` 通过且 `logs/todo.md` 中 `pack-upload: done` 才能 `biliup upload`。拿到 BV 后执行 `todo_list.py mark bilibili done` 并核对 `logs/todo.md`（其余协议见 `p3-episode`）。
-3. Mac 上已装 `biliup`（`~/.local/bin/biliup`，PATH 含该目录）
-4. Cookie：`~/Movies/running-content/.biliup/cookies.json`  
-   - 没有或 `renew`/`upload` 报登录失效 → 先登录（见下）
+   - 标题名烧字成片 `.mp4`（已 MOVE 进 `upload/`，根目录无第二份）
+   - `cover-16x9-1920x1080.jpg` 与 `cover-4x3-1920x1440.jpg`（两张都要）
+   - 可选 `subtitles.srt`（本脚本不挂外挂；创作中心可后补）
+2. `plan.md` 已有「## 标题」、「### B 站」简介、「## 标签」里的 B 站标签。脚本按 Unicode 码位计数：简介超过 2000、标题超过 80、标签超过 10 个或单条超过 20，就停，不投稿。
+3. `logs/todo.md` 里 `pack-upload: done`。没 done 时脚本拒绝投稿。
+4. Cookie：`~/Movies/running-content/.biliup/cookies.json`
+   - 没有或接口报登录失效 → 先登录（见下）
 
 ## 登录（仅失效时）
 
@@ -51,21 +50,56 @@ biliup -u ~/Movies/running-content/.biliup/cookies.json renew
 
 | 项 | 来源 / 默认 |
 | --- | --- |
-| 成片 | `~/Movies/running-content/YYYY-MM-DD-slug/upload/<标题>.mp4` |
-| 封面 | 同目录 `cover-4x3-1920x1440.jpg`（**唯一**投稿封面） |
-| 标题 | `plan.md`「发这个」那一行 |
-| 简介 | `plan.md`「### B 站」正文，原样投稿（可先写入临时文件再 `--desc`） |
-| 分区 `--tid` | `238`（运动） |
-| 并发 `--limit` | `6`（默认 `3` 偏慢，调到 `6` 跑满上行） |
-| 双封面（方案 A） | `--cover` 传 `cover-16x9-1920x1080.jpg`，先用 `cookies.json` 调 `member.bilibili.com/x/vu/web/cover/up` 上传 `cover-4x3-1920x1440.jpg` 拿 URL，再加 `--extra-fields '{"cover43":"<4:3 URL>"}'`（若 `app` 回退接口不透传 `cover43`，备选方案 B：Python `upos` 分片 + `x/vu/web/add/v3` 直投） |
-| 标签 `--tag` | 从当期 `plan.md`「## 标签」里 **B 站** 那栏抄（由 `/p3-subs` 按字幕写好）；去掉 `#`、改逗号分隔给 CLI；**不要**在本 skill 写死一套默认标签 |
-| 版权 | `--copyright 1`（自制） |
+| 成片 | `~/Movies/running-content/YYYY-MM-DD-slug/upload/` 里唯一的 `.mp4` |
+| 16:9 封面 | 同目录 `cover-16x9-1920x1080.jpg` → 提交字段 `cover` |
+| 4:3 封面 | 同目录 `cover-4x3-1920x1440.jpg` → 提交字段 `cover43` |
+| 标题 | `episodes/<slug>/plan.md`「## 标题」。Unicode 码位 ≤ 80 |
+| 简介 | 同文件「### B 站」正文。Unicode 码位 ≤ 2000 |
+| 分区 `tid` | `238`（运动） |
+| 并发 `--limit` | `6` |
+| 标签 | 「## 标签」下 B 站那一段（代码块或「B 站：」同一行）。去掉 `#`，逗号分隔。最多 10 个，单条 ≤ 20 个码位。不要用 YouTube 那一段，也不要写死一套默认标签 |
+| 版权 | `copyright=1`（自制） |
 | 线路 `-l` | 优先 `bda2`；证书/超时/SSL 再换 `bldsa` / `tx` / `qn` |
-| Cookie | `-u ~/Movies/running-content/.biliup/cookies.json`（全局选项，放在子命令前） |
+| Cookie | `~/Movies/running-content/.biliup/cookies.json` |
+| 稿件 | `https://member.bilibili.com/x/vu/web/add/v3?csrf=<bili_jct>` |
+
+脚本自己从 `--media-dir` 的目录名找到 `episodes/<slug>/plan.md`。不在仓库根目录跑时，这个定位仍然有效。
 
 ## 命令模板
 
-把占位换成当期真实路径与文案。简介含换行时用文件，避免 shell 吞行：
+先 dry-run，再正式传。正式上传前脚本记 `start bilibili-upload`；成功记 `end`（note 里是 BV 和链接），打印 BV 和链接，再 `todo_list.py mark bilibili done`。失败记 `fail bilibili-upload`，不标 done。todo 写入失败时 BV 已经打印，时间表也已经是 `END`；再跑同一命令会拒绝，避免再投一稿。
+
+```bash
+MEDIA="$HOME/Movies/running-content/YYYY-MM-DD-slug"
+
+.venv/bin/python tools/publish/bilibili_upload.py \
+  --media-dir "$MEDIA" \
+  --dry-run
+
+.venv/bin/python tools/publish/bilibili_upload.py \
+  --media-dir "$MEDIA" \
+  -l bda2 \
+  --limit 6
+```
+
+成片约 2G 时常要十几分钟。成功输出一行 `BV…` 和 `https://www.bilibili.com/video/BV…`。未标 `bilibili: done` 前不要写 `episode.md`。
+
+失败：
+
+- SSL / 线路错误 → 换 `-l` 重试（`bldsa`、`tx`、`qn`）。同一成片在失败后可再传。`--retries` 是单次分片或合并失败后的额外次数，默认 3，不含第一次
+- `logs/todo.md` 里 `bilibili` 已是 done，或 `logs/timeline.txt` 已有 `END bilibili-upload` 时，脚本拒绝再传，避免同一期再投稿一份
+- cookie 失效 → `login` / `renew` 后再传
+- Web `add/v3` 仍失败 → 改走下面的 biliup 单封面备选，封面改用 4:3
+
+## biliup 单封面（备选）
+
+只在默认脚本走不通时用。封面只用 4:3。投稿前先数简介字数：
+
+```bash
+.venv/bin/python tools/publish/pack_upload.py --check-desc /tmp/bilibili-desc.txt
+```
+
+`--check-desc` 通过且 `pack-upload: done` 才能传。biliup 没有仓库挂钩：投稿前用 `tools/log_timeline.py` 记 `start bilibili-upload`，成功 `end` 并 `todo_list.py mark bilibili done`，失败 `fail`（不标 done）。
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
@@ -86,18 +120,6 @@ biliup -u "$COOKIE" upload \
   "$MEDIA/〈标题〉.mp4"
 ```
 
-成片约 2G 时常要十几分钟，放后台盯日志；成功日志含 `bvid`（如 `BV…`）和 `aid`。未标 `bilibili: done` 前不要写 `episode.md`。
-
-失败：
-
-- SSL / 线路错误 → 换 `-l` 重试（同一成片可再传；勿重复成功稿）
-- cookie 失效 → `login` / `renew` 后再传
-- 客户端提交失效 → biliup 常自动改走 APP；仍失败再查版本（`biliup -V`）
-
-## 记日志
-
-biliup 无仓库挂钩：投稿前用 `tools/log_timeline.py` 记 `start bilibili-upload`，成功 `end`（并标 `bilibili: done`），失败 `fail`（不标 done）。
-
 ## 成功后
 
 1. 把 `https://www.bilibili.com/video/BV…` 写入该期 `episode.md`「发布」栏「Bilibili：」（YouTube 仍空则 **不要** 改 `published`）
@@ -110,8 +132,8 @@ biliup 无仓库挂钩：投稿前用 `tools/log_timeline.py` 记 `start bilibil
 
 ## 翻车记录
 
-- 投稿接口通常只收 **一张**封面：必须传 `cover-4x3-1920x1440.jpg`，不要传 16:9
-- `bda2` 遇证书过期时可换线；曾用 `bda2` 约 1.9MB/s 传完 ~2.3G
+- 投稿接口若只收一张封面（biliup / APP），必须传 `cover-4x3-1920x1440.jpg`，不要传 16:9
+- 双封面要在 `web/add/v3` 提交时带上 `cover` 和 `cover43`。投稿成功后再用创作中心改封面，接口常回 **-400**
+- `bda2` 遇证书过期时换 `-l`；曾用 `bda2` 约 1.9MB/s 传完 ~2.3G
 - 官方开放平台「个人开发者」未开，不要再试企业入驻链路当默认
-- 投稿后用创作中心 / member API 改封面常 **-400**；手换更稳
 - biliup 不替代 `p3-publish`：清临时 / squash 仍要双链 + 人确认 KEEP/DELETE
