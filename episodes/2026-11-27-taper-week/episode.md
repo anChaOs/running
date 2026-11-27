@@ -25,4 +25,4 @@ media: ~/Movies/running-content/2026-11-27-taper-week/
 
 - Bilibili：https://www.bilibili.com/video/BV1Yh1pzJE6o
 - YouTube：https://youtu.be/YjbuCrFHHAM
-- 抖音：
+- 抖音：https://v.douyin.com/mbwFdVp1Wn4/
