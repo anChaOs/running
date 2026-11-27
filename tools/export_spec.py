@@ -29,8 +29,11 @@ class LoudnessSpec:
 
 @dataclass(frozen=True)
 class SubtitleSpec:
+    """烧字默认。font_size 是 ASS Fontsize；spacing 是 Style Spacing（\\fsp，像素，中文也拉开）。"""
+
     font_size: int
     margin_v: int
+    spacing: int
 
 
 @dataclass(frozen=True)
@@ -62,18 +65,27 @@ def _required(root: dict[str, Any], key: str, label: str) -> Any:
     return root[key]
 
 
-def _positive_int(value: Any, label: str) -> int:
+def _whole_int(value: Any, label: str, *, positive: bool) -> int:
+    kind = "positive" if positive else "non-negative"
     if isinstance(value, bool):
-        raise TypeError(f"Export spec {label} must be a positive integer")
+        raise TypeError(f"Export spec {label} must be a {kind} integer")
     if isinstance(value, int):
         number = value
     elif isinstance(value, str) and value.strip().lstrip("+").isdigit():
         number = int(value)
     else:
-        raise ValueError(f"Export spec {label} must be a positive integer")
-    if number <= 0:
-        raise ValueError(f"Export spec {label} must be a positive integer")
+        raise ValueError(f"Export spec {label} must be a {kind} integer")
+    if number < 0 or (positive and number == 0):
+        raise ValueError(f"Export spec {label} must be a {kind} integer")
     return number
+
+
+def _positive_int(value: Any, label: str) -> int:
+    return _whole_int(value, label, positive=True)
+
+
+def _non_negative_int(value: Any, label: str) -> int:
+    return _whole_int(value, label, positive=False)
 
 
 def _finite_float(value: Any, label: str) -> float:
@@ -108,6 +120,7 @@ def load_export_specs(path: Path = SPEC_PATH) -> dict[str, ExportSpec]:
     subtitle = SubtitleSpec(
         font_size=_positive_int(_required(subtitle_raw, "font_size", "subtitle"), "subtitle.font_size"),
         margin_v=_positive_int(_required(subtitle_raw, "margin_v", "subtitle"), "subtitle.margin_v"),
+        spacing=_non_negative_int(_required(subtitle_raw, "spacing", "subtitle"), "subtitle.spacing"),
     )
     specs: dict[str, ExportSpec] = {}
     for name in ("preview", "final"):

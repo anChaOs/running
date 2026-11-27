@@ -70,6 +70,8 @@ def test_specs() -> None:
     assert video_codec_args(PREVIEW_SPEC) == ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23"]
     assert PREVIEW_SPEC.assembly == "concat-copy"
     assert FINAL_SPEC.assembly is None
+    assert (FINAL_SPEC.subtitle.font_size, FINAL_SPEC.subtitle.spacing, FINAL_SPEC.subtitle.margin_v) == (80, 3, 100)
+    assert PREVIEW_SPEC.subtitle == FINAL_SPEC.subtitle
 
 
 def test_4k_timeline_loads_from_config() -> None:

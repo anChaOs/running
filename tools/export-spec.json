@@ -22,8 +22,9 @@
     "abitrate": "192k"
   },
   "subtitle": {
-    "font_size": 72,
-    "margin_v": 100
+    "font_size": 80,
+    "margin_v": 100,
+    "spacing": 3
   },
   "loudness": {
     "integrated_lufs": -16,
