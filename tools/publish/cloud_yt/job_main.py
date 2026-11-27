@@ -152,9 +152,17 @@ def stage_from_gcs(bucket_name: str, slug: str, work_dir: Path) -> tuple[dict[st
 
 
 def cleanup_gcs_staging(bucket_name: str, slug: str) -> int:
+    """Delete staging/<slug>/ unless a Bilibili job still needs the shared video.
+
+    bili_metadata.json means bilibili_cloud.py is using the same video.mp4. Leave the
+    prefix for that job; the bucket lifecycle rule removes staging/ after a day.
+    """
     client = storage.Client()
     bucket = client.bucket(bucket_name)
     prefix = f"staging/{slug}/"
+    if bucket.blob(f"{prefix}bili_metadata.json").exists():
+        log(f"Keeping gs://{bucket_name}/{prefix} because bili_metadata.json is present")
+        return 0
     blobs = list(client.list_blobs(bucket, prefix=prefix))
     for blob in blobs:
         blob.delete()

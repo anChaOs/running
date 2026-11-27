@@ -26,9 +26,14 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import log_timeline  # noqa: E402
-import pack_upload  # noqa: E402
-import todo_list  # noqa: E402
+try:
+    import log_timeline  # noqa: E402
+    import pack_upload  # noqa: E402
+    import todo_list  # noqa: E402
+except ImportError:  # Cloud Run Job container only ships bilibili_upload.py
+    log_timeline = None  # type: ignore[assignment]
+    pack_upload = None  # type: ignore[assignment]
+    todo_list = None  # type: ignore[assignment]
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -48,12 +53,13 @@ TAG_MAX_LEN = 20
 _TIMELINE_END = re.compile(
     r"^(?P<ts>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})  END\s+(?P<step>\S+)(?:\s+(?P<rest>.*))?$"
 )
-# biliup-rs 0.2.4 的线路 query。默认 bda2。
+# biliup-rs 0.2.4 的线路 query。默认 bda2；海外 Cloud Run Job 推荐 ws。
 LINES: dict[str, dict[str, str]] = {
     "bda2": {"probe_version": "20221109", "upcdn": "bda2", "zone": "cs"},
     "bldsa": {"zone": "cs", "upcdn": "bldsa", "probe_version": "20221109"},
     "tx": {"zone": "cs", "upcdn": "tx", "probe_version": "20221109"},
     "qn": {"probe_version": "20221109", "upcdn": "qn", "zone": "cs"},
+    "ws": {"zone": "cs", "upcdn": "ws", "probe_version": "20221109"},
 }
 MEMBER_HEADERS = {
     "User-Agent": (
@@ -223,7 +229,9 @@ def parse_plan_bilibili(plan_path: Path) -> dict[str, Any]:
     }
 
 
-def check_bilibili_desc_length(text: str, limit: int = pack_upload.BILIBILI_DESC_MAX) -> int:
+def check_bilibili_desc_length(
+    text: str, limit: int = 2000 if pack_upload is None else pack_upload.BILIBILI_DESC_MAX
+) -> int:
     """按 Python Unicode 码位计数，不是 UTF-8 字节。"""
     count = len(text)
     if count > limit:
@@ -764,6 +772,8 @@ def submit_video(
     cover43: str,
     filename: str,
     biz_id: int,
+    tid: int = TID,
+    copyright: int = COPYRIGHT,
 ) -> dict[str, Any]:
     csrf = cookies["bili_jct"]
     payload = build_submit_payload(
@@ -775,6 +785,8 @@ def submit_video(
         filename=filename,
         biz_id=biz_id,
         csrf=csrf,
+        tid=tid,
+        copyright=copyright,
     )
     response = session.post(
         SUBMIT_URL,
@@ -805,6 +817,8 @@ def upload_episode(
     limit: int,
     retries: int,
     session: Any,
+    tid: int = TID,
+    copyright: int = COPYRIGHT,
 ) -> dict[str, Any]:
     if not ready.ok or ready.video is None or ready.cover_16x9 is None or ready.cover_4x3 is None:
         raise ValueError("episode is not ready to upload")
@@ -846,6 +860,8 @@ def upload_episode(
         cover43=cover43,
         filename=video_filename_from_upos(str(probe["upos_uri"])),
         biz_id=int(probe["biz_id"]),
+        tid=tid,
+        copyright=copyright,
     )
 
 

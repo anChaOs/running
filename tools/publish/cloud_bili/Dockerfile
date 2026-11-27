@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+COPY bilibili_upload.py /app/bilibili_upload.py
+COPY job_main.py /app/job_main.py
+
+ENTRYPOINT ["python", "/app/job_main.py"]
